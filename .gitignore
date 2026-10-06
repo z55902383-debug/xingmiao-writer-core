@@ -1,0 +1,12 @@
+node_modules/
+dist/
+release/
+.local-data/
+test-results/
+*.log
+.env*
+*.sqlite*
+*.db
+发布源码/
+*.zip
+build/third-party-licenses/
