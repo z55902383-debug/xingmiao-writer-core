@@ -1,5 +1,7 @@
 # Xingmiao Writer · Open Core Edition
 
+**Membership is free; there is no paid membership plan.** In the complete edition, member and regular-user roles distinguish permissions for managing the community prompt library. Third-party AI and image API providers may charge separately. The open core edition does not include accounts, membership or the community module.
+
 A local-first workspace for long-form fiction. Includes the library, archive, editor, chapter and volume management, AI writing, outlines, characters, worldbuilding, timeline, relationships, material canvases, review, local writing skills, backup and recovery.
 
 [中文](README.md)
