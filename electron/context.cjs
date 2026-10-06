@@ -81,6 +81,7 @@ function buildContext(
     ),
     style: fullText(book.style),
     chapter: {
+      id: chapter.id,
       title: chapter.title,
       outline: fullText(chapter.outline),
       body: currentBody,
@@ -94,8 +95,6 @@ function buildContext(
     write: "根据本章大纲创作本章正文。只输出正文，不附解释或标题。",
     continue: "续写当前正文，只输出新增部分，不重复已有正文。",
     polish: "润色当前整章，保留剧情与事实，输出完整修改后的正文。",
-    outline:
-      "生成本章可执行的章节细纲，包含目标、冲突、转折、人物、场景、伏笔和章末钩子。只输出细纲。",
     style:
       "分析参考文章的叙事视角、节奏、句段长度、对白、信息揭露、冲突与悬念方法，输出适合复用的写作风格档案。不要复用人物、情节和原句。",
     memory:
@@ -148,7 +147,10 @@ function buildContext(
       outline: fullText(volume.outline),
       detail: fullText(volume.detail),
     };
-  if (["volumeOutline", "volumeDetail"].includes(kind)) {
+  const planningRoutes = require("./planning-routes.cjs");
+  if (planningRoutes.routedKinds.includes(kind))
+    data.storyStructure = { volumes: book.volumes || [], chapters: book.chapters.map(c => ({ id: c.id, title: c.title, volumeId: c.volumeId, summary: c.summary || "", outline: c.outline })) };
+  if (planningRoutes.volumeKinds.includes(kind)) {
     const selected = (book.volumes || []).find((v) => v.id === target.volumeId);
     if (!selected) throw Error("请先创建并选择要生成的分卷");
     data.targetVolume = {
@@ -156,8 +158,14 @@ function buildContext(
       title: selected.title,
       outline: fullText(selected.outline),
       detail: fullText(selected.detail),
+      chapters: book.chapters.filter(c => c.volumeId === selected.id).map(c => ({ id: c.id, title: c.title, summary: c.summary || "", outline: c.outline })),
     };
+    if (kind === "volumeDetail" && !selected.outline.trim()) throw Error("请先生成并采用本卷大纲，再生成卷细纲。");
+    if (kind === "chapterPlan" && !selected.detail.trim()) throw Error("请先生成并采用本卷细纲，再拆成章节。");
+    if (kind === "chapterDetails" && !data.targetVolume.chapters.length) throw Error("请先生成并采用本卷章节规划。");
   }
+  if (kind === "volumePlan" && !book.outline.trim()) throw Error("请先生成并采用全文大纲，再规划分卷。");
+  if (kind === "bookOutline" && !book.premise.trim()) throw Error("请先写下故事想法，再生成全文大纲。");
   if (kind === "timelinePlan")
     data.availableIds = {
       characters: book.characters.map((c) => ({ id: c.id, name: c.name })),

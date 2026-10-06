@@ -23,6 +23,9 @@ import ModelSettings from "./ModelSettings";
 
 const tasks: Record<Kind, string> = {
   bookOutline: "全书总纲",
+  volumePlan: "分卷规划",
+  chapterPlan: "本卷章节规划",
+  chapterDetails: "本卷章节细纲",
   worldBuild: "世界设定",
   characters: "人物档案",
   volumeOutline: "卷大纲",

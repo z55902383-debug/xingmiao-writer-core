@@ -17,7 +17,7 @@ import type { Book } from "./types";
 const COLLAPSED_KEY = "xm-creation-guide-collapsed";
 
 type GuideStep = {
-  id: "premise" | "outline" | "chapters" | "characters" | "world" | "draft" | "memory";
+  id: "premise" | "outline" | "chapters" | "volumePlans" | "chapterPlans" | "draft" | "complete";
   title: string;
   detail: string;
   done: boolean;
@@ -35,11 +35,11 @@ export default function CreationGuideIsland({
   const steps = useMemo<GuideStep[]>(() => [
     { id: "premise", title: "写下故事方向", detail: "用几句话说清主角、目标和难题", done: !!book.premise.trim(), icon: FileText },
     { id: "outline", title: "整理全书总纲", detail: "先确定故事从哪里开始、走向哪里", done: !!book.outline.trim(), icon: ListBullets },
-    { id: "chapters", title: "规划分卷与章节", detail: "拆成可继续创作的章节安排", done: (book.volumes || []).length > 0 || book.chapters.some((c) => !!(c.summary || c.outline).trim()), icon: BookOpen },
-    { id: "characters", title: "建立核心人物", detail: "补充身份、动机和人物关系", done: book.characters.length > 0, icon: Users },
-    { id: "world", title: "补充世界设定", detail: "记录地点、阵营和故事规则", done: !!book.world.trim(), icon: GlobeHemisphereWest },
-    { id: "draft", title: "写下第一章", detail: "进入正文，写出故事的开场", done: book.chapters.some((c) => !!c.body.trim()), icon: BookOpen },
-    { id: "memory", title: "确认故事记忆", detail: "从定稿章节提取并确认关键事实", done: book.memories.some((m) => !m.stale), icon: CheckCircle },
+    { id: "chapters", title: "生成分卷规划", detail: "采用后创建对应分卷与名称", done: (book.volumes || []).length > 0, icon: BookOpen },
+    { id: "volumePlans", title: "完善卷大纲与细纲", detail: "明确每卷目标、事件与转折", done: !!book.volumes?.length && book.volumes.every(v => !!v.outline.trim() && !!v.detail.trim()), icon: ListBullets },
+    { id: "chapterPlans", title: "拆出章节大纲与细纲", detail: "采用后同步章名、归卷与章节规划", done: !!book.volumes?.length && book.volumes.every(v => book.chapters.some(c => c.volumeId === v.id)) && !!book.chapters.length && book.chapters.every(c => !!c.summary?.trim() && !!c.outline.trim()), icon: ListBullets },
+    { id: "draft", title: "逐章生成与采用正文", detail: "按章细纲写作，核对后写入对应章节", done: !!book.chapters.length && book.chapters.every(c => !!c.body.trim()), icon: BookOpen },
+    { id: "complete", title: "核对并完成全书", detail: "复核每章内容、定稿并备份导出", done: !!book.chapters.length && book.chapters.every(c => !!c.body.trim() && c.status === "final"), icon: CheckCircle },
   ], [book]);
   const completed = steps.filter((step) => step.done).length;
   const nextIndex = steps.findIndex((step) => !step.done);
@@ -69,7 +69,7 @@ export default function CreationGuideIsland({
         <section className="creation-guide-panel" id="creation-guide-panel" aria-label={tr("新手创作步骤")}>
           <header className="creation-guide-heading">
             <div>
-              <span className="creation-guide-eyebrow">{tr("从灵感到第一章")}</span>
+              <span className="creation-guide-eyebrow">{tr("从想法到全书完成")}</span>
               <h2>{tr("一步步搭起你的故事")}</h2>
               <p>{tr("完成任意一步后，这里的进度会自动更新。顺序可以按你的习惯调整。")}</p>
             </div>

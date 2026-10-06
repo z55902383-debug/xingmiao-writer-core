@@ -1,5 +1,5 @@
 import { tr } from "./i18n";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Plus,
   Trash,
@@ -10,6 +10,7 @@ import {
 import type { Book, Chapter, Volume, Kind } from "./types";
 import { api } from "./api";
 import { Button, Field, Modal } from "./ui";
+import { PlanExcerpt } from "./PlanningText";
 export default function VolumePlanner({
   panel,
   book,
@@ -22,6 +23,7 @@ export default function VolumePlanner({
   notify,
   onNavigateToPlan,
   onSwitchToVolumes,
+  focusRequest,
 }: {
   panel: "timeline" | "volumes" | "board";
   book: Book;
@@ -34,12 +36,22 @@ export default function VolumePlanner({
   notify: (s: string) => void;
   onNavigateToPlan: (id: string) => void;
   onSwitchToVolumes: () => void;
+  focusRequest?: { id: string; stamp: string };
 }) {
   const [draft, setDraft] = useState<Partial<Volume> | null>(null),
     [remove, setRemove] = useState<Volume | null>(null),
     [removeChapter, setRemoveChapter] = useState<Chapter | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [expandedChapter, setExpandedChapter] = useState("");
+  const [volumeFilter, setVolumeFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    if (!focusRequest) return;
+    setVolumeFilter("all"); setQuery("");
+    if (focusRequest.id.startsWith("plan-")) setExpandedChapter(focusRequest.id.slice(5));
+    window.setTimeout(() => document.getElementById(focusRequest.id)?.scrollIntoView({block:"start"}), 50);
+  }, [focusRequest?.stamp]);
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -164,14 +176,15 @@ export default function VolumePlanner({
         <div className="timeline-top">
           <div>
             <h3>{tr("分卷与章节规划")}</h3>
-            <p>{tr("先创建分卷，再按「概要 → 细纲 → 正文」逐步推进每一章；分卷也可以跳过。")}</p>
+            <p>{tr("全文大纲 → 分卷 → 卷大纲/细纲 → 章节大纲/细纲 → 正文。每步生成后核对并采用。")}</p>
           </div>
-          <Button
+          <div className="planner-heading-actions"><Button disabled={generating || !book.outline.trim()} onClick={() => onGenerate("volumePlan")}>{tr("生成分卷规划")}</Button><Button
             onClick={() => setDraft({ title: "", outline: "", detail: "" })}
           >
-            <Plus size={16} />{tr("新建分卷")}</Button>
+            <Plus size={16} />{tr("新建分卷")}</Button></div>
         </div>
-      {groups.map((v) => (
+        <div className="planner-filters"><Field label={tr("查看分卷")}><select value={volumeFilter} onChange={e => setVolumeFilter(e.target.value)}><option value="all">{tr("全部分卷")}</option>{groups.map(v => <option key={v.id || "none"} value={v.id || "none"}>{v.title}</option>)}</select></Field><Field label={tr("查找章节")}><input value={query} onChange={e => setQuery(e.target.value)} placeholder={tr("输入卷名或章名")}/></Field></div>
+      {groups.filter(v => (volumeFilter === "all" || (v.id || "none") === volumeFilter) && (!query.trim() || v.title.includes(query.trim()) || book.chapters.some(c => (c.volumeId || "") === v.id && c.title.includes(query.trim())))).map((v) => (
         <article
           className="volume-block"
           key={v.id}
@@ -227,24 +240,20 @@ export default function VolumePlanner({
                   onClick={() => onGenerate("volumeOutline", undefined, v.id)}
                 >{tr("生成卷大纲")}</Button>
                 <Button
-                  disabled={generating}
+                  disabled={generating || !v.outline.trim()}
                   onClick={() => onGenerate("volumeDetail", undefined, v.id)}
                 >{tr("生成卷细纲")}</Button>
+                <Button disabled={generating || !v.detail.trim()} onClick={() => onGenerate("chapterPlan", undefined, v.id)}>{tr("生成本卷章节规划")}</Button>
+                <Button disabled={generating || !book.chapters.some(c => c.volumeId === v.id)} onClick={() => onGenerate("chapterDetails", undefined, v.id)}>{tr("补全本卷章节细纲")}</Button>
               </div>
               <div className="volume-plans">
-                <details>
-                  <summary>{tr("卷大纲")}</summary>
-                  <p>{v.outline || tr("编辑分卷，记录本卷目标、主冲突与结局。")}</p>
-                </details>
-                <details>
-                  <summary>{tr("卷细纲")}</summary>
-                  <p>{v.detail || tr("记录本卷的阶段推进、转折与伏笔安排。")}</p>
-                </details>
+                <PlanExcerpt title={tr("卷大纲")} text={v.outline} empty={tr("生成或编辑分卷，记录本卷目标、主冲突与结局。")}/>
+                <PlanExcerpt title={tr("卷细纲")} text={v.detail} empty={tr("采用卷大纲后，展开阶段事件、转折与伏笔。")}/>
               </div>
             </>
           )}
           {book.chapters
-            .filter((c) => (c.volumeId || "") === v.id)
+            .filter((c) => (c.volumeId || "") === v.id && (!query.trim() || v.title.includes(query.trim()) || c.title.includes(query.trim())))
             .map((c) => (
               <div className="volume-chapter" key={c.id} id={"plan-" + c.id}>
                 <div className="volume-chapter-head">
@@ -296,6 +305,9 @@ export default function VolumePlanner({
                     <span className="chapter-step-number">3</span>{tr("按细纲写正文")}</Button>
                   <Button className="chapter-delete-action" aria-label={tr("删除章节 {0}", {0: c.title})} disabled={busy || generating} onClick={()=>setRemoveChapter(c)}><Trash size={15}/>{tr("删除章节")}</Button>
                 </div>
+                <div className="chapter-plan-status"><span>{tr(c.summary?.trim() ? "大纲已填写" : "大纲待生成")}</span><span>{tr(c.outline.trim() ? "细纲已填写" : "细纲待生成")}</span><span>{tr(c.body.trim() ? "正文已填写" : "正文待生成")}</span></div>
+                <details className="chapter-plan-editor" open={expandedChapter === c.id} onToggle={e => { if (e.currentTarget.open) setExpandedChapter(c.id); else setExpandedChapter(current => current === c.id ? "" : current); }}>
+                  <summary>{tr("查看 / 编辑章节规划")}</summary>
                 <Field label={tr("{0}章节概要", {0: c.title})}>
                   <textarea
                     rows={2}
@@ -306,9 +318,6 @@ export default function VolumePlanner({
                     placeholder={tr("这一章的主要事件与阶段目标")}
                   />
                 </Field>
-                <details>
-                  <summary>{tr("章节细纲 ·")}{" "}{c.outline ? tr("已填写") : tr("待展开")}
-                  </summary>
                   <Field label={tr("{0}章节细纲", {0: c.title})}>
                     <textarea
                       rows={4}

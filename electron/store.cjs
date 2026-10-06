@@ -510,6 +510,8 @@ class Store {
       );
       assert(!job.adopted, "这个候选稿已经采用过");
       const c = this.chapter(job.chapterId);
+      if (job.planningSignature)
+        assert(job.planningSignature === require("./planning-routes.cjs").planningSignature(this.book(job.bookId)), "生成后分卷或章节规划已修改，请重新生成，避免覆盖新规划。");
       if (job.contextSignature)
         assert(
           job.contextSignature ===

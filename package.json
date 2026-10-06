@@ -1,6 +1,6 @@
 {
   "name": "xingmiao-writer-core",
-  "version": "0.6.2",
+  "version": "0.6.4",
   "private": true,
   "description": "星喵写作开源核心版 · 本地 AI 小说工作台",
   "main": "electron/main.cjs",
@@ -13,7 +13,8 @@
     "package:dir": "npm run notices:third-party && npm run build && electron-builder --config electron-builder.config.cjs --win --x64 --dir --publish never",
     "package:win": "npm run notices:third-party && npm run build && electron-builder --config electron-builder.config.cjs --win --x64 --publish never",
     "notices:third-party": "node scripts/third-party-notices.mjs",
-    "export:source": "node scripts/export-source.mjs"
+    "export:source": "node scripts/export-source.mjs",
+    "test:planning:ui": "node tests/desktop-planning.mjs && node tests/desktop-planning-flow.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.5",

@@ -135,6 +135,7 @@ async function generate(input) {
       bookId: book.id,
       chapterId: chapter.id,
       baseRevision: chapter.revision,
+      ...(require("./planning-routes.cjs").routedKinds.includes(input.kind) ? { planningSignature: require("./planning-routes.cjs").planningSignature(book) } : {}),
       contextSignature: require("./timeline.cjs").contextSignature(
         book,
         chapter),
@@ -148,7 +149,7 @@ async function generate(input) {
       targetVolumeId: input.targetVolumeId || "",
       targetLabel: input.targetVolumeId
         ? (book.volumes || []).find((v) => v.id === input.targetVolumeId)?.title
-        : undefined,
+        : ["write", "continue", "polish", "summary", "outline", "memory", "check"].includes(input.kind) ? chapter.title : book.title,
       instruction: input.instruction || "",
       output: "",
       status: "running",
@@ -480,7 +481,7 @@ async function restoreBackup() {
           });
         else if (sourceEntry.type === "planning") {
           assert(
-            ["outline", "world", "detail"].includes(item.field),
+            ["title", "outline", "world", "detail"].includes(item.field),
             "资料快照字段无效");
           store.recycle("planning", bookId, {
             title: text(item.title, 200),
@@ -580,6 +581,11 @@ const actions = {
   "ai:cancel": (d) => {
     running.get(d.id)?.abort("user");
     return true;
+  },
+  "planning:preview": (d) => {
+    const job = store.job(d.id);
+    if (!job.adopted && job.planningSignature) assert(job.planningSignature === require("./planning-routes.cjs").planningSignature(store.book(job.bookId)), "生成后分卷或章节规划已修改，请重新生成，避免覆盖新规划。");
+    return job.adopted && job.planningPreview ? job.planningPreview : require("./planning-routes.cjs").planningRows(store.book(job.bookId), job, store.chapter(job.chapterId));
   },
   "ai:adopt": (d) => {
     assert(!running.has(d.id), "请等待变化分析完成，或先停止分析");

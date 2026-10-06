@@ -292,7 +292,7 @@ function extendStore(Store) {
         } else if (entry.type === "planning") {
           const item = entry.item;
           requireValue(
-            ["outline", "world", "detail"].includes(item.field),
+            ["title", "outline", "world", "detail"].includes(item.field),
             "恢复字段无效",
           );
           if (item.volumeId) {
@@ -302,7 +302,7 @@ function extendStore(Store) {
             this.saveVolume(b.id, { ...v, [item.field]: item.value });
           } else {
             requireValue(
-              ["outline", "world"].includes(item.field),
+              ["title", "outline", "world"].includes(item.field),
               "恢复字段无效",
             );
             this.recycle("planning", b.id, { ...item, value: b[item.field] });

@@ -60,6 +60,9 @@ export type Kind =
   | "check"
   | "style"
   | "bookOutline"
+  | "volumePlan"
+  | "chapterPlan"
+  | "chapterDetails"
   | "worldBuild"
   | "characters"
   | "volumeOutline"
@@ -263,3 +266,14 @@ declare global {
     };
   }
 }
+
+export type PlanningRow = {
+  type: "book" | "volume" | "chapter";
+  id?: string;
+  title: string;
+  destination: string;
+  volumeId?: string;
+  action: "create" | "update";
+  preservesBody?: boolean;
+  fields: { title?: string; outline?: string; detail?: string; summary?: string };
+};

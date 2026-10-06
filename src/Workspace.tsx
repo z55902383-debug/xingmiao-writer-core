@@ -4,6 +4,8 @@ import SyncReview from "./SyncReview";
 import CreationGuideIsland from "./CreationGuideIsland";
 import TimelinePanel from "./TimelinePanel";
 import VolumePlanner from "./VolumePlanner";
+import { PlanningCandidate, PlanningText } from "./PlanningText";
+import { ROUTED_PLANNING, VOLUME_TASKS, nextPlanningStep } from "./planningFlow";
 import CreativeCanvas from "./CreativeCanvas";
 import type { CanvasModule, CanvasNode } from "./canvasModel";
 import CanvasSourceEditor, {
@@ -78,6 +80,7 @@ import type {
   BookSummary,
   Memory,
   TimelineEvent,
+  PlanningRow,
 } from "./types";
 import { api, count, date, number, copyText } from "./api";
 import { Button, Empty, Field, IconButton, Menu, Modal, Splitter } from "./ui";
@@ -180,6 +183,9 @@ function loadPanes(): Panes {
 }
 const kinds: Record<Kind, string> = {
   bookOutline: "生成全书总纲",
+  volumePlan: "生成分卷规划",
+  chapterPlan: "生成本卷章节规划",
+  chapterDetails: "补全本卷章节细纲",
   worldBuild: "生成世界设定",
   characters: "生成人物档案",
   volumeOutline: "生成卷大纲",
@@ -219,6 +225,9 @@ const INTENTS: { id: string; label: string; hint: string; kinds: Kind[] }[] = [
     kinds: [
       "outline",
       "bookOutline",
+      "volumePlan",
+      "chapterPlan",
+      "chapterDetails",
       "volumeOutline",
       "volumeDetail",
       "timelinePlan",
@@ -243,6 +252,9 @@ const VIEW_KINDS: Record<View, Kind[]> = {
   editor: ["write", "continue", "polish", "check"],
   outline: [
     "bookOutline",
+    "volumePlan",
+    "chapterPlan",
+    "chapterDetails",
     "volumeOutline",
     "volumeDetail",
     "summary",
@@ -510,6 +522,7 @@ export default function Workspace({
   const [action, setAction] = useState<Kind>("write");
   const [intent, setIntent] = useState("write");
   const [targetVolumeId, setTargetVolumeId] = useState("");
+  const [planningFocus, setPlanningFocus] = useState<{id:string;stamp:string}>();
   const [instruction, setInstruction] = useState("");
   const [selectedJob, setSelectedJob] = useState("");
   const [context, setContext] = useState<ContextInfo | null>(null);
@@ -735,6 +748,9 @@ export default function Workspace({
       j.chapterId === chapter?.id ||
       [
         "bookOutline",
+        "volumePlan",
+        "chapterPlan",
+        "chapterDetails",
         "worldBuild",
         "characters",
         "volumeOutline",
@@ -743,6 +759,16 @@ export default function Workspace({
       ].includes(j.kind),
   );
   const selected = jobs.find((j) => j.id === selectedJob) || jobs[0];
+  const [routePreview, setRoutePreview] = useState<{ id: string; rows?: PlanningRow[]; error?: string } | null>(null);
+  useEffect(() => {
+    if (!selected || !ROUTED_PLANNING.includes(selected.kind) || selected.status !== "done") { setRoutePreview(null); return; }
+    let disposed = false;
+    api<PlanningRow[]>("planning:preview", { id: selected.id }).then(rows => {
+      if (!disposed) setRoutePreview({ id: selected.id, rows });
+    }).catch(error => { if (!disposed) setRoutePreview({ id: selected.id, error: error.message }); });
+    return () => { disposed = true; };
+  }, [selected?.id, selected?.status, selected?.adopted, selected?.output]);
+  const nextStep = nextPlanningStep(book, targetVolumeId, chapter?.id);
   const running = book.candidates.find(
     (j) => j.status === "running" || j.review?.status === "analyzing",
   );
@@ -903,6 +929,7 @@ export default function Workspace({
     targetChapterId?: string,
     volumeId?: string,
   ) {
+    setAssistantOpen(true);
     setAction(kind);
     setTargetVolumeId(volumeId || "");
     if (targetChapterId) setChapterId(targetChapterId);
@@ -924,7 +951,7 @@ export default function Workspace({
         chapterId: cid,
         kind,
         instruction,
-        targetVolumeId: ["volumeOutline", "volumeDetail"].includes(kind)
+        targetVolumeId: VOLUME_TASKS.includes(kind)
           ? volumeId || targetVolumeId
           : "",
         contextChapterIds,
@@ -951,6 +978,23 @@ export default function Workspace({
         },
       );
       replace(b);
+      if (ROUTED_PLANNING.includes(selected.kind)) {
+        const adopted = b.candidates.find(j => j.id === selected.id) as Job & { planningPreview?: PlanningRow[] };
+        const rows = adopted?.planningPreview || routePreview?.rows || [];
+        const destinationChapter = rows.find(row => row.type === "chapter")?.id;
+        const destinationVolume = selected.targetVolumeId || rows.find(row => row.type === "volume")?.id;
+        if (destinationChapter) setChapterId(destinationChapter);
+        if (destinationVolume) setTargetVolumeId(destinationVolume);
+        if (destinationChapter || destinationVolume) setPlanningFocus({id:destinationChapter ? "plan-"+destinationChapter : "volume-"+destinationVolume,stamp:selected.id});
+        setView("outline");
+        setOutlineTab(selected.kind === "bookOutline" ? "foundation" : "volumes");
+        setDisplayMode("regular");
+        setAssistantOpen(false);
+        const next = nextPlanningStep(b, destinationVolume, destinationChapter);
+        notify(tr("已同步名称与内容。下一步：{0}", {0:tr(next.label)}));
+        window.setTimeout(() => document.getElementById(destinationChapter ? "plan-"+destinationChapter : destinationVolume ? "volume-"+destinationVolume : "outline-foundation")?.scrollIntoView({ block:"start" }), 50);
+        return;
+      }
       if (
         [
           "bookOutline",
@@ -981,6 +1025,11 @@ export default function Workspace({
             ? "已保存为本书风格档案"
             : "候选稿已采用，原文保留在历史版本中",
       );
+      if (["write", "continue", "polish"].includes(selected.kind)) {
+        const next = nextPlanningStep(b, b.chapters.find(c=>c.id===selected.chapterId)?.volumeId, selected.chapterId);
+        notify(tr("正文已写入对应章节。下一步：{0}", {0:tr(next.label)}));
+        if (!selected.review?.changes?.length && selected.review?.status !== "error") setAssistantOpen(false);
+      }
       if (selected.kind === "style") setView("style");
     });
   }
@@ -1002,25 +1051,17 @@ export default function Workspace({
           if (step === "premise" || step === "outline") {
             setView("outline");
             setOutlineTab("foundation");
-          } else if (step === "chapters") {
+          } else if (["chapters", "volumePlans", "chapterPlans"].includes(step)) {
             setView("outline");
             setOutlineTab("volumes");
-          } else if (step === "characters") {
-            setView("characters");
-            setCharacterTab("archive");
-          } else if (step === "world") {
-            setView("world");
-            setWorldTab("setting");
-          } else if (step === "draft") {
-            if (book.chapters[0]) {
-              setChapterId(book.chapters[0].id);
+          } else if (step === "draft" || step === "complete") {
+            const next = book.chapters.find(c => step === "draft" ? !c.body.trim() : c.status !== "final") || book.chapters[0];
+            if (next) {
+              setChapterId(next.id);
               setView("editor");
             } else {
               void addChapter();
             }
-          } else {
-            setView("memory");
-            setMemoryTab("facts");
           }
         }}
       />
@@ -1781,6 +1822,14 @@ export default function Workspace({
               renderCanvas("outline", outlineTab)
             ) : (
               <div className="outline-content-scroll">
+                <div className="planning-next-step" aria-label={tr("下一步创作")}>
+                  <div><small>{tr("下一步")}</small><strong>{tr(nextStep.label)}</strong><p>{nextStep.chapterId ? book.chapters.find(c=>c.id===nextStep.chapterId)?.title : nextStep.volumeId ? book.volumes?.find(v=>v.id===nextStep.volumeId)?.title : tr("生成 → 核对 → 采用；名称和内容会同步到对应位置。")}</p></div>
+                  {nextStep.target !== "complete" && <Button variant="primary-soft" disabled={busy || !!running} onClick={() => {
+                    if (nextStep.kind) void generateFor(nextStep.kind, nextStep.chapterId, nextStep.volumeId);
+                    else if (nextStep.target === "editor") { setChapterId(nextStep.chapterId!); setView("editor"); }
+                    else { setOutlineTab(nextStep.target === "foundation" ? "foundation" : "volumes"); }
+                  }}>{tr(nextStep.kind ? "生成下一步" : "前往这一步")}<ArrowRight size={15}/></Button>}
+                </div>
                 {outlineTab === "foundation" && (
                   <section
                     className="outline-foundation"
@@ -1850,6 +1899,7 @@ export default function Workspace({
                 )}
                 {outlineTab !== "foundation" && (
                   <VolumePlanner
+                    focusRequest={planningFocus}
                     panel={outlineTab}
                     onGenerate={(kind, cid, vid) => generateFor(kind, cid, vid)}
                     generating={busy || !!running}
@@ -1860,6 +1910,7 @@ export default function Workspace({
                     notify={notify}
                     onNavigateToPlan={(id) => {
                       setOutlineTab("volumes");
+                      setPlanningFocus({id,stamp:String(Date.now())});
                       window.setTimeout(
                         () =>
                           document
@@ -3015,7 +3066,7 @@ export default function Workspace({
               </>
             );
           })()}
-          {["volumeOutline", "volumeDetail"].includes(action) && (
+          {VOLUME_TASKS.includes(action) && (
             <Field label={tr("生成目标分卷")}>
               <select
                 value={targetVolumeId}
@@ -3030,7 +3081,7 @@ export default function Workspace({
               </select>
             </Field>
           )}
-          <p className="generation-destination">{tr("生成去向：")}{["volumeOutline", "volumeDetail"].includes(action)
+          <p className="generation-destination">{tr("生成去向：")}{VOLUME_TASKS.includes(action)
               ? `${book.volumes?.find((v) => v.id === targetVolumeId)?.title || tr("请先选择卷")} · ${tr(kinds[action])}`
               : tr(kinds[action])}{" "}{tr("· 确认后写入")}</p>
           <button
@@ -3217,7 +3268,9 @@ export default function Workspace({
               ["write", "polish"].includes(selected.kind) ? (
                 <CandidateDiff before={chapter.body} after={selected.output} />
               ) : (
-                <CandidateBody job={selected} />
+                ROUTED_PLANNING.includes(selected.kind) && routePreview?.id === selected.id && routePreview.rows
+                  ? <PlanningCandidate rows={routePreview.rows}/>
+                  : <CandidateBody job={selected} />
               )}
               <SyncReview
                 key={selected.id}
@@ -3236,6 +3289,11 @@ export default function Workspace({
                       ? tr("确认后新增记录")
                       : tr("确认后写入对应位置，原内容保留在历史版本")}
                   </p>
+                  {ROUTED_PLANNING.includes(selected.kind) && selected.status === "done" && !selected.adopted && (
+                    <p role={routePreview?.error ? "alert" : "status"} className={routePreview?.error ? "error-box" : "planning-route-note"}>
+                      {routePreview?.id === selected.id && routePreview.error ? routePreview.error : routePreview?.id === selected.id && routePreview.rows ? tr("核对以上同步位置后，点击采用结果。") : tr("正在核对结果结构与同步位置…")}
+                    </p>
+                  )}
                   <div className="candidate-actions">
                     <Button
                       onClick={() =>
@@ -3252,6 +3310,7 @@ export default function Workspace({
                           !!running ||
                           busy ||
                           selected.adopted ||
+                          (ROUTED_PLANNING.includes(selected.kind) && (selected.status !== "done" || routePreview?.id !== selected.id || !routePreview.rows)) ||
                           !["done", "cancelled", "interrupted"].includes(
                             selected.status,
                           ) ||
@@ -3282,6 +3341,9 @@ export default function Workspace({
                   </div>
                 </>
               )}
+              {selected.adopted && [...ROUTED_PLANNING, "write", "continue", "polish"].includes(selected.kind) && <div className="planning-continue">
+                <Button onClick={() => { setAssistantOpen(false); setView("outline"); setOutlineTab(nextStep.target === "foundation" ? "foundation" : "volumes"); }}>{tr("继续下一步")} · {tr(nextStep.label)}<ArrowRight size={14}/></Button>
+              </div>}
               {selected.usage?.total_tokens && (
                 <small className="usage">{tr("本次用量：")}{number(selected.usage.total_tokens)} Tokens
                 </small>
