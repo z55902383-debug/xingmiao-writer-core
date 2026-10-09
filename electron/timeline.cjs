@@ -227,7 +227,7 @@ function contextSignature(book, chapter) {
         book.premise,
         book.outline,
         book.world,
-        book.style,
+          require("./writing-profiles.cjs").contextValue(book),
         book.characters,
         book.worldRecords || [],
         book.foreshadows || [],

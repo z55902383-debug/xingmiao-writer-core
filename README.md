@@ -4,17 +4,26 @@
 
 本地优先的 AI 长篇小说写作工作台。提供书架、归档和完整的主要写作功能，不需要星喵账号或会员。
 
-**v0.6.5 · Windows x64 · MIT**
+**v0.6.7 · Windows x64 · MIT**
 
 把故事总纲、分卷、章节正文、人物、世界设定与来源记忆放在同一个本地工作台。你可以完全手写，也可以接入自己的模型，在预览和审核后采用 AI 候选。
 
-[下载 Windows 安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.5/XingmiaoWriter-Core-0.6.5-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.5)
+[下载 Windows 安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.7/XingmiaoWriter-Core-0.6.7-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.7)
 
 [English](README.en.md) · [架构说明](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
 
 [功能说明](docs/features.md) · [路线图与已知限制](docs/roadmap.md) · [上传与发布](docs/GitHub上传步骤.md) · [更新记录](CHANGELOG.md)
 
 ![开源版书架](docs/assets/library.png)
+
+## v0.6.7 风格与要求资料库
+
+- 风格档案新增多条写作风格与写作要求，可新建、编辑、删除恢复、导入和导出
+- 支持为风格和要求分别导入原文并用 AI 蒸馏，预览后采用到指定条目，保留编辑历史
+- 本次参考资料新增风格参考，可分别选择多条风格和要求，仅发送选中内容并保留本次使用记录
+- 兼容原本书风格，新增资料随作品 JSON 备份恢复，阻止陈旧结果覆盖新资料
+
+[操作说明](docs/风格与写作要求使用说明.md) · [本次检查](docs/检查记录-v0.6.7.md)
 
 ## v0.6.5 人工码字与界面更新
 
@@ -49,7 +58,7 @@
 
 需要 Node.js 24、npm，建议使用 Windows 10/11。Electron 首次安装需要下载运行时。
 
-只想使用软件：在本仓库的 **Releases** 页面下载 `XingmiaoWriter-Core-0.6.5-x64-Setup.exe`，不需要安装 Node.js。发布者上传安装包前，Releases 中不会自动出现下载项。
+只想使用软件：在本仓库的 **Releases** 页面下载 `XingmiaoWriter-Core-0.6.7-x64-Setup.exe`，不需要安装 Node.js。发布者上传安装包前，Releases 中不会自动出现下载项。
 
 ```sh
 npm ci
@@ -68,7 +77,7 @@ npm run test:ui
 
 `test:ui` 使用独立临时书库，不修改真实作品。Windows 打包：`npm run package:win`；只生成可运行目录：`npm run package:dir`。生成物位于 `release/`。
 
-2026-10-09 本地验证：类型检查与构建、116 项业务测试，以及人工码字、草稿恢复、工具栏、备忘录引用、侧栏、正文排版、分卷层级、完整创作流程和双语桌面检查。AI 使用本地模拟服务，不代表所有服务商均已实测。
+2026-10-09 本地验证：类型检查与构建、123 项业务测试，以及风格资料全流程、原有 AI 写作、完整分步创作和双语桌面检查。模型使用隔离模拟服务。
 
 ## 项目结构
 

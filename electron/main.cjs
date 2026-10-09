@@ -141,7 +141,7 @@ async function generate(input) {
       input.kind,
       text(input.instruction || ""),
       store.skills(),
-      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat },
+      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat, writingProfileId: input.writingProfileId },
     );
     const config = store.config();
     assert(config.model || config.provider === "codex", "请先配置模型");
@@ -164,9 +164,10 @@ async function generate(input) {
         ? { baseStyle: book.style, baseReference: book.reference }
         : {}),
       kind: input.kind,
+      ...(context.writingProfileSnapshot ? { writingProfileSnapshot: context.writingProfileSnapshot } : {}),
       ...(isProseKind(input.kind) ? { manuscriptFormat } : {}),
       targetVolumeId: input.targetVolumeId || "",
-      targetLabel: input.targetVolumeId
+      targetLabel: context.writingProfileSnapshot ? context.writingProfileSnapshot.title : input.targetVolumeId
         ? (book.volumes || []).find((v) => v.id === input.targetVolumeId)?.title
         : ["write", "continue", "polish", "summary", "outline", "memory", "check"].includes(input.kind) ? chapter.title : book.title,
       instruction: input.instruction || "",
@@ -174,7 +175,7 @@ async function generate(input) {
       status: "running",
       createdAt: now(),
       adopted: false,
-      context: { ...context, messages: undefined },
+      context: { ...context, messages: undefined, writingProfileSnapshot: undefined },
       error: "",
     };
     store.putJob(job);
@@ -384,6 +385,7 @@ async function restoreBackup() {
         style: text(source.style),
         reference: text(source.reference),
         referenceName: text(source.referenceName, 1000),
+        ...store.restoreWritingProfileFields(source),
         target: Number(source.target) || 200000,
         characters: [],
         contextChapters: Number.isInteger(source.contextChapters)
@@ -642,7 +644,7 @@ const actions = {
       d.kind,
       d.instruction,
       store.skills(),
-      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})) });
+      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId });
     return rest;
   },
   "ai:generate": generate,
@@ -764,6 +766,29 @@ const actions = {
       reference,
       referenceName: basename(result.filePaths[0]),
     });
+  },
+  "writing:save": (d) => store.saveWritingProfile(d.bookId, d.profile),
+  "writing:select": (d) => store.selectWritingProfiles(d.bookId, d.selection),
+  "writing:delete": (d) => store.deleteWritingProfile(d.bookId, d.id, d.revision, d.body),
+  "writing:restore": (d) => store.restoreWritingProfile(d.bookId, d.id),
+  "writing:import": async (d) => {
+    const result = await dialog.showOpenDialog(win, { properties: ["openFile"], filters: [{ name: "UTF-8 写作资料", extensions: d.source ? ["txt", "md"] : ["txt", "md", "json"] }] });
+    if (result.canceled) return null;
+    const file = result.filePaths[0];
+    assert((await fs.stat(file)).size <= 8000000, "资料文件过大，请拆分后导入");
+    const body = await fs.readFile(file, "utf8");
+    assert(!body.includes("\uFFFD"), "文件不是 UTF-8 编码，请转换后再导入");
+    if (!d.source && file.toLowerCase().endsWith(".json")) {
+      const value = JSON.parse(body.replace(/^\uFEFF/, ""));
+      assert(value.format === "xingmiao-writing-profile" && value.version === 1 && value.profile?.kind === d.kind, "请选择同类型的写作资料 JSON 文件");
+      return { name: basename(file), title: text(value.profile.title, 120), body: text(value.profile.body, 100000) };
+    }
+    return { name: basename(file), title: basename(file).replace(/\.[^.]+$/, "").slice(0, 120), body };
+  },
+  "writing:export": (d) => {
+    const profile = require("./writing-profiles.cjs").profiles(store.book(d.bookId)).find(item => item.id === d.id);
+    assert(profile, "风格或要求不存在");
+    return saveFile(`写作资料-${profile.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")}.json`, JSON.stringify({ format: "xingmiao-writing-profile", version: 1, profile: { kind: profile.kind, title: profile.title, body: profile.body } }, null, 2), "json");
   },
   "book:export": async (d) => {
     const b = store.book(d.id);

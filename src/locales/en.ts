@@ -3040,3 +3040,36 @@ Object.assign(english, {
   "没有匹配的章节。": "No matching chapters.",
   "此分卷还没有章节，可点击上方「添加章节」开始规划。": "This volume has no chapters yet. Use Add chapter above to begin planning."
 });
+
+Object.assign(english, {
+  "写作风格": "Writing styles", "写作要求": "Writing requirements", "风格参考": "Style references",
+  "管理风格与要求": "Manage styles and requirements", "管理写作风格与要求": "Manage writing styles and requirements",
+  "添加可复用的写作资料，生成时自由选择。": "Create reusable writing references and choose them for each generation.",
+  "暂无资料，可在风格档案中新建。": "No references yet. Create one in Style profiles.",
+  "查看内容": "View content", "请先填写或蒸馏内容": "Add or distill content first",
+  "可选择多条，也可全部取消；只发送选中的内容，不发送蒸馏原文。": "Select multiple items or clear all. Only selected content is sent, not the source articles.",
+  "写作资料库": "Writing reference library", "写作资料类型": "Reference type",
+  "手写可复用的风格与要求，或从文章中蒸馏。生成时再选择要使用的条目。": "Write reusable styles and requirements, or distill them from articles. Choose which entries to use when generating.",
+  "新建写作风格": "New writing style", "新建写作要求": "New writing requirement",
+  "还没有自定义风格。可以描述叙事视角、语言、对白与节奏。": "No custom styles yet. Describe viewpoint, language, dialogue and pacing.",
+  "还没有写作要求。可以写下结构、段落、禁用表达和质量标准。": "No writing requirements yet. Add structure, paragraph rules, expressions to avoid and quality standards.",
+  "添加第一条": "Add your first entry", "AI 蒸馏": "Distill with AI", "写作资料已导出": "Writing reference exported",
+  "已保存原文，等待蒸馏": "Source saved, ready to distill", "查看完整资料": "View full reference",
+  "蒸馏参考原文": "Distillation source", "已删除的风格与要求": "Deleted styles and requirements",
+  "编辑写作风格": "Edit writing style", "编辑写作要求": "Edit writing requirement",
+  "风格内容": "Style content", "要求内容": "Requirement content",
+  "这里的内容在选中后用于生成。导入文件后可继续编辑。": "This content is used when selected for generation. Imported files remain editable.",
+  "导入风格或要求文件": "Import style or requirement file", "从文章蒸馏": "Distill from an article",
+  "导入或粘贴原文。AI 结果先预览，采用后才替换当前条目。": "Import or paste source text. Preview the AI result before applying it to this entry.",
+  "导入蒸馏原文": "Import source article", "历史内容": "Previous content", "载入此版本": "Load this version",
+  "保存并蒸馏": "Save and distill", "保存资料": "Save reference", "删除写作资料？": "Delete writing reference?",
+  "条目会移入已删除资料，并从生成选择中移除。已有正文和候选稿保留。": "This entry moves to deleted references and is removed from generation selections. Existing prose and candidates are kept.",
+  "已保存到写作资料：{0}": "Saved to writing reference: {0}",
+  "原本书风格与参考文章继续保留，也可在本次参考资料中选择或取消。": "Your original book style and source article are kept. Select or deselect the style for generation.",
+  "移除本书风格": "Remove book style", "移除本书风格？": "Remove book style?",
+  "风格会移入已删除资料，正文与参考文章保留。": "The style moves to deleted references. Prose and the source article are kept.",
+  "可手写或采用分析结果；生成时在风格参考中选择是否使用。": "Write manually or apply an analysis result. Choose whether to use it in Style references.",
+  "蒸馏目标": "Distillation target", "本书参考文章": "Book source article",
+  "资料已删除，请重新选择": "Reference deleted. Select another entry.", "本次使用的风格与要求": "Styles and requirements used for this result",
+  "未选择": "Not selected"
+});

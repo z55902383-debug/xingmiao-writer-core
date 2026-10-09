@@ -70,6 +70,7 @@ export type Kind =
   | "summary"
   | "timelinePlan";
 export type ContextInfo = {
+  writingReferences?: { id: string; kind: "style" | "requirement"; title: string; body: string }[];
   sourceChapters?: {
     id: string;
     title: string;
@@ -100,6 +101,7 @@ export type SyncChange = {
   evidence: string;
 };
 export type Job = {
+  writingProfileSnapshot?: WritingProfile;
   manuscriptFormat?: import("../electron/manuscript-format.mjs").ManuscriptFormat;
   review?: {
     status: string;
@@ -159,6 +161,9 @@ export type TimelineSnapshot = {
   relations: TimelineEvent[];
 };
 export type Book = {
+  writingProfiles?: WritingProfile[];
+  writingProfileTrash?: WritingProfile[];
+  writingSelection?: WritingSelection;
   foreshadows?: Foreshadow[];
   worldRecords?: WorldRecord[];
   writingActivity?: WritingDay[];
@@ -286,4 +291,12 @@ export type BrainstormEvent = {
   output: string;
   status: "running" | "done" | "interrupted" | "cancelled" | "error";
   error: string;
+};
+
+export type WritingSelection = { styleIds: string[]; requirementIds: string[] };
+export type WritingProfile = {
+  id: string; kind: "style" | "requirement"; title: string; body: string;
+  source: string; sourceName: string; revision: number;
+  createdAt?: string; updatedAt?: string;
+  history?: { title: string; body: string; savedAt?: string }[];
 };

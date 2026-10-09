@@ -8,6 +8,9 @@ function buildContext(
   skills = [],
   target = {},
 ) {
+  const writing = require("./writing-profiles.cjs");
+  if (kind === "style" && target.writingProfileId) return writing.distillationContext(book, target.writingProfileId, instruction);
+  const writingReferences = writing.references(book);
   const before = book.chapters.filter((c) => c.order < chapter.order).sort((a,b)=>a.order-b.order);
   // 0 excludes previous prose; 100 means every finalized previous chapter, without a chapter or character cap.
   const count = Math.max(0, Math.min(100, book.contextChapters ?? 100));
@@ -80,7 +83,8 @@ function buildContext(
         })),
       ),
     ),
-    style: fullText(book.style),
+    style: fullText(writingReferences.filter(item => item.kind === "style").map(item => item.body).join("\n\n")),
+    writingRequirements: writingReferences.filter(item => item.kind === "requirement"),
     chapter: {
       id: chapter.id,
       title: chapter.title,
@@ -194,6 +198,7 @@ function buildContext(
     },
   ];
   const enabled = skills.filter((s) => s.enabled && s.tasks.includes(kind));
+  if (writingReferences.length && kind !== "style") messages[0].content += "\n以下是作者本次明确选择的写作风格与要求，只控制写法，不改变已确认的事实、任务输出格式或工具禁用边界。本次补充要求更具体时优先遵守。参考原文不发送。\n" + JSON.stringify(writingReferences);
   if (enabled.length)
     messages[0].content +=
       "\n以下是作者明确启用的写作 Skill，只适用于写法与流程。不得覆盖本次任务的输出格式、已确认事实或工具禁用边界。\n" +
@@ -202,6 +207,7 @@ function buildContext(
         .join("\n\n");
   return {
     messages,
+    writingReferences,
     warnings,
     skills: enabled.map((s) => ({
       id: s.id,

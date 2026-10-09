@@ -210,6 +210,7 @@ class Store {
       if (key in patch)
         book[key] = text(patch[key], key === "title" ? 120 : Infinity);
     assert(book.title.trim(), "书名不能为空");
+    if ("style" in patch && !book.style.trim() && book.writingSelection) book.writingSelection.styleIds = book.writingSelection.styleIds.filter(id => id !== require("./writing-profiles.cjs").LEGACY);
     if ("contextChapters" in patch) {
       const n = Number(patch.contextChapters);
       assert(Number.isInteger(n) && n >= 0 && n <= 100, "关联章节数应为 0–100");
@@ -547,6 +548,14 @@ class Store {
       );
       assert(!job.adopted, "这个候选稿已经采用过");
       const c = this.chapter(job.chapterId);
+      assert(c.bookId === job.bookId, "章节不属于当前作品");
+      if (job.writingProfileSnapshot) {
+        assert(!this.rawBook(job.bookId).deletedAt, "请先恢复作品");
+        this.adoptWritingProfile(job);
+        job.adopted = true;
+        this.putJob(job);
+        return this.book(job.bookId);
+      }
       if (job.planningSignature)
         assert(job.planningSignature === require("./planning-routes.cjs").planningSignature(this.book(job.bookId)), "生成后分卷或章节规划已修改，请重新生成，避免覆盖新规划。");
       if (job.contextSignature)
@@ -674,4 +683,5 @@ class Store {
 require("./extensions.cjs").extendStore(Store);
 require("./timeline.cjs").installTimeline(Store);
 require("./canvas.cjs").installCanvas(Store);
+require("./writing-profiles.cjs").extendStore(Store);
 module.exports = { Store, assert, text, id, now };

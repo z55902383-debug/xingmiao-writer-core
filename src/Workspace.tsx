@@ -5,6 +5,7 @@ import CreationGuideIsland from "./CreationGuideIsland";
 import TimelinePanel from "./TimelinePanel";
 import VolumePlanner from "./VolumePlanner";
 import { PlanningCandidate, PlanningText } from "./PlanningText";
+import WritingProfiles, { WritingPicker } from "./WritingProfiles";
 import { ROUTED_PLANNING, VOLUME_TASKS, nextPlanningStep } from "./planningFlow";
 import CreativeCanvas from "./CreativeCanvas";
 import type { CanvasModule, CanvasNode } from "./canvasModel";
@@ -525,6 +526,7 @@ export default function Workspace({
   const [action, setAction] = useState<Kind>("write");
   const [intent, setIntent] = useState("write");
   const [targetVolumeId, setTargetVolumeId] = useState("");
+  const [distillProfileId, setDistillProfileId] = useState("");
   const [planningFocus, setPlanningFocus] = useState<{id:string;stamp:string}>();
   const [instruction, setInstruction] = useState("");
   const [selectedJob, setSelectedJob] = useState("");
@@ -753,6 +755,11 @@ export default function Workspace({
             : "未启用",
         },
         {
+          label: "风格参考",
+          on: !!context?.writingReferences?.length,
+          note: context?.writingReferences?.length ? context.writingReferences.map(item => item.title).join("、") : "未选择",
+        },
+        {
           label: "临时要求",
           on: !!instruction.trim(),
           note: instruction.trim()
@@ -916,6 +923,7 @@ export default function Workspace({
         instruction,
         targetVolumeId,
         chapterIds: contextChapterIds,
+        writingProfileId: action === "style" ? distillProfileId : undefined,
       })
         .then((result) => {
           if (!cancelled) {
@@ -941,6 +949,8 @@ export default function Workspace({
     book.characters,
     book.style,
     book.reference,
+    book.writingProfiles,
+    book.writingSelection,
     book.world,
     book.outline,
     book.timeline,
@@ -955,6 +965,7 @@ export default function Workspace({
     contextChapterIds,
     config,
     manuscriptFormat,
+    distillProfileId,
   ]);
   /* 新建章节时继承「当前这一章」的归属分卷与目标字数。
      否则在正文页点添加，新章会掉进「未分卷」分组，还得回大纲重新归档。 */
@@ -979,9 +990,12 @@ export default function Workspace({
     kind: Kind,
     targetChapterId?: string,
     volumeId?: string,
+    writingProfileId?: string,
   ) {
     setAssistantOpen(true);
     setAction(kind);
+    setDistillProfileId(writingProfileId || "");
+    if (writingProfileId) setIntent(INTENTS.find(group => group.kinds.includes("style"))!.id);
     setTargetVolumeId(volumeId || "");
     if (targetChapterId) setChapterId(targetChapterId);
     if (!modelReady) {
@@ -1006,6 +1020,7 @@ export default function Workspace({
           ? volumeId || targetVolumeId
           : "",
         contextChapterIds,
+        writingProfileId,
       });
       mutate((b) => ({
         ...b,
@@ -1016,7 +1031,7 @@ export default function Workspace({
     });
   }
   async function generate() {
-    await generateFor(action, chapter?.id, targetVolumeId);
+    await generateFor(action, chapter?.id, targetVolumeId, action === "style" ? distillProfileId : undefined);
   }
   async function adopt() {
     if (!selected) return;
@@ -1073,7 +1088,7 @@ export default function Workspace({
         selected.kind === "memory"
           ? "记忆已确认并保存"
           : selected.kind === "style"
-            ? "已保存为本书风格档案"
+            ? selected.writingProfileSnapshot ? tr("已保存到写作资料：{0}", {0: selected.writingProfileSnapshot.title}) : "已保存为本书风格档案"
             : "候选稿已采用，原文保留在历史版本中",
       );
       if (["write", "continue", "polish"].includes(selected.kind)) {
@@ -2881,9 +2896,12 @@ export default function Workspace({
           <div className="document-page">
             <PageHeading
               icon={<PaintBrush size={23} />}
-              title={tr("找到属于这本书的语感")}
-              text="从参考文章中学习叙事方法，沉淀为可编辑的风格档案。"
+              title={tr("管理写作风格与要求")}
+              text="添加可复用的写作资料，生成时自由选择。"
             />
+            <WritingProfiles book={book} busy={busy || !!running} onChanged={replace} beforeChange={flush} onGenerate={id => generateFor("style", undefined, undefined, id)} notify={notify} />
+            <div className="writing-legacy">
+            <p>{tr("原本书风格与参考文章继续保留，也可在本次参考资料中选择或取消。")}</p>
             <div className="reference-box">
               <div className="reference-symbol">
                 <FileText size={27} />
@@ -2946,6 +2964,7 @@ export default function Workspace({
             </details>
             <div className="style-heading">
               <h3>{tr("本书风格档案")}</h3>
+              {book.style.trim() && <Button disabled={busy || !!running} onClick={() => setConfirm({ title: "移除本书风格？", message: "风格会移入已删除资料，正文与参考文章保留。", action: async () => replace(await api<Book>("writing:delete", { bookId: book.id, id: "legacy-book-style", revision: 1, body: book.style })) })}><Trash size={16} />{tr("移除本书风格")}</Button>}
               <Button
                 variant="primary-soft"
                 disabled={!book.reference.trim() || busy || !!running}
@@ -2955,7 +2974,7 @@ export default function Workspace({
             </div>
             <Field
               label={tr("写作方法与语言偏好")}
-              hint={tr("保存后自动应用到后续 AI 生成。可以直接手写，也可以采用 AI 分析结果。")}
+              hint={tr("可手写或采用分析结果；生成时在风格参考中选择是否使用。")}
             >
               <textarea
                 className="large-textarea"
@@ -2964,6 +2983,7 @@ export default function Workspace({
                 placeholder={tr("叙事视角：\\n语言与句式：\\n对白特点：\\n节奏与悬念：\\n避免的表达：")}
               />
             </Field>
+            </div>
           </div>
         )}
       </div>
@@ -3150,7 +3170,8 @@ export default function Workspace({
               </select>
             </Field>
           )}
-          <p className="generation-destination">{tr("生成去向：")}{VOLUME_TASKS.includes(action)
+          {action === "style" && <Field label={tr("蒸馏目标")}><select value={distillProfileId} onChange={event => setDistillProfileId(event.target.value)} disabled={busy || !!running}><option value="">{tr("本书参考文章")}</option>{(book.writingProfiles || []).map(item => <option key={item.id} value={item.id}>{tr(item.kind === "style" ? "写作风格" : "写作要求")} · {item.title}</option>)}</select></Field>}
+          <p className="generation-destination">{tr("生成去向：")}{action === "style" && distillProfileId ? (book.writingProfiles || []).find(item => item.id === distillProfileId)?.title || tr("资料已删除，请重新选择") : VOLUME_TASKS.includes(action)
               ? `${book.volumes?.find((v) => v.id === targetVolumeId)?.title || tr("请先选择卷")} · ${tr(kinds[action])}`
               : tr(kinds[action])}{" "}{tr("· 确认后写入")}</p>
           <button
@@ -3176,6 +3197,7 @@ export default function Workspace({
                   </li>
                 ))}
               </ul>
+              <WritingPicker book={book} disabled={busy || !!running} onManage={() => { setView("style"); }} onSelect={selection => run(async () => replace(await api<Book>("writing:select", { bookId: book.id, selection })))} />
               {context && (
                 <p className="ref-foot">{tr("本次发送约")}{" "}{number(context.characters)}{" "}{tr("字符（完整资料）")}{context.chapterTitles?.length
                     ? tr(" · 关联章节：{0}", {0: context.chapterTitles.join("、")})
@@ -3225,6 +3247,7 @@ export default function Workspace({
           )}
           {selected && (
             <section className="candidate">
+              {!!selected.context.writingReferences?.length && <details className="writing-job-references"><summary>{tr("本次使用的风格与要求")}</summary>{selected.context.writingReferences.map(item => <div key={item.id}><strong>{item.title}</strong><div className="writing-profile-text">{item.body}</div></div>)}</details>}
               <div className="candidate-head">
                 <span>
                   <Sparkle size={15} />
@@ -3275,6 +3298,7 @@ export default function Workspace({
                             selected.kind,
                             selected.chapterId,
                             selected.targetVolumeId,
+                            selected.writingProfileSnapshot?.id,
                           )
                         }
                       >{tr("重新生成")}</Button>
