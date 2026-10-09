@@ -6,6 +6,7 @@ import type { Book, BookSummary, Chapter, Config } from "./types";
 import Shelf, { NewBook } from "./Shelf";
 import Settings from "./Settings";
 import Workspace from "./Workspace";
+import ManualTyping from "./ManualTyping";
 
 import { Button, IconButton, Modal } from "./ui";
 import { demo } from "./demo";
@@ -18,6 +19,7 @@ export default function App() {
   const [settings, setSettings] = useState(false);
   const settingsReturnAction = useRef<(() => void) | null>(null);
   
+  const [showManualTyping, setShowManualTyping] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -165,7 +167,18 @@ export default function App() {
     );
   return (
     <>
-      {book && config ? (
+      {showManualTyping ? (
+        <ManualTyping
+          books={books}
+          onSettings={openSettings}
+          onBack={async () => {
+            setBooks(await api<BookSummary[]>("books:list"));
+            setShowManualTyping(false);
+          }}
+          notify={notify}
+          closeGuard={closeGuard}
+        />
+      ) : book && config ? (
         <Workspace
           key={`${book.id}-${workspaceKey}`}
           initial={book}
@@ -202,6 +215,7 @@ export default function App() {
             })
           }
           
+          onManualTyping={() => setShowManualTyping(true)}
           onBackup={() =>
             safe(async () => {
               const path = await api<string | null>("backup:save");

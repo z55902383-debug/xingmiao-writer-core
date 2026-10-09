@@ -6,6 +6,11 @@ contextBridge.exposeInMainWorld("xingmiao", {
     ipcRenderer.on("xm:job", handler);
     return () => ipcRenderer.removeListener("xm:job", handler);
   },
+  onBrainstorm: (callback) => {
+    const handler = (_event, value) => callback(value);
+    ipcRenderer.on("xm:brainstorm", handler);
+    return () => ipcRenderer.removeListener("xm:brainstorm", handler);
+  },
   onClose: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("xm:closing", handler);

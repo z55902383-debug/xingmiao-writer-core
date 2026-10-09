@@ -100,6 +100,7 @@ export type SyncChange = {
   evidence: string;
 };
 export type Job = {
+  manuscriptFormat?: import("../electron/manuscript-format.mjs").ManuscriptFormat;
   review?: {
     status: string;
     changes?: SyncChange[];
@@ -262,6 +263,7 @@ declare global {
         data?: unknown,
       ) => Promise<{ ok: boolean; data: unknown; error?: string }>;
       onJob: (fn: (job: Job) => void) => () => void;
+      onBrainstorm: (fn: (value: BrainstormEvent) => void) => () => void;
       onClose: (fn: () => void) => () => void;
     };
   }
@@ -276,4 +278,12 @@ export type PlanningRow = {
   action: "create" | "update";
   preservesBody?: boolean;
   fields: { title?: string; outline?: string; detail?: string; summary?: string };
+};
+
+export type BrainstormEvent = {
+  requestId: string;
+  bookId: string | null;
+  output: string;
+  status: "running" | "done" | "interrupted" | "cancelled" | "error";
+  error: string;
 };

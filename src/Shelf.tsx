@@ -183,6 +183,7 @@ export default function Shelf({
   
   
   
+  onManualTyping,
   onBackup,
   onRestore,
   busy,
@@ -197,6 +198,7 @@ export default function Shelf({
   
   
   
+  onManualTyping: () => void;
   onBackup: () => void;
   onRestore: () => void;
   busy: boolean;
@@ -293,6 +295,12 @@ export default function Shelf({
         </button>
         
         
+        <button
+          className="nav-item typing-nav-item"
+          onClick={onManualTyping}
+        >
+          <PencilLine size={20} />{tr("人工码字板")}<span className="nav-item-hint">{tr("专注")}</span>
+        </button>
         <div className="shelf-nav-bottom">
           <button
             type="button"

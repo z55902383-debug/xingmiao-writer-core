@@ -104,12 +104,16 @@ input, textarea { caret-color: var(--accent); }
 .workspace-top { background: var(--bg); }
 .editor-scroll { background: var(--reading-surface); }
 .manuscript { padding-top: 36px; }
-.breadcrumb, .save-state, .editor-tabs, .editor-tabs button, .toolbar-actions .button, .toolbar-actions select, .editor-status, .chapter-kicker > span:first-child, .outline-inline > div, .outline-inline span { font-size: 12px; }
+.breadcrumb, .save-state, .editor-tabs, .editor-tabs button,
+.toolbar-actions .button, .toolbar-actions select,
+.editor-status, .chapter-kicker > span:first-child,
+.outline-inline > div, .outline-inline span { font-size: 12px; }
 .chapter-title-input { font-weight: 600; letter-spacing: 0; }
 .chapter-title-input:focus-visible { border-bottom-color: var(--accent); box-shadow: none; }
 .manuscript-input:focus-visible { box-shadow: none; }
 .outline-inline { background: var(--panel); border-color: var(--border); }
-.assistant-intro p, .assistant-compose > label, .assistant-compose .field > label, .assistant-body > .field > label { font-size: 12px; line-height: 1.7; }
+.assistant-intro p, .assistant-compose > label,
+.assistant-compose .field > label, .assistant-body > .field > label { font-size: 12px; line-height: 1.7; }
 .assistant-compose textarea { font-size: 13px; background: var(--panel); }
 .assistant-setup p { font-size: 13px; }
 .assistant-model { background: var(--panel); }
@@ -281,6 +285,8 @@ input, textarea { caret-color: var(--accent); }
 .shelf-nav .nav-item { color: var(--muted); }
 .shelf-nav .nav-item:hover { color: var(--ink); }
 .shelf-nav .nav-item.active { color: var(--accent-bright); box-shadow: none; border: 1px solid var(--border-strong); }
+.shelf-nav .toolbox-nav-item, .shelf-nav .plaza-nav-item { border-color: transparent; background: transparent; }
+.shelf-nav .toolbox-nav-item { margin-top: 16px; }
 .shelf-nav .nav-item-hint { font-size: 12px; color: var(--dim); }
 .shelf-heading h1 { line-height: 1.3; }
 .recent-project-mark {
@@ -379,6 +385,7 @@ input, textarea { caret-color: var(--accent); }
 .language-switcher.expanded { flex-wrap: wrap; width: 100%; font-size: 14px; gap: 12px; }
 .language-switcher.expanded select { width: 180px; margin-left: auto; min-height: 40px; font-size: 14px; }
 .language-settings { max-width: 640px; }
+.toolbox-top > .language-switcher { margin-left: auto; margin-right: 16px; }
 :root[data-language="en"] .shelf-nav .nav-item,
 :root[data-language="en"] .workspace-nav .nav-item {
   white-space: normal; line-height: 1.5; gap: 8px;
@@ -400,6 +407,8 @@ input, textarea { caret-color: var(--accent); }
 :root[data-language="en"] .settings-nav > button { white-space: normal; text-align: left; line-height: 1.5; }
 :root[data-language="en"] .settings-nav > button svg { flex-shrink: 0; }
 :root[data-language="en"] .field > label { line-height: 1.5; }
+:root[data-language="en"] .toolbox-card-copy strong { line-height: 1.45; }
+:root[data-language="en"] .toolbox-card-copy small { line-height: 1.65; }
 :root[data-language="en"] .cc-node-status { max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (min-width: 801px) and (max-height: 700px) {
   :root[data-language="en"] .shelf-summary > div:not(.summary-note) { align-items: flex-start; }
@@ -418,3 +427,223 @@ input, textarea { caret-color: var(--accent); }
 }
 
 /* Membership instructions stay available before login. */
+.plaza-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  flex: 0 1 510px;
+}
+.plaza-heading-actions > .button { flex-shrink: 0; }
+.membership-note { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.membership-note-copy { flex: 1; min-width: 0; }
+.membership-note strong { display: block; color: var(--ink); font-size: 13px; font-weight: 600; }
+.plaza-heading .membership-note p { margin: 4px 0 0; font-size: 12px; line-height: 1.7; text-wrap: pretty; }
+.membership-help-trigger { flex-shrink: 0; color: var(--accent); }
+.membership-help { text-align: center; }
+.membership-qr { display: block; width: 320px; max-width: 100%; height: auto; margin: 0 auto; border-radius: 10px; }
+.membership-help .membership-qr-caption { margin: 16px 0 0; color: var(--muted); font-size: 12px; }
+@media (max-width: 1050px) {
+  .plaza-heading { flex-wrap: wrap; }
+  .plaza-heading-actions { flex-basis: 100%; justify-content: space-between; }
+  .membership-note { max-width: 440px; }
+}
+@media (max-width: 520px) {
+  .plaza-heading-actions { flex-wrap: wrap; gap: 12px; }
+  .membership-note { max-width: 100%; }
+}
+
+/* ══════════════════════════════════════════════════════
+   UI 整体优化 — 视觉节奏 / 色彩 / 细节
+   ══════════════════════════════════════════════════════ */
+
+/* ── 全局微调：更平滑的圆角 + 柔和阴影节奏 ─────────── */
+:root {
+  --r-sm: 5px;
+  --r-md: 9px;
+  --r-lg: 13px;
+  --r-xl: 18px;
+  --shadow-card: 0 1px 3px #0000001a, 0 4px 16px #00000012;
+  --shadow-float: 0 8px 32px #00000026, 0 2px 8px #0000000f;
+  --transition-hover: border-color 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui), transform 160ms var(--ease-ui);
+}
+
+/* ── 启动屏 ────────────────────────────────────────── */
+.boot-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 16px;
+  background: var(--bg);
+  color: var(--soft);
+}
+.boot-screen .cat-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow-float);
+  animation: boot-pulse 2s ease-in-out infinite;
+}
+@keyframes boot-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow-float); }
+  50% { box-shadow: 0 0 0 8px var(--accent-deep), var(--shadow-float); }
+}
+.boot-screen h1 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+.boot-screen p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── 书架导航 — 整体质感提升 ───────────────────────── */
+.shelf-nav {
+  background: color-mix(in srgb, var(--panel) 97%, var(--bg));
+}
+.shelf-nav .brand {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.shelf-nav .brand .cat-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.shelf-nav .nav-item {
+  border-radius: var(--r-md);
+  transition: var(--transition-hover);
+  margin-bottom: 1px;
+}
+.shelf-nav .nav-item:hover {
+  background: var(--raised);
+  transform: translateX(1px);
+}
+.shelf-nav .nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  border-color: var(--accent-mid) !important;
+}
+/* 码字板沿用导航的普通、悬停和键盘焦点样式。 */
+.shelf-nav .typing-nav-item {
+  margin-top: 4px;
+}
+
+/* ── 书卡质感 ────────────────────────────────────────── */
+.book-card {
+  box-shadow: var(--shadow-card);
+  transition: var(--transition-hover);
+}
+.book-card:hover {
+  box-shadow: var(--shadow-float);
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-card:hover { transform: none; box-shadow: var(--shadow-card); }
+}
+
+/* ── 封面 — 更有质感的渐变 ──────────────────────────── */
+.book-cover {
+  background: linear-gradient(145deg, var(--cover-blue) 0%, color-mix(in srgb, var(--cover-blue) 80%, #000) 100%);
+}
+.book-cover.cover-1 {
+  background: linear-gradient(145deg, var(--cover-slate) 0%, color-mix(in srgb, var(--cover-slate) 80%, #000) 100%);
+}
+.book-cover.cover-2 {
+  background: linear-gradient(145deg, var(--cover-warm) 0%, color-mix(in srgb, var(--cover-warm) 80%, #000) 100%);
+}
+
+/* ── 模态框 — 更柔和的浮层 ──────────────────────────── */
+.modal-overlay {
+  background: var(--scrim);
+  backdrop-filter: blur(4px);
+}
+.modal {
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-2);
+  border: 1px solid var(--border-strong);
+}
+.modal-header {
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+}
+
+/* ── Toast 通知 ──────────────────────────────────────── */
+.toast {
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-strong);
+}
+
+/* ── 按钮 — 更清晰的状态层 ──────────────────────────── */
+.button {
+  transition: background var(--duration-ui) var(--ease-ui),
+              color var(--duration-ui) var(--ease-ui),
+              border-color var(--duration-ui) var(--ease-ui),
+              box-shadow var(--duration-ui) var(--ease-ui),
+              transform 80ms var(--ease-ui);
+}
+.button:active:not(:disabled) { transform: scale(0.97); }
+.button.primary {
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.button.primary:hover:not(:disabled) {
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+/* ── Workspace 顶栏 ──────────────────────────────────── */
+.workspace-top {
+  background: color-mix(in srgb, var(--panel) 96%, var(--bg));
+}
+
+/* ── 输入框 / 文本域 ──────────────────────────────────── */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="search"],
+textarea,
+select {
+  transition: border-color var(--duration-ui) var(--ease-ui),
+              box-shadow var(--duration-ui) var(--ease-ui);
+}
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* ── 滚动条（Webkit）────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+/* ── 亮色主题调整 ─────────────────────────────────────── */
+:root[data-theme="light"] .shelf-nav {
+  background: color-mix(in srgb, var(--panel) 98%, var(--bg));
+}
+:root[data-theme="light"] .book-card {
+  box-shadow: 0 1px 3px #0000000f, 0 4px 12px #00000009;
+}
+:root[data-theme="light"] .book-card:hover {
+  box-shadow: 0 4px 20px #00000018, 0 1px 4px #0000000c;
+}
+:root[data-theme="light"] .modal {
+  box-shadow: 0 20px 80px #0000001a;
+}

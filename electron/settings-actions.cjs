@@ -15,6 +15,14 @@ async function closeLogin() {
 }
 function settingsActions({ store, window, publicConfig, saveFile, running,  }) {
   return {
+    ...require("./memo-actions.cjs").memoActions(store),
+    "manuscript:get": () => require("./manuscript-format.mjs").normalizeManuscriptFormat(store.setting("manuscript-formatting", {})),
+    "manuscript:set": (d) => {
+      const prefs = require("./manuscript-format.mjs").normalizeManuscriptFormat(d);
+      store.putSetting("manuscript-formatting", prefs);
+      return prefs;
+    },
+
     "profiles:select": (d) => {
       store.selectProfile(d.id);
       return publicConfig();

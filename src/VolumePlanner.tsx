@@ -6,11 +6,15 @@ import {
   PencilSimple,
   BookOpen,
   ArrowRight,
+  CircleDashed,
+  ListChecks,
+  CheckCircle,
 } from "@phosphor-icons/react";
 import type { Book, Chapter, Volume, Kind } from "./types";
 import { api } from "./api";
 import { Button, Field, Modal } from "./ui";
 import { PlanExcerpt } from "./PlanningText";
+import "./planner-hierarchy.css";
 export default function VolumePlanner({
   panel,
   book,
@@ -73,6 +77,10 @@ export default function VolumePlanner({
   const planProgress = book.chapters.length
     ? Math.round((plannedChapterCount / book.chapters.length) * 100)
     : 0;
+  const visibleChapters = (volume: { id: string; title: string }) => book.chapters.filter(
+    (chapter) => (chapter.volumeId || "") === volume.id &&
+      (!query.trim() || volume.title.includes(query.trim()) || chapter.title.includes(query.trim())),
+  );
   const boardColumns = [
     { id: "todo", title: "待规划", chapters: book.chapters.filter((c) => !c.summary?.trim() && !c.outline.trim() && !c.body.trim()) },
     { id: "planning", title: "规划中", chapters: book.chapters.filter((c) => !c.body.trim() && (!!c.summary?.trim() || !!c.outline.trim()) && !(c.summary?.trim() && c.outline.trim())) },
@@ -156,11 +164,14 @@ export default function VolumePlanner({
           <span>{book.chapters.length}{" "}{tr("章")}</span>
         </div>
         <div className="chapter-board-lanes">
-          {boardColumns.map((column) => <section key={column.id} className="chapter-board-lane">
-            <header><strong>{tr(column.title)}</strong><span>{column.chapters.length}</span></header>
+          {boardColumns.map((column) => <section key={column.id} className="chapter-board-lane" data-stage={column.id} aria-label={tr(column.title)}>
+            <header><strong>
+              {column.id === "todo" ? <CircleDashed size={17} /> : column.id === "planning" ? <PencilSimple size={17} /> : column.id === "planned" ? <ListChecks size={17} /> : <CheckCircle size={17} />}
+              {tr(column.title)}</strong><span>{column.chapters.length}</span></header>
             <div className="chapter-board-cards">
-              {column.chapters.map((chapter) => <article key={chapter.id}>
+              {column.chapters.map((chapter) => <article key={chapter.id} data-stage={column.id}>
                 <button className="chapter-board-card-main" onClick={() => onNavigateToPlan("plan-" + chapter.id)}>
+                  <small className="chapter-board-volume">{book.volumes?.find((volume) => volume.id === chapter.volumeId)?.title || tr("未分卷")}</small>
                   <strong>{chapter.title || tr("未命名章节")}</strong>
                   <span>{chapter.summary || chapter.outline || tr("先写下这一章要发生什么")}</span>
                   <small>{chapter.status === "final" ? tr("已定稿") : chapter.body.trim() ? tr("正文草稿") : chapter.summary?.trim() ? tr("概要已写") : tr("待规划")}</small>
@@ -252,8 +263,10 @@ export default function VolumePlanner({
               </div>
             </>
           )}
-          {book.chapters
-            .filter((c) => (c.volumeId || "") === v.id && (!query.trim() || v.title.includes(query.trim()) || c.title.includes(query.trim())))
+          <section className="volume-chapters" aria-label={v.title + " · " + tr("本卷章节")}>
+            <div className="volume-chapters-heading"><h4>{tr(v.id ? "本卷章节" : "未分卷章节")}</h4><span>{visibleChapters(v).length}{" "}{tr("章")}</span></div>
+            <div className="volume-chapter-list">
+          {visibleChapters(v)
             .map((c) => (
               <div className="volume-chapter" key={c.id} id={"plan-" + c.id}>
                 <div className="volume-chapter-head">
@@ -305,7 +318,7 @@ export default function VolumePlanner({
                     <span className="chapter-step-number">3</span>{tr("按细纲写正文")}</Button>
                   <Button className="chapter-delete-action" aria-label={tr("删除章节 {0}", {0: c.title})} disabled={busy || generating} onClick={()=>setRemoveChapter(c)}><Trash size={15}/>{tr("删除章节")}</Button>
                 </div>
-                <div className="chapter-plan-status"><span>{tr(c.summary?.trim() ? "大纲已填写" : "大纲待生成")}</span><span>{tr(c.outline.trim() ? "细纲已填写" : "细纲待生成")}</span><span>{tr(c.body.trim() ? "正文已填写" : "正文待生成")}</span></div>
+                <div className="chapter-plan-status"><span className={c.summary?.trim() ? "is-complete" : "is-pending"}>{tr(c.summary?.trim() ? "概要已填写" : "概要待生成")}</span><span className={c.outline.trim() ? "is-complete" : "is-pending"}>{tr(c.outline.trim() ? "细纲已填写" : "细纲待生成")}</span><span className={c.body.trim() ? "is-complete" : "is-pending"}>{tr(c.body.trim() ? "正文已填写" : "正文待生成")}</span></div>
                 <details className="chapter-plan-editor" open={expandedChapter === c.id} onToggle={e => { if (e.currentTarget.open) setExpandedChapter(c.id); else setExpandedChapter(current => current === c.id ? "" : current); }}>
                   <summary>{tr("查看 / 编辑章节规划")}</summary>
                 <Field label={tr("{0}章节概要", {0: c.title})}>
@@ -331,6 +344,9 @@ export default function VolumePlanner({
                 </details>
               </div>
             ))}
+            </div>
+            {!visibleChapters(v).length && <p className="planner-chapter-empty">{tr(query.trim() ? "没有匹配的章节。" : "此分卷还没有章节，可点击上方「添加章节」开始规划。")}</p>}
+          </section>
         </article>
       ))}
       </>}

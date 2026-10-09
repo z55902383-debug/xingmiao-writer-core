@@ -87,18 +87,21 @@ import { Button, Empty, Field, IconButton, Menu, Modal, Splitter } from "./ui";
 import { currentTheme, toggleThemeFrom } from "./theme";
 import { revealSelection } from "./editorTools";
 import { useWorkspace } from "./useWorkspace";
+import ManuscriptSettings, { useManuscriptFormat } from "./ManuscriptSettings";
+import { handleManuscriptEnter, useManuscriptTyping } from "./manuscriptInput";
+import { formatManuscript } from "../electron/manuscript-format.mjs";
 type View =
   "editor" | "outline" | "characters" | "world" | "memory" | "notes" | "style";
 
 /* 阅读偏好：只影响本机显示，不进作品数据。
-   默认值取产品规范的推荐区间（字号 18、行高 1.95、正文宽度 760）。 */
+   默认值取产品规范的推荐区间（字号 18、行高 1.8、正文宽度 760）。 */
 type DisplayPrefs = { fontSize: number; lineHeight: number; width: number };
 const DISPLAY_KEY = "xm-editor-display";
 const editorPositionKey = (bookId: string, chapterId: string) =>
   `xm-editor-position:${bookId}:${chapterId}`;
 const DISPLAY_DEFAULT: DisplayPrefs = {
   fontSize: 18,
-  lineHeight: 2.0,
+  lineHeight: 1.8,
   width: 760,
 };
 const FONT_SIZES = [14, 16, 18, 20, 22, 24];
@@ -536,6 +539,15 @@ export default function Workspace({
   const [findText, setFindText] = useState("");
   const [showFind, setShowFind] = useState(false);
   const [showDisplay, setShowDisplay] = useState(false);
+  const [showManuscriptSettings, setShowManuscriptSettings] = useState(false);
+  const [formattingBody, setFormattingBody] = useState(false);
+  const formatOperation = useRef(false);
+  const {
+    format: manuscriptFormat,
+    loading: formatLoading,
+    error: formatError,
+    save: saveManuscriptFormat,
+  } = useManuscriptFormat();
   const [display, setDisplay] = useState<DisplayPrefs>(loadDisplay);
   const setDisplayPref = (patch: Partial<DisplayPrefs>) =>
     setDisplay((prev) => {
@@ -650,6 +662,13 @@ export default function Workspace({
   const customTarget = useRef<HTMLInputElement>(null);
   const chapter =
     book.chapters.find((c) => c.id === chapterId) || book.chapters[0];
+  const inputFormat = {
+    ...manuscriptFormat,
+    autoIndent: !formatLoading && !formatError && manuscriptFormat.autoIndent,
+  };
+  useManuscriptTyping(editor, inputFormat, (body) => {
+    if (chapter) editChapter(chapter.id, { body });
+  }, `${view}:${chapter?.id || ""}`);
   useLayoutEffect(() => {
     if (!chapter || view !== "editor") return;
     const textarea = editor.current;
@@ -800,6 +819,37 @@ export default function Workspace({
       setBusy(false);
     }
   }
+  async function applyManuscriptFormat(nextFormat = manuscriptFormat) {
+    if (!chapter || busy || formatOperation.current) return;
+    const targetChapterId = chapter.id;
+    formatOperation.current = true;
+    setFormattingBody(true);
+    setBusy(true);
+    try {
+      // 先落盘手写稿。章节保存事务会在替换正文前留下可恢复的原稿快照。
+      await flush();
+      const latestBook = await api<Book>("book:get", { id: book.id });
+      const latest = latestBook.chapters.find((item) => item.id === targetChapterId);
+      if (!latest) throw new Error(tr("章节不存在，请重新打开作品。"));
+      const body = formatManuscript(latest.body, nextFormat);
+      if (body === latest.body) {
+        replace(latestBook);
+        notify(tr("当前正文已符合排版设置。"));
+        return;
+      }
+      await api<Chapter>("chapter:save", {
+        id: latest.id,
+        patch: { body },
+        revision: latest.revision,
+      });
+      await reload();
+      notify(tr("正文已整理，原稿可在历史版本中恢复。"));
+    } finally {
+      setFormattingBody(false);
+      setBusy(false);
+      formatOperation.current = false;
+    }
+  }
   useEffect(() => {
     closeGuard.current = flush;
     return () => {
@@ -904,6 +954,7 @@ export default function Workspace({
     instruction,
     contextChapterIds,
     config,
+    manuscriptFormat,
   ]);
   /* 新建章节时继承「当前这一章」的归属分卷与目标字数。
      否则在正文页点添加，新章会掉进「未分卷」分组，还得回大纲重新归档。 */
@@ -1398,6 +1449,22 @@ export default function Workspace({
             </div>
             <div className="chapter-quickbar">
               <Button
+                title={tr("设置首行缩进、段落间距与回车自动缩进")}
+                disabled={busy || formatLoading}
+                aria-haspopup="dialog"
+                onClick={() => setShowManuscriptSettings(true)}
+              >
+                <GearSix size={16} />{tr("正文排版")}
+              </Button>
+              <Button
+                title={tr("按排版设置整理本章正文，原稿会保留在历史版本中")}
+                disabled={busy || formatLoading || !chapter.body.trim()}
+                busy={formattingBody}
+                onClick={() => void applyManuscriptFormat().catch((error) => notify(error.message))}
+              >
+                <TextAa size={16} />{tr("整理正文")}
+              </Button>
+              <Button
                 variant={showFind ? "primary-soft" : ""}
                 onClick={() => setShowFind((v) => !v)}
               >
@@ -1669,6 +1736,8 @@ export default function Workspace({
                   className="manuscript-input"
                   aria-label={tr("章节正文")}
                   spellCheck={false}
+                  readOnly={formattingBody}
+                  onKeyDown={(event) => handleManuscriptEnter(event, inputFormat, (body) => editChapter(chapter.id, { body }))}
                   onSelect={(e) => {
                     const el = e.currentTarget;
                     if (el.selectionEnd > el.selectionStart)
@@ -1690,7 +1759,7 @@ export default function Workspace({
                     editChapter(chapter.id, { body: e.target.value })
                   }
                   placeholder={
-                    tr("故事，从这里开始。\n\n写下第一句话，或让右侧的 AI 助手陪你一起构思。")
+                    tr("故事，从这里开始。\n\n写下第一句话，或让右侧的 AI 助手陪你一起构思。\n回车按正文排版设置换段，Shift+Enter 只换行。")
                   }
                 />
                 <div className="manuscript-end">
@@ -3695,6 +3764,18 @@ export default function Workspace({
           ) : null}
         </div>
       </aside>
+      {showManuscriptSettings && (
+        <ManuscriptSettings
+          value={manuscriptFormat}
+          onSave={async (value) => {
+            await saveManuscriptFormat(value);
+            notify(tr("正文排版设置已保存。"));
+          }}
+          onClose={() => !formattingBody && setShowManuscriptSettings(false)}
+          onApply={applyManuscriptFormat}
+          applyDisabled={busy || formatLoading || !chapter?.body.trim()}
+        />
+      )}
       {history && (
         <Modal title={tr("章节历史版本")} wide onClose={() => setHistory(null)}>
           <div className="modal-body history-list">

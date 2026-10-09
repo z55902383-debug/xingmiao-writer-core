@@ -4,6 +4,7 @@ import App from "./App";
 import { applySavedTheme } from "./theme";
 import "./styles.css";
 import "./ui-polish.css";
+import "./manual-typing.css";
 applySavedTheme();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

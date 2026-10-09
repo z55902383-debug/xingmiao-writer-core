@@ -11,6 +11,8 @@ const { join, basename } = require("node:path");
 const fs = require("node:fs/promises");
 const { Store, assert, text, id, now } = require("./store.cjs");
 const { buildContext } = require("./context.cjs");
+const { normalizeManuscriptFormat, isProseKind, formatJobOutput, candidateManuscriptBody } = require("./manuscript-format.mjs");
+
 const { requestModel, endpoint } = require("./ai.cjs");
 const { requestCodex, inspectCodex } = require("./codex.cjs");
 const { settingsActions, closeLogin } = require("./settings-actions.cjs");
@@ -30,6 +32,17 @@ let store,
   preparing = false;
 const running = new Map();
 const jobPromises = new Map();
+const manualBrainstorm = require("./manual-brainstorm.cjs").createManualBrainstorm({
+  getBook: (bookId) => store.rawBook(text(bookId, 100)),
+  getConfig: () => store.config(),
+  getKey: keyFor,
+  requestModel,
+  requestCodex,
+  emit: (state) => {
+    if (win && !win.isDestroyed()) win.webContents.send("xm:brainstorm", state);
+  },
+});
+
 
 
 if (!process.env.XM_TEST && !app.requestSingleInstanceLock()) app.quit();
@@ -113,20 +126,23 @@ function emit(job) {
 async function generate(input) {
   assert(
     running.size === 0 && !preparing,
-    "已有生成任务正在进行，请等待完成或停止");
+    "已有生成任务正在进行，请等待完成或停止",
+  );
   preparing = true;
   try {
     const book = store.book(input.bookId);
     assert(!book.deletedAt, "请先从回收站恢复作品");
     const chapter = book.chapters.find((c) => c.id === input.chapterId);
     assert(chapter, "章节不属于当前书籍");
+    const manuscriptFormat = normalizeManuscriptFormat(store.setting("manuscript-formatting", {}));
     const context = buildContext(
       book,
       chapter,
       input.kind,
       text(input.instruction || ""),
       store.skills(),
-      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds });
+      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat },
+    );
     const config = store.config();
     assert(config.model || config.provider === "codex", "请先配置模型");
     const key = config.provider === "codex" ? "" : await keyFor(config);
@@ -135,10 +151,12 @@ async function generate(input) {
       bookId: book.id,
       chapterId: chapter.id,
       baseRevision: chapter.revision,
-      ...(require("./planning-routes.cjs").routedKinds.includes(input.kind) ? { planningSignature: require("./planning-routes.cjs").planningSignature(book) } : {}),
+      ...(require("./planning-routes.cjs").routedKinds.includes(input.kind)
+        ? { planningSignature: require("./planning-routes.cjs").planningSignature(book) } : {}),
       contextSignature: require("./timeline.cjs").contextSignature(
         book,
-        chapter),
+        chapter,
+      ),
       model: config.model || "Codex 默认模型",
       provider: config.provider || "api",
       profileName: config.name || "默认模型",
@@ -146,6 +164,7 @@ async function generate(input) {
         ? { baseStyle: book.style, baseReference: book.reference }
         : {}),
       kind: input.kind,
+      ...(isProseKind(input.kind) ? { manuscriptFormat } : {}),
       targetVolumeId: input.targetVolumeId || "",
       targetLabel: input.targetVolumeId
         ? (book.volumes || []).find((v) => v.id === input.targetVolumeId)?.title
@@ -182,16 +201,19 @@ async function generate(input) {
               lastSave = Date.now();
             }
           },
-          controller.signal);
+          controller.signal,
+        );
         assert(
           job.output.trim(),
-          "模型未返回正文，可能只返回了推理内容；请增加输出上限或更换模型");
+          "模型未返回正文，可能只返回了推理内容；请增加输出上限或更换模型",
+        );
         job.status = "done";
         job.usage = result.usage;
         if (result.finishReason === "length") {
           job.status = "interrupted";
           job.error = "达到输出长度上限，内容可能未完成；可保留后续写。";
         }
+        job.output = formatJobOutput(job);
         if (
           job.status === "done" &&
           ["write", "continue", "polish"].includes(job.kind)
@@ -200,10 +222,7 @@ async function generate(input) {
           store.putJob(job);
           emit(job);
           try {
-            const body =
-              job.kind === "continue"
-                ? chapter.body + (chapter.body ? "\n\n" : "") + job.output
-                : job.output;
+            const body = candidateManuscriptBody(chapter.body, job, job.kind === "continue" ? "append" : "replace");
             const sync = require("./sync-review.cjs");
             let raw = "";
             const result = await (
@@ -215,7 +234,8 @@ async function generate(input) {
               (chunk) => {
                 raw += chunk;
               },
-              controller.signal);
+              controller.signal,
+            );
             if (result.finishReason === "length")
               throw Error("分析未完成，请重试；正文已保留");
             const changes = sync.parse(raw, body);
@@ -239,6 +259,8 @@ async function generate(input) {
           ? "已停止，生成内容已保留。"
           : e.message;
       } finally {
+        // Partial prose remains usable after interruption, cancellation or error.
+        job.output = formatJobOutput(job);
         store.putJob(job);
         running.delete(job.id);
         jobPromises.delete(job.id);
@@ -251,9 +273,41 @@ async function generate(input) {
     preparing = false;
   }
 }
-
-
-
+const creativeToolNames = {
+  cover: "封面生成器",
+  brainstorm: "脑洞生成器",
+  bookName: "书名生成器",
+  nameTest: "书名测试",
+  intro: "简介生成器",
+  outline: "大纲生成器",
+  detail: "细纲生成器",
+  opening: "黄金开篇生成器",
+  cheat: "金手指生成器",
+  names: "名字生成器",
+  character: "人设生成器",
+  world: "世界观生成器",
+  glossary: "词条生成器",
+  matchIdea: "对标脑洞",
+  matchName: "对标书名",
+  matchIntro: "对标简介",
+};
+const creativeToolInstructions = {
+  brainstorm: "生成 3 个差异明确、能继续写成长篇的故事脑洞。每个方向写：一句话卖点、主角目标、核心冲突、关键转折、后续推进与阶段性悬念。不要把三个方向混成一个故事。",
+  bookName: "一次给出 12 个书名，按不同气质分组。每个书名附一句含义或卖点；最后选出最适合当前设定的 3 个并说明理由。避免只替换一两个字的重复标题。",
+  nameTest: "对用户给出的书名逐个评估；若只给一个，也要先评估它。按题材匹配、辨识度、记忆度、点击吸引力、剧透风险给 1–10 分和简短理由，最后给综合排序及可改进的备选标题。用表格呈现评分。",
+  intro: "写 3 版可直接修改使用的小说简介：清晰卖点版、强悬念版、情绪氛围版。每版控制在约 150–300 字，交代主角、目标、核心阻碍和独特看点，不剧透关键结局，不写分析说明替代简介正文。",
+  outline: "输出一份完整、前后连贯的小说故事大纲：核心设定与主题、主角目标和变化、主要人物关系、开端/发展/转折/高潮/结局。把关键因果写清楚，并给出明确结局；用户指定篇幅或结构时严格遵守。",
+  detail: "把用户提供的大纲拆成可落笔的章节细纲。按要求的卷、章范围输出；每章包括暂定标题、视角人物、目标、冲突、关键行动或信息、结尾钩子。让章节之间有因果衔接，不重复大纲原句；缺少章节数时先说明采用的合理假设。",
+  opening: "直接创作小说开篇正文，不要只给写作建议或提纲。用具体场景、人物行动和正在发生的冲突切入，在开头尽快建立悬念；保持提供的视角和语气，结尾留下推动下一段的疑问或行动。默认约 800–1200 字，用户有字数要求时优先遵守。",
+  cheat: "设计一套能推动长篇剧情的核心能力/金手指。依次写：能力规则、明确限制、使用代价、成长阶段、适用场景、容易失控之处、对手的破解方式，以及如何避免能力轻易解决所有冲突。设定要与题材相容。",
+  names: "根据时代、地域、题材和身份生成名字清单；默认提供 20 个，并按人物、地点、组织或物件分类（按用户需求调整类别）。每个名字附简短气质或适用场景，注意读音、字形和同一作品中的风格统一。",
+  character: "围绕用户指定的人物生成可用于写作的人物档案：身份与外在目标、内在需求、性格优势和缺陷、重要秘密、说话与行动特征、关键关系、人物弧光，以及可用于首次出场的行为细节。若未指定人数，先设计一位核心人物并补充两位关系人物。",
+  world: "搭建可用于小说的世界设定，按时代与地理、社会秩序/势力、资源与生活方式、特殊规则（如超自然或科技）、规则限制与代价、会影响主线的矛盾组织。说明设定怎样制造剧情，不要只罗列名词。",
+  glossary: "生成一组可直接收录进设定集的词条，默认 10 条并按类别整理。每条包括名称、定义、使用规则或功能、限制/代价、在剧情中的用途；遵循用户已有世界设定，避免同义重复。",
+  matchIdea: "提炼用户提供的参考脑洞中抽象的创意机制（如人物关系、冲突来源、信息差和升级节奏），不复述或仿写原作表达、人物和具体情节。再为当前作品给出 3 个有明显差异的原创方案，并说明各自如何适配设定。",
+  matchName: "分析参考书名的结构、类型信号、情绪承诺和记忆点，不复制原名的独特表达。结合用户作品卖点给出 10 个原创备选，注明各自的读者预期，并推荐最合适的 3 个。",
+  matchIntro: "拆解参考简介的信息顺序、钩子类型、冲突呈现和句式节奏，不照搬其表达。依据用户自己的作品设定，写 3 版原创简介，并简要说明每版突出什么卖点。",
+};
 async function restoreBackup() {
   const result = await dialog.showOpenDialog(win, {
     properties: ["openFile"],
@@ -549,11 +603,27 @@ const actions = {
     await clipboard.writeText(text(d.text));
     return true;
   },
+  "manual:export-draft": async (d) => {
+    const title = text(d.title ?? "");
+    const body = text(d.body);
+    assert(title.trim() || body.trim(), "文稿为空，请先写下内容再导出");
+    const filename = (title.trim() || "临时文稿")
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+      .slice(0, 100);
+    // The prefix also keeps Windows device names such as CON and NUL valid.
+    return saveFile(
+      `文稿-${filename}.txt`,
+      `${title ? `${title}\n\n` : ""}${body}`,
+      "txt",
+    );
+  },
+  "manual:chapter-sources": (d) => store.chapterWritingSources(d.chapterId),
   "books:list": () => store.list(),
   "book:get": (d) => store.book(d.id),
   "book:create": (d) => store.createBook(d),
   "book:update": (d) => store.updateBook(d.id, d.patch),
   "chapter:create": (d) => store.createChapter(d.bookId),
+  "chapter:create-with-body": (d) => store.createChapterWithBody(d.bookId, d),
   "chapter:save": (d) => store.updateChapter(d.id, d.patch, d.revision),
   "chapter:finalize": (d) => store.finalize(d.id, d.revision),
   "versions:list": (d) => store.versions(d.id),
@@ -572,12 +642,14 @@ const actions = {
       d.kind,
       d.instruction,
       store.skills(),
-      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds });
+      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})) });
     return rest;
   },
   "ai:generate": generate,
   
   
+  "manual:brainstorm": (d) => manualBrainstorm.start(d),
+  "manual:brainstorm-cancel": (d) => manualBrainstorm.cancel(text(d.requestId, 100)),
   "ai:cancel": (d) => {
     running.get(d.id)?.abort("user");
     return true;
@@ -715,6 +787,7 @@ const actions = {
   // 走和正常关闭一样的收尾流程：先中止生成任务、等落盘，再重启。
   "data:restart": async () => {
     await closeLogin();
+    await manualBrainstorm.cancelAll();
     for (const controller of running.values()) controller.abort("user");
     await Promise.allSettled([...jobPromises.values()]);
     closing = true;
@@ -724,6 +797,7 @@ const actions = {
   },
   "app:close": async () => {
     await closeLogin();
+    await manualBrainstorm.cancelAll();
     for (const controller of running.values()) controller.abort("user");
     await Promise.allSettled([...jobPromises.values()]);
     closing = true;
@@ -801,6 +875,7 @@ app.whenReady().then(() => {
   else win.loadFile(join(__dirname, "../dist/index.html"));
 });
 app.on("window-all-closed", () => {
+  void manualBrainstorm.cancelAll();
   for (const controller of running.values()) controller.abort("user");
   app.quit();
 });

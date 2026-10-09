@@ -1,0 +1,64 @@
+/* The same editor fills the reference pane without disturbing the manuscript. */
+.mt-memo-panel .mt-side-head > div:first-child { flex: 1; min-width: 0; }
+.mt-memo-panel .mt-memo-head-actions { flex-shrink: 0; }
+.mt-root .mt-memo-content-field {
+  gap: 6px;
+}
+.mt-memo-content-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  flex-shrink: 0;
+}
+.mt-memo-content-head > label {
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 500;
+}
+.mt-memo-content-head > .icon-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+}
+.mt-memo-content-head > .icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.mt-memo-content-head > .icon-button[aria-expanded="true"] {
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+  border-color: var(--accent-mid);
+}
+.mt-root .mt-memo-panel.mt-memo-expanded {
+  overflow: hidden;
+}
+.mt-memo-expanded .mt-side-head h2 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mt-memo-expanded > .mt-memo-filter,
+.mt-memo-expanded > .mt-memo-list,
+.mt-memo-expanded .mt-memo-title-field {
+  display: none;
+}
+.mt-root .mt-memo-expanded > .mt-memo-editor {
+  flex: 1;
+  min-height: 0;
+  border-top: 0;
+}
+.mt-root .mt-memo-expanded .mt-memo-content-field {
+  flex: 1;
+  min-height: 0;
+}
+.mt-root .mt-memo-expanded .mt-memo-content-field textarea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.mt-memo-expanded .mt-memo-detail,
+.mt-memo-expanded .mt-memo-actions {
+  flex-shrink: 0;
+}

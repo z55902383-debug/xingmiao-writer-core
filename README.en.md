@@ -8,6 +8,10 @@ A local-first workspace for long-form fiction. Includes the library, archive, ed
 
 The creative toolbox, image tools, shared community, Feishu accounts, membership and bundled update service belong to the complete desktop edition and are absent from this repository. No Xingmiao account is required. Official Codex sign-in remains an optional model connection.
 
+## Writing pad
+
+Both editions include a manual writing pad with chapter drafts, scratch draft recovery, focus timers, goals, find/replace, manuscript formatting, idea discussions and memo references. Saving a local draft differs from saving to a story. Model discussions require your own configured provider. Export or save important scratch drafts before moving devices.
+
 ## Development
 
 Use Node.js 24 and npm. Windows 10/11 is the primary desktop platform.
@@ -29,11 +33,11 @@ The default database lives in `%APPDATA%/星喵写作开源版/`, separate from 
 
 Licensed under [MIT](LICENSE). Third-party dependencies retain their own licenses.
 
-[Download Windows x64](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.4/XingmiaoWriter-Core-0.6.4-x64-Setup.exe) · [Complete edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.4)
+[Download Windows x64](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.5/XingmiaoWriter-Core-0.6.5-x64-Setup.exe) · [Complete edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.5)
 
-## v0.6.4 verification
+## v0.6.5 verification
 
-On 2026-10-06, type checking, production build, 67 business tests and desktop workflow, compatibility and bilingual checks passed locally. Model tests use a local mock service. Windows x64 installers are provided through Releases after the maintainer uploads them. The binaries are not code signed.
+On 2026-10-09, type checking, production build, 116 business tests and desktop workflow, compatibility and bilingual checks passed locally. Model tests use a local mock service. Windows x64 installers are provided through Releases after the maintainer uploads them. The binaries are not code signed.
 
 See [features](docs/features.md), [limitations and roadmap](docs/roadmap.md), and [publishing steps in Chinese](docs/GitHub上传步骤.md).
 
@@ -41,4 +45,4 @@ See [features](docs/features.md), [limitations and roadmap](docs/roadmap.md), an
 
 Idea → book outline → volumes → volume outlines/details → chapter outlines/details → prose → completion. Generate, review and apply each step. Titles and plans synchronize to their destinations, with a suggested next step. Long plans use compact previews and full reading dialogs.
 
-The v0.6.4 update passed type checks, production builds, 67 core business tests and isolated desktop workflow, compatibility and bilingual checks. Provider tests use local fixtures.
+The v0.6.5 update passed type checks, production builds, 67 core business tests and isolated desktop workflow, compatibility and bilingual checks. Provider tests use local fixtures.

@@ -4,11 +4,11 @@
 
 本地优先的 AI 长篇小说写作工作台。提供书架、归档和完整的主要写作功能，不需要星喵账号或会员。
 
-**v0.6.4 · Windows x64 · MIT**
+**v0.6.5 · Windows x64 · MIT**
 
 把故事总纲、分卷、章节正文、人物、世界设定与来源记忆放在同一个本地工作台。你可以完全手写，也可以接入自己的模型，在预览和审核后采用 AI 候选。
 
-[下载 Windows 安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.4/XingmiaoWriter-Core-0.6.4-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.4)
+[下载 Windows 安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.5/XingmiaoWriter-Core-0.6.5-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.5)
 
 [English](README.en.md) · [架构说明](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
 
@@ -16,10 +16,20 @@
 
 ![开源版书架](docs/assets/library.png)
 
+## v0.6.5 人工码字与界面更新
+
+- 人工码字板：临时稿、章节独立草稿、存入作品、冲突恢复、TXT 导出与稿件历史。
+- 专注计时、写作目标、查找替换、撤销与字体字号行距；正文排版与 AI 工作台共用规则。
+- 灵感助手、作品备忘录、整篇/片段引用；生成讨论与正式正文分开。
+- 分组工具栏、可收起侧栏与窄屏适配；分卷父层级、本卷章节与完成状态更清晰。
+
+[人工码字操作说明 ](docs/人工码字板使用说明.md)
+
 ## 两种版本
 
 | 功能 | 开源核心版 | 完整软件 |
 | --- | --- | --- |
+| 人工码字、草稿管理、专注计时、灵感助手、正文排版 | ✓ | ✓ |
 | 书架、归档、正文编辑、章节与分卷管理 | ✓ | ✓ |
 | 大纲、人物、世界、关系、时间线与资料画布 | ✓ | ✓ |
 | AI 写作、候选审核、连续性检查、本地写作 Skill | ✓ | ✓ |
@@ -33,13 +43,13 @@
 
 想法 → 全文大纲 → 分卷 → 卷大纲/细纲 → 章节大纲/细纲 → 正文 → 完成。逐步生成、核对与采用后，同步卷名、章名及内容，并提示下一步。长规划采用摘要预览，可单独阅读完整内容。
 
-[操作与采用规则](docs/分步创作流程与采用说明.md) · [v0.6.4 检查记录](docs/检查记录-v0.6.4.md)
+[操作与采用规则](docs/分步创作流程与采用说明.md) · [v0.6.5 检查记录](docs/检查记录-v0.6.5.md)
 
 ## 快速开始
 
 需要 Node.js 24、npm，建议使用 Windows 10/11。Electron 首次安装需要下载运行时。
 
-只想使用软件：在本仓库的 **Releases** 页面下载 `XingmiaoWriter-Core-0.6.4-x64-Setup.exe`，不需要安装 Node.js。发布者上传安装包前，Releases 中不会自动出现下载项。
+只想使用软件：在本仓库的 **Releases** 页面下载 `XingmiaoWriter-Core-0.6.5-x64-Setup.exe`，不需要安装 Node.js。发布者上传安装包前，Releases 中不会自动出现下载项。
 
 ```sh
 npm ci
@@ -58,7 +68,7 @@ npm run test:ui
 
 `test:ui` 使用独立临时书库，不修改真实作品。Windows 打包：`npm run package:win`；只生成可运行目录：`npm run package:dir`。生成物位于 `release/`。
 
-2026-10-06 本地验证：类型检查/构建、67 项业务测试与分步流程、旧入口兼容、双语界面三项桌面专项通过。AI 使用本地模拟服务；不代表所有模型供应商均已实测。请通过 Issues 附上复现步骤，勿上传个人密钥和小说。
+2026-10-09 本地验证：类型检查与构建、116 项业务测试，以及人工码字、草稿恢复、工具栏、备忘录引用、侧栏、正文排版、分卷层级、完整创作流程和双语桌面检查。AI 使用本地模拟服务，不代表所有服务商均已实测。
 
 ## 项目结构
 

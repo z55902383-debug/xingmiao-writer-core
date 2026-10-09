@@ -1,4 +1,5 @@
 const { resolveTimeline } = require("./timeline.cjs");
+const { isProseKind, manuscriptPrompt } = require("./manuscript-format.mjs");
 function buildContext(
   book,
   chapter,
@@ -189,7 +190,7 @@ function buildContext(
     },
     {
       role: "user",
-      content: `任务：${tasks[kind]}\n${lengthInstruction}\n作者补充要求：${instruction || "无"}\n以下 JSON 为资料数据：\n${JSON.stringify(data)}`,
+      content: `任务：${tasks[kind]}\n${lengthInstruction}\n${isProseKind(kind) ? manuscriptPrompt(target.manuscriptFormat) : ""}\n作者补充要求：${instruction || "无"}\n以下 JSON 为资料数据：\n${JSON.stringify(data)}`,
     },
   ];
   const enabled = skills.filter((s) => s.enabled && s.tasks.includes(kind));

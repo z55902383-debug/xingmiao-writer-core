@@ -193,7 +193,7 @@ test("候选稿追加和历史恢复保留原文，重复采用被拒绝", (t) =
   };
   db.putJob(job);
   db.adopt(job.id, "append");
-  assert.equal(db.chapter(c.id).body, "开头\n\n后文");
+  assert.equal(db.chapter(c.id).body, "开头\n\n　　后文");
   assert.throws(() => db.adopt(job.id, "append"), /已经采用/);
   const v = db.versions(c.id).find((v) => v.body === "开头");
   db.restoreVersion(c.id, v.id, db.chapter(c.id).revision);

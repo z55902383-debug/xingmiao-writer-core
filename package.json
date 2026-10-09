@@ -1,6 +1,6 @@
 {
   "name": "xingmiao-writer-core",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "private": true,
   "description": "星喵写作开源核心版 · 本地 AI 小说工作台",
   "main": "electron/main.cjs",
@@ -14,7 +14,14 @@
     "package:win": "npm run notices:third-party && npm run build && electron-builder --config electron-builder.config.cjs --win --x64 --publish never",
     "notices:third-party": "node scripts/third-party-notices.mjs",
     "export:source": "node scripts/export-source.mjs",
-    "test:planning:ui": "node tests/desktop-planning.mjs && node tests/desktop-planning-flow.mjs"
+    "test:planning:ui": "node tests/desktop-planning.mjs && node tests/desktop-planning-flow.mjs",
+    "test:manual:ui": "node tests/desktop-manual-typing.mjs && node tests/desktop-manual-followup.mjs",
+    "test:formatting:ui": "node tests/desktop-manuscript-formatting.mjs",
+    "test:manual:ideas": "node tests/desktop-manual-ideas.mjs",
+    "test:manual:toolbar": "node tests/desktop-manual-toolbar.mjs",
+    "test:manual:memo-reference": "node tests/desktop-manual-memo-reference.mjs",
+    "test:manual:panels": "node tests/desktop-manual-panel-state.mjs",
+    "test:planning:hierarchy": "node tests/desktop-planner-hierarchy.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.5",

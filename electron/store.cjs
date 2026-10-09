@@ -2,6 +2,7 @@ const { DatabaseSync } = require("node:sqlite");
 const { randomUUID } = require("node:crypto");
 const { mkdirSync } = require("node:fs");
 const { dirname } = require("node:path");
+const { normalizeManuscriptFormat, isProseKind, formatJobOutput, candidateManuscriptBody } = require("./manuscript-format.mjs");
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
 const text = (value, max = Infinity) => {
@@ -313,6 +314,20 @@ class Store {
     this.putBook(book);
     return c;
   }
+  createChapterWithBody(bookId, input) {
+    // Validate the complete draft before inserting a chapter. Creation and its
+    // first save share one transaction so failed saves cannot leave empty rows.
+    const title = text(input.title ?? "", 120).trim();
+    const body = text(input.body);
+    assert(body.trim(), "请先写下正文，再保存为新章节");
+    return this.transaction(() => {
+      const book = this.rawBook(bookId);
+      assert(!book.deletedAt, "请先从回收站恢复作品");
+      assert(!book.archived, "请先恢复已归档的作品，再保存新章节");
+      const chapter = this.createChapter(bookId, title);
+      return this.updateChapter(chapter.id, { body }, chapter.revision);
+    });
+  }
   snapshot(c, label) {
     const version = {
       id: id(),
@@ -485,6 +500,28 @@ class Store {
       .all(bookId)
       .map((r) => JSON.parse(r.data));
   }
+  chapterWritingSources(chapterId) {
+    const chapter = this.chapter(text(chapterId, 100));
+    const book = this.rawBook(chapter.bookId);
+    assert(book.id === chapter.bookId, "章节不属于该作品");
+    // Match String.trim(), including full-width spacing in Chinese drafts.
+    const whitespace =
+      " \t\n\r\v\f\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
+    return this.db
+      .prepare(
+        `SELECT data FROM candidates
+         WHERE book_id=?
+           AND json_extract(data, '$.bookId')=?
+           AND json_extract(data, '$.chapterId')=?
+           AND json_extract(data, '$.kind') IN ('write', 'continue', 'polish')
+           AND json_extract(data, '$.status') IN ('done', 'error', 'interrupted', 'cancelled')
+           AND json_type(data, '$.output')='text'
+           AND trim(json_extract(data, '$.output'), ?)<>''
+         ORDER BY rowid DESC LIMIT 100`,
+      )
+      .all(book.id, book.id, chapter.id, whitespace)
+      .map((row) => JSON.parse(row.data));
+  }
   job(jobId) {
     const row = this.db
       .prepare("SELECT data FROM candidates WHERE id=?")
@@ -535,6 +572,17 @@ class Store {
         ["write", "continue", "polish", "outline", "style"].includes(job.kind),
         "该结果需单独审核",
       );
+      let proseBody;
+      if (isProseKind(job.kind)) {
+        // Old candidates have no captured preference. Resolve it once on adoption;
+        // new candidates retain the rules under which their review was generated.
+        job.manuscriptFormat = normalizeManuscriptFormat(job.manuscriptFormat ?? this.setting("manuscript-formatting", {}));
+        job.output = formatJobOutput(job);
+        proseBody = candidateManuscriptBody(c.body, job, mode);
+        if (job.review && (typeof job.review.bodyHash === "string" || ["ready", "empty"].includes(job.review.status)) && job.review.bodyHash !== require("./sync-review.cjs").hash(proseBody)) {
+          job.review = { status: "error", error: "采用的正文格式已变化，请重新分析章节变化。" };
+        }
+      }
       if (job.kind === "style") {
         const book = this.rawBook(job.bookId);
         assert(
@@ -548,10 +596,7 @@ class Store {
           job.kind === "outline"
             ? { outline: job.output }
             : {
-                body:
-                  mode === "append"
-                    ? `${c.body}${c.body ? "\n\n" : ""}${job.output}`
-                    : job.output,
+                body: proseBody,
               },
           c.revision,
           "采用 AI 候选前快照",
