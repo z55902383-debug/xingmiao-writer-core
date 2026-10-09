@@ -3116,6 +3116,8 @@ Object.assign(english, {
 
 
 
+
+
 // Discoverable reference controls and reference snapshots.
 Object.assign(english, {
   "{0} 项": "{0} items",
@@ -3123,6 +3125,11 @@ Object.assign(english, {
   "请选择章节后核对生成资料。": "Select a chapter to check generation references.",
   "蒸馏只读目标原文": "Distillation uses only its source",
   "当前蒸馏只分析目标原文；所选风格与要求用于后续创作。": "This distillation analyzes only its source. Selected styles and requirements are for later writing.",
+  "请先选择章节": "Select a chapter first",
+  "作品信息": "Book information",
+  "本章概要": "Chapter summary",
+  "故事想法": "Story idea",
+  "全文大纲": "Full story outline",
   "选择写作风格与要求": "Choose writing styles and requirements",
   "风格 {0} · 要求 {1}": "Styles {0} · requirements {1}",
   "生成前可多选，决定这次怎么写。": "Choose multiple references to shape this generation.",

@@ -21,3 +21,13 @@ test("all static interface translation calls have English entries with matching 
   }
   assert.deepEqual(missing, []);
 });
+
+test("reference metadata labels and their action states have English translations", async () => {
+  const { english } = await import(pathToFileURL(path.resolve("src/locales/en.ts")));
+  const source = fs.readFileSync("src/ReferenceOverview.tsx", "utf8");
+  const map = source.match(/const labels:[\s\S]*?= \{([\s\S]*?)\n\};/);
+  assert.ok(map, "Reference labels must remain discoverable to translation checks");
+  const labels = [...map[1].matchAll(/\w+:\s*"([^"]+)"/g)].map(row => row[1]);
+  const missing = [...labels, "请先选择章节", "正在核对引用", "引用待核对", "可查看引用清单", "蒸馏只读目标原文"].filter(key => !english[key]);
+  assert.deepEqual(missing, []);
+});
