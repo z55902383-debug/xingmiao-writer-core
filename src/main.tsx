@@ -5,6 +5,7 @@ import { applySavedTheme } from "./theme";
 import "./styles.css";
 import "./ui-polish.css";
 import "./manual-typing.css";
+import "./reference-controls.css";
 applySavedTheme();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

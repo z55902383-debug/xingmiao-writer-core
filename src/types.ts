@@ -70,6 +70,7 @@ export type Kind =
   | "summary"
   | "timelinePlan";
 export type ContextInfo = {
+  referenceSections?: { key: string; group: "story" | "writing" | "task"; count?: number; titles?: string[] }[];
   writingReferences?: { id: string; kind: "style" | "requirement"; title: string; body: string }[];
   sourceChapters?: {
     id: string;

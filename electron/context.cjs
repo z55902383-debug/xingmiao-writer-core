@@ -207,6 +207,7 @@ function buildContext(
         .join("\n\n");
   return {
     messages,
+    referenceSections: require("./context-references.cjs").describeReferences({ ...data, referenceName: book.referenceName }, writingReferences, enabled, instruction),
     writingReferences,
     warnings,
     skills: enabled.map((s) => ({
@@ -224,7 +225,7 @@ function buildContext(
     contextChapters: count,
     chapterTitles: recent.map(c=>c.title),
     sourceChapters,
-    characterCount: book.characters.length,
+    characterCount: characterData.length,
     characters: messages.reduce((s, m) => s + m.content.length, 0),
   };
 }

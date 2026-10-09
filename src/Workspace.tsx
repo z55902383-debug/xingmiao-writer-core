@@ -5,7 +5,8 @@ import CreationGuideIsland from "./CreationGuideIsland";
 import TimelinePanel from "./TimelinePanel";
 import VolumePlanner from "./VolumePlanner";
 import { PlanningCandidate, PlanningText } from "./PlanningText";
-import WritingProfiles, { WritingPicker } from "./WritingProfiles";
+import WritingProfiles, { WritingPicker, profileSelection } from "./WritingProfiles";
+import ReferenceOverview from "./ReferenceOverview";
 import GenerationActivity, { type GenerationStart } from "./GenerationActivity";
 import { ROUTED_PLANNING, VOLUME_TASKS, nextPlanningStep } from "./planningFlow";
 import CreativeCanvas from "./CreativeCanvas";
@@ -540,6 +541,9 @@ export default function Workspace({
   );
   const [contextError, setContextError] = useState("");
   const [showContext, setShowContext] = useState(false);
+  const [writingPickerOpen, setWritingPickerOpen] = useState(false);
+  const [contextPending, setContextPending] = useState(true);
+  const [contextRefresh, setContextRefresh] = useState(0);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [findText, setFindText] = useState("");
@@ -715,64 +719,14 @@ export default function Workspace({
   const nextChapter = currentNo ? book.chapters[currentNo] : undefined;
   /* 参考资料清单：把「这一轮模型到底读了什么」摊开给作者看，
      而不是只报一个总数。每一项都能追溯到作品里的具体位置。 */
-  const refItems = chapter
-    ? [
-        {
-          label: "本章细纲",
-          on: !!chapter.outline.trim(),
-          note: chapter.outline.trim()
-            ? tr("{0} 字", {0: number(count(chapter.outline))})
-            : "未填写",
-        },
-        {
-          label: "前文摘要",
-          on: !!context?.chapterCount,
-          note: context?.chapterCount
-            ? tr("{0} 个定稿章节", {0: context.chapterCount})
-            : "未引用前章正文",
-        },
-        {
-          label: "人物档案",
-          on: !!context?.characterCount,
-          note: context?.characterCount ? tr("{0} 位", {0: context.characterCount}) : "无",
-        },
-        {
-          label: "世界设定",
-          on: !!book.world.trim(),
-          note: book.world.trim() ? "已填写" : "未填写",
-        },
-        {
-          label: "有效记忆",
-          on: !!context?.memoryCount,
-          note: context?.memoryCount ? tr("{0} 条", {0: context.memoryCount}) : "无",
-        },
-        {
-          label: "时间线状态",
-          on: !!context?.timelineCount,
-          note: context?.timelineCount ? tr("{0} 条", {0: context.timelineCount}) : "无",
-        },
-        {
-          label: "写作 Skill",
-          on: !!context?.skills?.length,
-          note: context?.skills?.length
-            ? context.skills.map((s) => s.name).join("、")
-            : "未启用",
-        },
-        {
-          label: "风格参考",
-          on: !!context?.writingReferences?.length,
-          note: context?.writingReferences?.length ? context.writingReferences.map(item => item.title).join("、") : "未选择",
-        },
-        {
-          label: "临时要求",
-          on: !!instruction.trim(),
-          note: instruction.trim()
-            ? instruction.trim().replace(/\s+/g, " ").slice(0, 22)
-            : "未填写",
-        },
-      ]
-    : [];
-  const refReady = refItems.filter((i) => i.on).length;
+  const refReady = context?.referenceSections?.length || 0;
+  const writingChoice = profileSelection(book);
+  function openReferenceControls() {
+    setAssistantOpen(true);
+    setWritingPickerOpen(true);
+    setShowContext(true);
+    requestAnimationFrame(() => document.querySelector(".assistant-reference-controls")?.scrollIntoView({ block: "start" }));
+  }
   const jobs = book.candidates.filter(
     (j) =>
       j.id === selectedJob || j.status === "running" || j.review?.status === "analyzing" ||
@@ -926,6 +880,8 @@ export default function Workspace({
   }, [view]);
   useEffect(() => {
     let cancelled = false;
+    if (!chapter) { setContext(null); setContextError(""); setContextPending(false); return; }
+    setContextPending(true);
     const timer = setTimeout(() => {
       if (!chapter) return;
       api<ContextInfo>("context:preview", {
@@ -941,12 +897,14 @@ export default function Workspace({
           if (!cancelled) {
             setContext(result);
             setContextError("");
+            setContextPending(false);
           }
         })
         .catch((e) => {
           if (!cancelled) {
             setContext(null);
             setContextError(e.message);
+            setContextPending(false);
           }
         });
     }, 800);
@@ -955,6 +913,13 @@ export default function Workspace({
       clearTimeout(timer);
     };
   }, [
+    book.id,
+    book.title,
+    book.genre,
+    book.premise,
+    book.chapters,
+    book.worldRecords,
+    book.foreshadows,
     chapter?.revision,
     chapter?.id,
     book.memories,
@@ -978,6 +943,7 @@ export default function Workspace({
     config,
     manuscriptFormat,
     distillProfileId,
+    contextRefresh,
   ]);
   /* 新建章节时继承「当前这一章」的归属分卷与目标字数。
      否则在正文页点添加，新章会掉进「未分卷」分组，还得回大纲重新归档。 */
@@ -3199,37 +3165,27 @@ export default function Workspace({
           <p className="generation-destination">{tr("生成去向：")}{action === "style" && distillProfileId ? (book.writingProfiles || []).find(item => item.id === distillProfileId)?.title || tr("资料已删除，请重新选择") : VOLUME_TASKS.includes(action)
               ? `${book.volumes?.find((v) => v.id === targetVolumeId)?.title || tr("请先选择卷")} · ${tr(kinds[action])}`
               : tr(kinds[action])}{" "}{tr("· 确认后写入")}</p>
+          <div className="assistant-reference-controls">
+          <WritingPicker book={book} sourceOnly={action === "style" && !!distillProfileId} open={writingPickerOpen} onToggle={() => setWritingPickerOpen(value => !value)} disabled={busy || !!running} onManage={() => { setView("style"); setAssistantOpen(false); }} onSelect={selection => run(async () => replace(await api<Book>("writing:select", { bookId: book.id, selection })))} />
           <button
             className="context-toggle"
-            onClick={() => setShowContext(!showContext)}
+            onClick={() => { setShowContext(!showContext); if (!showContext) setWritingPickerOpen(true); }}
             aria-expanded={showContext}
+            aria-controls="assistant-context-detail"
           >
             <FolderOpen size={16} />
-            <span>{tr("本次参考资料")}</span>
+            <span><strong>{tr("本次参考资料")}</strong><em>{tr("核对这次模型会读取哪些内容")}</em></span>
             <small>
-              {context ? tr("{0}/{1} 项", {0: refReady, 1: refItems.length}) : tr("待准备")}
+              {contextPending ? tr("更新中") : context ? tr("{0} 类", {0: refReady}) : tr("待准备")}
             </small>
             <CaretDown size={14} />
           </button>
           {showContext && (
-            <div className="context-detail">
-              <ul className="ref-list">
-                {refItems.map((item) => (
-                  <li key={item.label} className={item.on ? "on" : ""}>
-                    <span className="ref-mark" aria-hidden="true" />
-                    <b>{tr(item.label)}</b>
-                    <em>{tr(item.note)}</em>
-                  </li>
-                ))}
-              </ul>
-              <WritingPicker book={book} disabled={busy || !!running} onManage={() => { setView("style"); }} onSelect={selection => run(async () => replace(await api<Book>("writing:select", { bookId: book.id, selection })))} />
-              {context && (
-                <p className="ref-foot">{tr("本次发送约")}{" "}{number(context.characters)}{" "}{tr("字符（完整资料）")}{context.chapterTitles?.length
-                    ? tr(" · 关联章节：{0}", {0: context.chapterTitles.join("、")})
-                    : ""}
-                </p>
-              )}
-              {context?.sourceChapters?.length ? (
+            <div className="context-detail" id="assistant-context-detail" aria-busy={contextPending}>
+              <p className="reference-help">{tr("按当前任务与选择准备；候选稿另有实际引用记录。")}</p>
+              {contextPending ? <p role="status">{tr("正在更新引用清单…")}</p> : context && <ReferenceOverview context={context}/>}
+              {!chapter && <p>{tr("请选择章节后核对生成资料。")}</p>}
+              {!contextPending && context?.sourceChapters?.length ? (
                 <div className="context-chapter-picker">
                   <strong>{tr("纳入前文")}</strong>
                   {context.sourceChapters.map((source) => {
@@ -3262,17 +3218,18 @@ export default function Workspace({
                   <small>{tr("仅显示已定稿前章；取消勾选后，本次生成不会读取该章正文。")}</small>
                 </div>
               ) : null}
-              {contextError && <p>{contextError}</p>}
-              {context?.warnings.map((w, i) => (
+              {!contextPending && contextError && <div role="alert" className="reference-error"><p>{contextError}</p><Button onClick={() => setContextRefresh(value => value + 1)}>{tr("重新核对参考资料")}</Button></div>}
+              {!contextPending && context?.warnings.map((w, i) => (
                 <p className="warning" key={i}>
                   {w}
                 </p>
               ))}
             </div>
           )}
+          </div>
           {selected && (
             <section className="candidate">
-              {!!selected.context.writingReferences?.length && <details className="writing-job-references"><summary>{tr("本次使用的风格与要求")}</summary>{selected.context.writingReferences.map(item => <div key={item.id}><strong>{item.title}</strong><div className="writing-profile-text">{item.body}</div></div>)}</details>}
+              <details className="candidate-reference-snapshot"><summary><FolderOpen size={15}/><span>{tr("这份结果实际参考")}</span><small>{tr("风格 {0} · 要求 {1}", { 0: selected.context.writingReferences?.filter(item => item.kind === "style").length || 0, 1: selected.context.writingReferences?.filter(item => item.kind === "requirement").length || 0 })}</small><CaretDown size={14}/></summary><p className="reference-help">{tr("生成时保存的记录，修改当前选择不会改变这份候选。")}</p><ReferenceOverview context={selected.context} snapshot/></details>
               <div className="candidate-head">
                 <span>
                   <Sparkle size={15} />
@@ -3494,8 +3451,11 @@ export default function Workspace({
           ref={composeBox}
           style={panes.compose ? { height: panes.compose } : undefined}
         >
+          <button className="compose-reference-trigger" onClick={openReferenceControls} aria-label={tr("选择风格并核对参考资料")}>
+            <FolderOpen size={17}/><span><strong>{tr("风格与参考")}</strong><small>{tr("风格 {0} · 要求 {1}", { 0: writingChoice.styleIds.length, 1: writingChoice.requirementIds.length })}{" · "}{tr(!chapter ? "请先选择章节" : contextPending ? "正在核对引用" : contextError ? "引用待核对" : action === "style" && distillProfileId ? "蒸馏只读目标原文" : "可查看引用清单")}</small></span><CaretRight size={16}/>
+          </button>
           <details className="compose-advanced">
-            <summary>{tr("参考范围与目标字数")}</summary>
+            <summary>{tr("参考范围与目标字数")}<span className="compose-setting-summary">{tr("目标 {0} 字", { 0: chapter?.targetWords || book.chapterTargetWords || 2000 })}</span></summary>
             <div className="compose-advanced-popover">
               <Field
                 label={

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, PencilSimple, Trash, UploadSimple, Export, Sparkle, ArrowCounterClockwise, DotsThree, Check } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, UploadSimple, Export, Sparkle, ArrowCounterClockwise, DotsThree, Check, CaretDown } from "@phosphor-icons/react";
 import { api } from "./api";
 import { tr } from "./i18n";
 import { Button, Field, Modal, Menu } from "./ui";
@@ -12,26 +12,49 @@ export function profileRows(book: Book): WritingProfile[] {
 export function profileSelection(book: Book): WritingSelection {
   return book.writingSelection || { styleIds: book.style.trim() ? ["legacy-book-style"] : [], requirementIds: [] };
 }
-export function WritingPicker({ book, disabled, onSelect, onManage }: { book: Book; disabled: boolean; onSelect: (selection: WritingSelection) => Promise<void>; onManage: () => void }) {
+export function WritingPicker({ book, disabled, onSelect, onManage, open, onToggle, sourceOnly = false }: { book: Book; disabled: boolean; onSelect: (selection: WritingSelection) => Promise<void>; onManage: () => void; open: boolean; onToggle: () => void; sourceOnly?: boolean }) {
   const [pendingChoice, setPendingChoice] = useState<WritingSelection | null>(null);
+  const [query, setQuery] = useState("");
+  const [onlySelected, setOnlySelected] = useState(false);
+  const [pickerKind, setPickerKind] = useState<"style" | "requirement">("style");
   const selected = pendingChoice || profileSelection(book);
+  const all = profileRows(book);
+  const chosen = all.filter(item => selected[item.kind === "style" ? "styleIds" : "requirementIds"].includes(item.id));
   async function choose(value: WritingSelection) { setPendingChoice(value); try { await onSelect(value); } finally { setPendingChoice(null); } }
   return <section className="writing-picker" aria-label={tr("风格参考")}>
-    <div className="writing-section-head"><strong>{tr("风格参考")}</strong><Button variant="ghost" onClick={onManage}>{tr("管理风格与要求")}</Button></div>
-    {(["style", "requirement"] as const).map(kind => {
+    <button className="writing-picker-toggle" aria-expanded={open} aria-controls="writing-picker-options" onClick={onToggle}><PaintPickerIcon/><span><strong>{tr("选择写作风格与要求")}</strong><small>{tr("风格 {0} · 要求 {1}", { 0: selected.styleIds.length, 1: selected.requirementIds.length })}</small></span><CaretDown size={16}/></button>
+    <p className="writing-picker-intro">{tr("生成前可多选，决定这次怎么写。")}</p>
+    {sourceOnly && <p className="writing-picker-intro">{tr("当前蒸馏只分析目标原文；所选风格与要求用于后续创作。")}</p>}
+    {chosen.length ? <div className="writing-selected-preview" aria-label={tr("已选风格与要求")}>{chosen.slice(0, 2).map(item => <span key={item.id} title={item.title}><Check size={12}/><span>{item.title}</span></span>)}{chosen.length > 2 && <span>{tr("另 {0} 项", { 0: chosen.length - 2 })}</span>}</div> : <p className="writing-selection-empty">{tr("未选择风格或要求，可按默认写法生成。")}</p>}
+    {open && <div id="writing-picker-options" className="writing-picker-options">
+    <div className="writing-section-head"><strong>{tr("从资料库选择")}</strong><Button variant="ghost" onClick={onManage}>{tr("管理风格与要求")}</Button></div>
+    <Field label={tr("搜索风格或要求名称")}><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={tr("名称或来源文件名")} /></Field>
+    <label className="writing-selected-filter"><input type="checkbox" checked={onlySelected} onChange={event => setOnlySelected(event.target.checked)}/>{tr("只看已选")}</label>
+    <div className="writing-picker-tabs" role="tablist" aria-label={tr("选择资料类型")}>{(["style", "requirement"] as const).map(kind => <button key={kind} id={`writing-choice-${kind}-tab`} role="tab" aria-selected={pickerKind === kind} aria-controls="writing-choice-group" onClick={() => { setPickerKind(kind); setQuery(""); }}>{tr(kind === "style" ? "写作风格" : "写作要求")}<small>{selected[kind === "style" ? "styleIds" : "requirementIds"].length}</small></button>)}</div>
+    {[pickerKind].map(kind => {
       const field = kind === "style" ? "styleIds" : "requirementIds";
-      const rows = profileRows(book).filter(item => item.kind === kind);
-      return <fieldset key={kind} disabled={disabled || !!pendingChoice}><legend>{tr(kind === "style" ? "写作风格" : "写作要求")}</legend>
-        {!rows.length && <p>{tr("暂无资料，可在风格档案中新建。")}</p>}
-        {rows.map(item => <div className="writing-choice" key={item.id}>
-          <label><input type="checkbox" checked={selected[field].includes(item.id)} disabled={!item.body.trim()} onChange={event => void choose({ ...selected, [field]: event.target.checked ? [...selected[field], item.id] : selected[field].filter(id => id !== item.id) })} />{item.title}</label>
+      const available = all.filter(item => item.kind === kind);
+      const rows = available.filter(item => (!onlySelected || selected[field].includes(item.id)) && `${item.title} ${item.sourceName}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+      const selectedRows = rows.filter(item => selected[field].includes(item.id)), otherRows = rows.filter(item => !selected[field].includes(item.id));
+      return <fieldset role="tabpanel" id="writing-choice-group" aria-labelledby={`writing-choice-${kind}-tab`} key={kind} disabled={disabled || !!pendingChoice}><legend>{tr(kind === "style" ? "写作风格" : "写作要求")}<small>{tr("已选 {0}/{1}", { 0: selected[field].length, 1: available.length })}</small></legend>
+        <div className="writing-picker-group-head"><span>{tr(kind === "style" ? "视角、语言、对白与节奏" : "结构、段落与质量标准")}</span><Button variant="ghost" disabled={!selected[field].length} onClick={() => void choose({ ...selected, [field]: [] })}>{tr(kind === "style" ? "清空风格" : "清空要求")}</Button></div>
+        {!rows.length && <p>{tr(!available.length ? "暂无资料，可在风格档案中新建。" : "没有匹配的条目，可清除搜索或取消只看已选。")}</p>}
+        <div className="writing-choice-list">{[["已选", selectedRows], ["可选择", otherRows]].map(([label, entries]) => {
+          const items = entries as WritingProfile[];
+          return items.length ? <div className="writing-choice-group" key={label as string}><p>{tr(label as string)} · {items.length}</p>{items.map(item => <div className={`writing-choice ${selected[field].includes(item.id) ? "is-selected" : ""}`} key={item.id}>
+          <label><input type="checkbox" aria-label={item.title} checked={selected[field].includes(item.id)} disabled={!item.body.trim() || (selected[field].length >= 30 && !selected[field].includes(item.id))} onChange={event => void choose({ ...selected, [field]: event.target.checked ? [...selected[field], item.id] : selected[field].filter(id => id !== item.id) })} /><span title={item.title}>{item.title}</span></label>
+          {item.id === "legacy-book-style" && <small>{tr("本书原有档案")}</small>}
           {item.body.trim() ? <details><summary>{tr("查看内容")}</summary><div className="writing-profile-text">{item.body}</div></details> : <small>{tr("请先填写或蒸馏内容")}</small>}
-        </div>)}
+        </div>)}</div> : null;
+        })}</div>
+        {selected[field].length >= 30 && <p>{tr("每类最多选择 30 条，可先取消部分条目。")}</p>}
       </fieldset>;
     })}
     <p className="writing-help">{tr("可选择多条，也可全部取消；只发送选中的内容，不发送蒸馏原文。")}</p>
+    </div>}
   </section>;
 }
+function PaintPickerIcon() { return <Sparkle size={18} aria-hidden="true"/>; }
 
 type Draft = Partial<WritingProfile> & Pick<WritingProfile, "kind" | "title" | "body" | "source" | "sourceName">;
 export default function WritingProfiles({ book, busy, onChanged, beforeChange, onGenerate, notify }: {
@@ -43,9 +66,12 @@ export default function WritingProfiles({ book, busy, onChanged, beforeChange, o
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [remove, setRemove] = useState<WritingProfile | null>(null);
-  const rows = (book.writingProfiles || []).filter(item => item.kind === kind);
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const [libraryFilter, setLibraryFilter] = useState("all");
   const selection = profileSelection(book);
-  function open(item?: WritingProfile) { setError(""); setDraft(item ? { ...item } : { kind, title: "", body: "", source: "", sourceName: "" }); }
+  const availableRows = (book.writingProfiles || []).filter(item => item.kind === kind);
+  const rows = availableRows.filter(item => `${item.title} ${item.sourceName}`.toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase()) && (libraryFilter === "all" || libraryFilter === "pending" ? libraryFilter === "all" || !item.body.trim() : selection[kind === "style" ? "styleIds" : "requirementIds"].includes(item.id)));
+  function open(item?: WritingProfile) { setError(""); if (!item) { setLibraryQuery(""); setLibraryFilter("all"); } setDraft(item ? { ...item } : { kind, title: "", body: "", source: "", sourceName: "" }); }
   async function perform(task: () => Promise<void>) {
     setSaving(true); setError("");
     try { await beforeChange(); await task(); }
@@ -75,7 +101,9 @@ export default function WritingProfiles({ book, busy, onChanged, beforeChange, o
       {(["style", "requirement"] as const).map(value => <button role="tab" aria-selected={kind === value} key={value} onClick={() => setKind(value)}>{tr(value === "style" ? "写作风格" : "写作要求")} <small>{(book.writingProfiles || []).filter(item => item.kind === value).length}</small></button>)}
     </div>
     <p className="writing-type-description">{tr(kind === "style" ? "写作风格：决定文章的语感，包括叙事视角、句式、对白与节奏。" : "写作要求：规定文章的标准，包括结构、段落、禁用表达与质量检查。")}</p>
-    {!rows.length && <div className="writing-empty"><p>{tr(kind === "style" ? "还没有自定义风格。可以描述叙事视角、语言、对白与节奏。" : "还没有写作要求。可以写下结构、段落、禁用表达和质量标准。")}</p><Button variant="primary-soft" onClick={() => open()} disabled={busy || saving}>{tr("添加第一条")}</Button></div>}
+    {!!availableRows.length && <div className="writing-library-search"><Field label={tr("搜索此类资料")}><input type="search" value={libraryQuery} onChange={event => setLibraryQuery(event.target.value)} placeholder={tr("名称或来源文件名")}/></Field><Field label={tr("资料状态")}><select value={libraryFilter} onChange={event => setLibraryFilter(event.target.value)}><option value="all">{tr("全部资料")}</option><option value="selected">{tr("已选用")}</option><option value="pending">{tr("待蒸馏或填写")}</option></select></Field></div>}
+    {!availableRows.length && <div className="writing-empty"><p>{tr(kind === "style" ? "还没有自定义风格。可以描述叙事视角、语言、对白与节奏。" : "还没有写作要求。可以写下结构、段落、禁用表达和质量标准。")}</p><Button variant="primary-soft" onClick={() => open()} disabled={busy || saving}>{tr("添加第一条")}</Button></div>}
+    {!!availableRows.length && !rows.length && <div className="writing-empty"><p>{tr("没有匹配的资料。")}</p><Button onClick={() => { setLibraryQuery(""); setLibraryFilter("all"); }}>{tr("清除筛选")}</Button></div>}
     {rows.map(item => <article className="writing-profile-row" key={item.id}>
       <div className="writing-section-head writing-row-heading"><div className="writing-row-title"><h4>{item.title}</h4><span className={`writing-row-badge ${!item.body.trim() ? "pending" : selection[item.kind === "style" ? "styleIds" : "requirementIds"].includes(item.id) ? "selected" : ""}`}>{item.body.trim() ? selection[item.kind === "style" ? "styleIds" : "requirementIds"].includes(item.id) ? <><Check size={12}/>{tr("已选用")}</> : tr("可选用") : tr("待蒸馏或填写")}</span></div><span className="writing-row-actions">
         <Button disabled={busy || saving} onClick={() => open(item)}><PencilSimple size={15} />{tr("编辑")}</Button>

@@ -4,17 +4,28 @@
 
 本地优先的 AI 长篇小说写作工作台。提供书架、归档和完整的主要写作功能，不需要星喵账号或会员。
 
-**v0.6.8 · Windows x64 · MIT**
+**v0.6.9 · Windows x64 · MIT**
 
 把故事总纲、分卷、章节正文、人物、世界设定与来源记忆放在同一个本地工作台。你可以完全手写，也可以接入自己的模型，在预览和审核后采用 AI 候选。
 
-[下载 Windows 安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.8/XingmiaoWriter-Core-0.6.8-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.8)
+[下载 Windows 安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.9/XingmiaoWriter-Core-0.6.9-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.9)
 
 [English](README.en.md) · [架构说明](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
 
 [功能说明](docs/features.md) · [路线图与已知限制](docs/roadmap.md) · [上传与发布](docs/GitHub上传步骤.md) · [更新记录](CHANGELOG.md)
 
 ![开源版书架](docs/assets/library.png)
+
+## v0.6.9 风格选择与引用清单
+
+- 生成按钮上方常驻风格与参考入口，显示选中数量并直达风格选择和当前引用清单
+- 多条风格和要求按页签、已选/可选层级展示，支持搜索名称与来源、只看已选、分别清空；长列表独立滚动
+- 引用清单按实际请求资料分组，定向蒸馏不误报其他作品资料；候选稿保留当时的引用快照
+- 资料库增加搜索与状态筛选，目标字数直接显示，窄窗口管理入口、较小设置区及空/失败状态更清楚
+
+[使用说明](docs/风格选择与参考资料说明.md) · [本次检查](docs/检查记录-v0.6.9.md)
+
+![常驻风格入口与多条参考选择](docs/assets/reference-controls.png)
 
 ## v0.6.8 生成反馈与风格页面优化
 
@@ -71,7 +82,7 @@
 
 需要 Node.js 24、npm，建议使用 Windows 10/11。Electron 首次安装需要下载运行时。
 
-只想使用软件：在本仓库的 **Releases** 页面下载 `XingmiaoWriter-Core-0.6.8-x64-Setup.exe`，不需要安装 Node.js。发布者上传安装包前，Releases 中不会自动出现下载项。
+只想使用软件：在本仓库的 **Releases** 页面下载 `XingmiaoWriter-Core-0.6.9-x64-Setup.exe`，不需要安装 Node.js。发布者上传安装包前，Releases 中不会自动出现下载项。
 
 ```sh
 npm ci
@@ -90,7 +101,7 @@ npm run test:ui
 
 `test:ui` 使用独立临时书库，不修改真实作品。Windows 打包：`npm run package:win`；只生成可运行目录：`npm run package:dir`。生成物位于 `release/`。
 
-2026-10-09 本地验证：类型检查与构建、123 项业务测试，以及风格资料全流程、原有 AI 写作、完整分步创作和双语桌面检查。模型使用隔离模拟服务。
+2026-10-09 本地验证：类型检查与构建、125 项业务测试，以及风格资料全流程、原有 AI 写作、完整分步创作和双语桌面检查。模型使用隔离模拟服务。
 
 ## 项目结构
 
