@@ -142,6 +142,7 @@ try {
   await expect(page.locator(".candidate-state-panel")).toContainText("已停止生成");
   await page.getByRole("tab", { name: "功能" }).click();
   await page.getByRole("button", { name: "风格档案", exact: true }).click();
+  await page.locator(".writing-legacy-summary").click();
   const referencePath = resolve(output, "reference.txt");
   await writeFile(
     referencePath,

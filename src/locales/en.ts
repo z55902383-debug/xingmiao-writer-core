@@ -3073,3 +3073,41 @@ Object.assign(english, {
   "资料已删除，请重新选择": "Reference deleted. Select another entry.", "本次使用的风格与要求": "Styles and requirements used for this result",
   "未选择": "Not selected"
 });
+
+// Assistant activity and clearer profile hierarchy.
+Object.assign(english, {
+  "生成进度": "Generation activity",
+  "正在准备资料": "Preparing references",
+  "正在分析故事变化": "Analyzing story changes",
+  "正在生成内容": "Generating content",
+  "等待模型响应": "Waiting for the model",
+  "生成失败": "Generation failed",
+  "生成已中断": "Generation interrupted",
+  "内容已生成，分析未完成": "Content ready; analysis incomplete",
+  "生成完成": "Generation complete",
+  "停止当前生成": "Stop current generation",
+  "耗时 {0} 秒": "Elapsed: {0}s",
+  "已生成 {0} 字符": "{0} characters received",
+  "查看实时结果": "View live result",
+  "查看结果": "View result",
+  "保存当前编辑，整理本次参考资料。": "Saving your edits and preparing references.",
+  "正文已保留，正在核对人物、世界与记忆变化。": "Your text is kept while character, world and memory changes are checked.",
+  "内容正在逐段更新，可随时查看或停止。": "New text appears as it arrives. View it or stop at any time.",
+  "已发出请求，模型返回内容后会逐段显示。": "Request sent. Text will appear as the model responds.",
+  "跟随最新内容": "Follow latest text",
+  "本书原有档案": "Original book profile",
+  "单份本书风格与参考文章": "One book style and its reference article",
+  "风格已填写": "Style added",
+  "已导入参考文章": "Reference imported",
+  "尚未添加": "Not added yet",
+  "可添加多条 · 生成时自由组合": "Multiple entries · combine when generating",
+  "手写或导入资料，也可用 AI 从文章中蒸馏。保存后，在助手的「风格参考」中选择使用。": "Write or import entries, or distill them from articles with AI. Choose saved entries under Style references in the assistant.",
+  "写作风格：决定文章的语感，包括叙事视角、句式、对白与节奏。": "Writing styles shape the voice: perspective, sentence structure, dialogue and pacing.",
+  "写作要求：规定文章的标准，包括结构、段落、禁用表达与质量检查。": "Writing requirements set standards: structure, paragraphs, restricted expressions and quality checks.",
+  "已选用": "Selected",
+  "可选用": "Available",
+  "待蒸馏或填写": "Needs content",
+  "更多操作：{0}": "More actions: {0}",
+  "{0} 字符": "{0} characters",
+  "蒸馏原文：{0}": "Distillation source: {0}"
+});

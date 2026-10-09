@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Plus, PencilSimple, Trash, UploadSimple, Export, Sparkle, ArrowCounterClockwise } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, UploadSimple, Export, Sparkle, ArrowCounterClockwise, DotsThree, Check } from "@phosphor-icons/react";
 import { api } from "./api";
 import { tr } from "./i18n";
-import { Button, Field, Modal } from "./ui";
+import { Button, Field, Modal, Menu } from "./ui";
 import type { Book, WritingProfile, WritingSelection } from "./types";
 import "./writing-profiles.css";
 
@@ -44,6 +44,7 @@ export default function WritingProfiles({ book, busy, onChanged, beforeChange, o
   const [error, setError] = useState("");
   const [remove, setRemove] = useState<WritingProfile | null>(null);
   const rows = (book.writingProfiles || []).filter(item => item.kind === kind);
+  const selection = profileSelection(book);
   function open(item?: WritingProfile) { setError(""); setDraft(item ? { ...item } : { kind, title: "", body: "", source: "", sourceName: "" }); }
   async function perform(task: () => Promise<void>) {
     setSaving(true); setError("");
@@ -69,19 +70,24 @@ export default function WritingProfiles({ book, busy, onChanged, beforeChange, o
     });
   }
   return <section className="writing-library" aria-label={tr("写作资料库")}>
-    <div className="writing-section-head"><div><h3>{tr("写作资料库")}</h3><p>{tr("手写可复用的风格与要求，或从文章中蒸馏。生成时再选择要使用的条目。")}</p></div><Button onClick={() => open()} disabled={busy || saving}><Plus size={16} />{tr(kind === "style" ? "新建写作风格" : "新建写作要求")}</Button></div>
+    <div className="writing-section-head writing-library-heading"><div><span className="writing-eyebrow">{tr("可添加多条 · 生成时自由组合")}</span><h3>{tr("写作资料库")}</h3><p>{tr("手写或导入资料，也可用 AI 从文章中蒸馏。保存后，在助手的「风格参考」中选择使用。")}</p></div><Button variant="primary-soft" onClick={() => open()} disabled={busy || saving}><Plus size={16} />{tr(kind === "style" ? "新建写作风格" : "新建写作要求")}</Button></div>
     <div className="writing-tabs" role="tablist" aria-label={tr("写作资料类型")}>
       {(["style", "requirement"] as const).map(value => <button role="tab" aria-selected={kind === value} key={value} onClick={() => setKind(value)}>{tr(value === "style" ? "写作风格" : "写作要求")} <small>{(book.writingProfiles || []).filter(item => item.kind === value).length}</small></button>)}
     </div>
+    <p className="writing-type-description">{tr(kind === "style" ? "写作风格：决定文章的语感，包括叙事视角、句式、对白与节奏。" : "写作要求：规定文章的标准，包括结构、段落、禁用表达与质量检查。")}</p>
     {!rows.length && <div className="writing-empty"><p>{tr(kind === "style" ? "还没有自定义风格。可以描述叙事视角、语言、对白与节奏。" : "还没有写作要求。可以写下结构、段落、禁用表达和质量标准。")}</p><Button variant="primary-soft" onClick={() => open()} disabled={busy || saving}>{tr("添加第一条")}</Button></div>}
     {rows.map(item => <article className="writing-profile-row" key={item.id}>
-      <div className="writing-section-head"><h4>{item.title}</h4><span className="writing-row-actions">
+      <div className="writing-section-head writing-row-heading"><div className="writing-row-title"><h4>{item.title}</h4><span className={`writing-row-badge ${!item.body.trim() ? "pending" : selection[item.kind === "style" ? "styleIds" : "requirementIds"].includes(item.id) ? "selected" : ""}`}>{item.body.trim() ? selection[item.kind === "style" ? "styleIds" : "requirementIds"].includes(item.id) ? <><Check size={12}/>{tr("已选用")}</> : tr("可选用") : tr("待蒸馏或填写")}</span></div><span className="writing-row-actions">
         <Button disabled={busy || saving} onClick={() => open(item)}><PencilSimple size={15} />{tr("编辑")}</Button>
-        <Button disabled={busy || saving || !item.source.trim()} onClick={() => void onGenerate(item.id)}><Sparkle size={15} />{tr("AI 蒸馏")}</Button>
-        <Button disabled={saving} onClick={() => void perform(async () => { const file = await api<string | null>("writing:export", { bookId: book.id, id: item.id }); if (file) notify(tr("写作资料已导出")); })}><Export size={15} />{tr("导出")}</Button>
-        <Button disabled={busy || saving} onClick={() => { setError(""); setRemove(item); }}><Trash size={15} />{tr("删除")}</Button>
+        {item.source.trim() && <Button variant={item.body.trim() ? "" : "primary-soft"} disabled={busy || saving} onClick={() => void onGenerate(item.id)}><Sparkle size={15} />{tr("AI 蒸馏")}</Button>}
+        <Menu label={tr("更多操作：{0}", { 0: item.title })} trigger={<DotsThree size={19} />}>
+          <button disabled={saving} onClick={() => void perform(async () => { const file = await api<string | null>("writing:export", { bookId: book.id, id: item.id }); if (file) notify(tr("写作资料已导出")); })}><Export size={15} />{tr("导出")}</button>
+          <span className="menu-divider" />
+          <button disabled={busy || saving} onClick={() => { setError(""); setRemove(item); }}><Trash size={15} />{tr("删除")}</button>
+        </Menu>
       </span></div>
       <p className="writing-row-preview">{item.body || tr("已保存原文，等待蒸馏")}</p>
+      <p className="writing-row-meta">{item.body.trim() && tr("{0} 字符", { 0: item.body.replace(/\s/g, "").length.toLocaleString() })}{item.body.trim() && item.source && " · "}{item.source && tr("蒸馏原文：{0}", { 0: item.sourceName || tr("已保存") })}</p>
       <details><summary>{tr("查看完整资料")}</summary><div className="writing-profile-text">{item.body}</div>{item.source && <details><summary>{tr("蒸馏参考原文")}{item.sourceName ? ` · ${item.sourceName}` : ""}</summary><div className="writing-profile-text">{item.source}</div></details>}</details>
     </article>)}
     {!!book.writingProfileTrash?.length && <details className="writing-trash"><summary>{tr("已删除的风格与要求")} · {book.writingProfileTrash.length}</summary>{book.writingProfileTrash.map(item => <div key={item.id} className="writing-section-head"><span>{item.title}</span><Button disabled={saving || busy} onClick={() => void perform(async () => onChanged(await api<Book>("writing:restore", { bookId: book.id, id: item.id })))}><ArrowCounterClockwise size={15} />{tr("恢复")}</Button></div>)}</details>}

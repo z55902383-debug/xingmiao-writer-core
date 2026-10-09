@@ -183,6 +183,13 @@ async function generate(input) {
     running.set(job.id, controller);
     let lastSave = Date.now(),
       lastEmit = 0;
+    let progressTimer;
+    const emitProgress = () => {
+      clearTimeout(progressTimer);
+      progressTimer = undefined;
+      emit(job);
+      lastEmit = Date.now();
+    };
     const execution = (async () => {
       try {
         const result = await (
@@ -194,8 +201,10 @@ async function generate(input) {
           (chunk) => {
             job.output += chunk;
             if (Date.now() - lastEmit > 70) {
-              emit(job);
-              lastEmit = Date.now();
+              emitProgress();
+            } else if (!progressTimer) {
+              // Flush the trailing chunk even when the provider pauses before its next token.
+              progressTimer = setTimeout(emitProgress, 70 - (Date.now() - lastEmit));
             }
             if (Date.now() - lastSave > 700) {
               store.putJob(job);
@@ -261,6 +270,7 @@ async function generate(input) {
           : e.message;
       } finally {
         // Partial prose remains usable after interruption, cancellation or error.
+        clearTimeout(progressTimer);
         job.output = formatJobOutput(job);
         store.putJob(job);
         running.delete(job.id);

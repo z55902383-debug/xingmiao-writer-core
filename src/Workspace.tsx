@@ -6,6 +6,7 @@ import TimelinePanel from "./TimelinePanel";
 import VolumePlanner from "./VolumePlanner";
 import { PlanningCandidate, PlanningText } from "./PlanningText";
 import WritingProfiles, { WritingPicker } from "./WritingProfiles";
+import GenerationActivity, { type GenerationStart } from "./GenerationActivity";
 import { ROUTED_PLANNING, VOLUME_TASKS, nextPlanningStep } from "./planningFlow";
 import CreativeCanvas from "./CreativeCanvas";
 import type { CanvasModule, CanvasNode } from "./canvasModel";
@@ -530,6 +531,9 @@ export default function Workspace({
   const [planningFocus, setPlanningFocus] = useState<{id:string;stamp:string}>();
   const [instruction, setInstruction] = useState("");
   const [selectedJob, setSelectedJob] = useState("");
+  const [generationStart, setGenerationStart] = useState<GenerationStart | null>(null);
+  const [activityJobId, setActivityJobId] = useState("");
+  const generationStarting = useRef(false);
   const [context, setContext] = useState<ContextInfo | null>(null);
   const [contextChapterIds, setContextChapterIds] = useState<string[] | null>(
     null,
@@ -771,6 +775,7 @@ export default function Workspace({
   const refReady = refItems.filter((i) => i.on).length;
   const jobs = book.candidates.filter(
     (j) =>
+      j.id === selectedJob || j.status === "running" || j.review?.status === "analyzing" ||
       j.chapterId === chapter?.id ||
       [
         "bookOutline",
@@ -798,6 +803,13 @@ export default function Workspace({
   const running = book.candidates.find(
     (j) => j.status === "running" || j.review?.status === "analyzing",
   );
+  const activityJob = running || book.candidates.find(j => j.id === activityJobId);
+  useEffect(() => { if (running) setActivityJobId(running.id); }, [running?.id]);
+  function viewGenerationResult(id: string) {
+    setSelectedJob(id);
+    setCandidateDiff(false);
+    requestAnimationFrame(() => document.querySelector(".candidate")?.scrollIntoView({ block: "start" }));
+  }
   const words = book.chapters.reduce((s, c) => s + count(c.body), 0);
   const finalizedChapters = book.chapters.filter(
     (item) => item.status === "final",
@@ -992,6 +1004,7 @@ export default function Workspace({
     volumeId?: string,
     writingProfileId?: string,
   ) {
+    if (running || generationStarting.current) return;
     setAssistantOpen(true);
     setAction(kind);
     setDistillProfileId(writingProfileId || "");
@@ -1003,7 +1016,9 @@ export default function Workspace({
       onSettings();
       return;
     }
-    await run(async () => {
+    generationStarting.current = true;
+    setGenerationStart({ startedAt: Date.now(), label: `${tr(kinds[kind])} · ${writingProfileId ? book.writingProfiles?.find(item => item.id === writingProfileId)?.title || "" : book.volumes?.find(item => item.id === volumeId)?.title || chapter?.title || book.title}` });
+    try { await run(async () => {
       let cid = targetChapterId || chapter?.id;
       if (!cid) {
         const c = await api<Chapter>("chapter:create", { bookId: book.id });
@@ -1026,9 +1041,12 @@ export default function Workspace({
         ...b,
         candidates: [j, ...b.candidates.filter((x) => x.id !== j.id)],
       }));
-      setSelectedJob(j.id);
-      document.querySelector(".assistant-body")?.scrollTo({ top: 0 });
-    });
+      setActivityJobId(j.id);
+      viewGenerationResult(j.id);
+    }); } finally {
+      setGenerationStart(null);
+      generationStarting.current = false;
+    }
   }
   async function generate() {
     await generateFor(action, chapter?.id, targetVolumeId, action === "style" ? distillProfileId : undefined);
@@ -2900,8 +2918,10 @@ export default function Workspace({
               text="添加可复用的写作资料，生成时自由选择。"
             />
             <WritingProfiles book={book} busy={busy || !!running} onChanged={replace} beforeChange={flush} onGenerate={id => generateFor("style", undefined, undefined, id)} notify={notify} />
-            <div className="writing-legacy">
-            <p>{tr("原本书风格与参考文章继续保留，也可在本次参考资料中选择或取消。")}</p>
+            <details className="writing-legacy">
+            <summary className="writing-legacy-summary"><span><strong>{tr("本书原有档案")}</strong><small>{tr("单份本书风格与参考文章")}</small></span><span className="writing-legacy-status">{tr(book.style.trim() ? "风格已填写" : book.reference.trim() ? "已导入参考文章" : "尚未添加")}<CaretDown size={16} /></span></summary>
+            <div className="writing-legacy-content">
+            <p className="writing-help">{tr("原本书风格与参考文章继续保留，也可在本次参考资料中选择或取消。")}</p>
             <div className="reference-box">
               <div className="reference-symbol">
                 <FileText size={27} />
@@ -2984,6 +3004,7 @@ export default function Workspace({
               />
             </Field>
             </div>
+            </details>
           </div>
         )}
       </div>
@@ -3069,6 +3090,10 @@ export default function Workspace({
             <X size={18} />
           </IconButton>
         </div>
+        <GenerationActivity job={activityJob} preparing={generationStart}
+          label={activityJob ? `${tr(kinds[activityJob.kind])} · ${activityJob.targetLabel || book.title}` : ""}
+          onView={() => activityJob && viewGenerationResult(activityJob.id)}
+          onStop={() => activityJob && api("ai:cancel", { id: activityJob.id }).catch(e => notify(e.message))} />
         <div className="assistant-body">
           <div className="assistant-intro">
             <div className="assistant-symbol">
@@ -4377,13 +4402,35 @@ function CandidateBody({ job }: { job: Job }) {
     }
   }
   if (!job.output) return null;
-  return (
-    <pre
-      className={`candidate-text ${job.status === "running" ? "streaming" : ""}`}
-    >
-      {job.output || tr("正在连接模型，等待输出…")}
-    </pre>
-  );
+  return <StreamingCandidateText job={job} />;
+}
+function StreamingCandidateText({ job }: { job: Job }) {
+  const text = useRef<HTMLPreElement>(null);
+  const follow = useRef(true);
+  const wasStreaming = useRef(false);
+  const [paused, setPaused] = useState(false);
+  useLayoutEffect(() => {
+    follow.current = true;
+    wasStreaming.current = false;
+    setPaused(false);
+  }, [job.id]);
+  useLayoutEffect(() => {
+    if (follow.current && text.current && (job.status === "running" || wasStreaming.current)) text.current.scrollTop = text.current.scrollHeight;
+    wasStreaming.current = job.status === "running";
+  }, [job.output, job.status]);
+  return <div className="candidate-stream">
+    <pre ref={text} className={`candidate-text ${job.status === "running" ? "streaming" : ""}`}
+      onScroll={() => {
+        const node = text.current;
+        if (!node) return;
+        follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 32;
+        setPaused(!follow.current);
+      }}>{job.output}</pre>
+    {job.status === "running" && paused && <Button className="candidate-follow" onClick={() => {
+      follow.current = true; setPaused(false);
+      if (text.current) text.current.scrollTop = text.current.scrollHeight;
+    }}>{tr("跟随最新内容")}</Button>}
+  </div>;
 }
 function PlugIcon() {
   return <GearSix size={22} />;

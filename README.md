@@ -4,17 +4,30 @@
 
 本地优先的 AI 长篇小说写作工作台。提供书架、归档和完整的主要写作功能，不需要星喵账号或会员。
 
-**v0.6.7 · Windows x64 · MIT**
+**v0.6.8 · Windows x64 · MIT**
 
 把故事总纲、分卷、章节正文、人物、世界设定与来源记忆放在同一个本地工作台。你可以完全手写，也可以接入自己的模型，在预览和审核后采用 AI 候选。
 
-[下载 Windows 安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.7/XingmiaoWriter-Core-0.6.7-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.7)
+[下载 Windows 安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.8/XingmiaoWriter-Core-0.6.8-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.8)
 
 [English](README.en.md) · [架构说明](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
 
 [功能说明](docs/features.md) · [路线图与已知限制](docs/roadmap.md) · [上传与发布](docs/GitHub上传步骤.md) · [更新记录](CHANGELOG.md)
 
 ![开源版书架](docs/assets/library.png)
+
+## v0.6.8 生成反馈与风格页面优化
+
+- 写作助手顶部常驻真实生成状态：准备资料、等待响应、接收内容、分析变化，显示耗时与已生成字符数
+- 生成中增加柔和流光边框、流动细线与旋转图标；支持减少动态效果，完成、停止与失败后结束动画
+- 流式内容跟随最新段落，向上阅读自动暂停，可一键恢复；中央生成入口直接定位本次候选，及时刷新模型暂停前的最后一段
+- 写作资料库按风格与要求说明用途，标示已选用、可选用或待填写；导出删除收入更多菜单，本书原有档案独立收起
+
+[界面操作说明](docs/生成进度与风格页面说明.md) · [本次检查](docs/检查记录-v0.6.8.md)
+
+![生成时常驻的助手进度](docs/assets/generation-activity.png)
+
+![资料库与原本书档案分层](docs/assets/writing-profile-library.png)
 
 ## v0.6.7 风格与要求资料库
 
@@ -58,7 +71,7 @@
 
 需要 Node.js 24、npm，建议使用 Windows 10/11。Electron 首次安装需要下载运行时。
 
-只想使用软件：在本仓库的 **Releases** 页面下载 `XingmiaoWriter-Core-0.6.7-x64-Setup.exe`，不需要安装 Node.js。发布者上传安装包前，Releases 中不会自动出现下载项。
+只想使用软件：在本仓库的 **Releases** 页面下载 `XingmiaoWriter-Core-0.6.8-x64-Setup.exe`，不需要安装 Node.js。发布者上传安装包前，Releases 中不会自动出现下载项。
 
 ```sh
 npm ci

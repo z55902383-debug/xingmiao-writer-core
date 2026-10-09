@@ -8,6 +8,10 @@ A local-first workspace for long-form fiction. Includes the library, archive, ed
 
 The creative toolbox, image tools, shared community, Feishu accounts, membership and bundled update service belong to the complete desktop edition and are absent from this repository. No Xingmiao account is required. Official Codex sign-in remains an optional model connection.
 
+## Live generation activity
+
+The assistant keeps preparation, waiting, streaming and story-analysis states visible above its scrolling area, with elapsed time and received characters. Active motion respects reduced-motion preferences. Streamed text follows new content until you scroll up; you can resume following. Styles and requirements have clear purposes and selection badges, with original book profiles collapsed separately.
+
 ## Style and requirement library
 
 Create multiple editable writing styles and requirements per book, import text or reusable JSON, and distill source articles with your own model. Review the candidate before applying it to a specific entry. Select references for each generation; only selected contents are sent, with no distillation sources. Deletion is recoverable, and book JSON backups retain the library and selections.
@@ -37,7 +41,7 @@ The default database lives in `%APPDATA%/星喵写作开源版/`, separate from 
 
 Licensed under [MIT](LICENSE). Third-party dependencies retain their own licenses.
 
-[Download Windows x64](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.7/XingmiaoWriter-Core-0.6.7-x64-Setup.exe) · [Complete edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.7)
+[Download Windows x64](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.8/XingmiaoWriter-Core-0.6.8-x64-Setup.exe) · [Complete edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.8)
 
 ## v0.6.5 verification
 

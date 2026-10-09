@@ -1,0 +1,21 @@
+.generation-activity { flex-shrink: 0; margin: 10px 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); position: relative; overflow: hidden; }
+.generation-activity.is-active { border-color: var(--accent); }
+.generation-activity.is-active::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 12px color-mix(in srgb, var(--accent) 18%, transparent); animation: generation-glow 2.8s ease-in-out infinite; }
+.generation-activity-heading { display: flex; align-items: center; gap: 8px; }
+.generation-activity-heading strong { font-size: 13px; flex: 1; }
+.generation-activity-icon { display: flex; color: var(--accent); }
+.generation-activity.is-active .generation-activity-icon svg { animation: generation-spin 1.4s linear infinite; }
+.generation-activity .button { min-height: 26px; padding: 3px 6px; font-size: 11px; }
+.generation-activity-target { font-size: 12px; color: var(--muted); margin: 6px 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.generation-activity-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.generation-activity-track { height: 2px; margin-top: 8px; background: var(--accent-soft); overflow: hidden; }
+.generation-activity-track i { display: block; height: 100%; width: 35%; background: var(--accent); animation: generation-flow 2s ease-in-out infinite; }
+.generation-activity-hint { margin: 8px 0 0; font-size: 11px; line-height: 1.65; color: var(--muted); }
+.candidate-stream { position: relative; }
+.candidate-stream .candidate-text { max-height: min(500px, 34vh); }
+.candidate-follow { position: absolute; right: 8px; bottom: 8px; background: var(--panel); font-size: 11px; box-shadow: 0 2px 8px var(--bg); }
+@keyframes generation-spin { to { transform: rotate(360deg); } }
+@keyframes generation-flow { from { transform: translateX(-110%); } to { transform: translateX(390%); } }
+@keyframes generation-glow { 50% { box-shadow: inset 0 0 22px color-mix(in srgb, var(--accent) 30%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .generation-activity.is-active::before, .generation-activity.is-active .generation-activity-icon svg, .generation-activity-track i { animation: none; } }
+@media (max-height: 720px) { .generation-activity { padding: 8px 10px; margin-top: 6px; } .generation-activity-hint { display: none; } }
