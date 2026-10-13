@@ -1,12 +1,17 @@
 import LanguageSwitcher from "./LanguageSwitcher";
+import KnowledgeAssistant from "./KnowledgeAssistant";
 import { tr, genreLabel } from "./i18n";
 import SyncReview from "./SyncReview";
+import CandidateRecovery from "./CandidateRecovery";
+import "./onboarding.css";
 import CreationGuideIsland from "./CreationGuideIsland";
 import TimelinePanel from "./TimelinePanel";
 import VolumePlanner from "./VolumePlanner";
 import { PlanningCandidate, PlanningText } from "./PlanningText";
 import WritingProfiles, { WritingPicker, profileSelection } from "./WritingProfiles";
 import ReferenceOverview from "./ReferenceOverview";
+import SkillPicker from "./SkillPicker";
+import type { Skill } from "./types";
 import GenerationActivity, { type GenerationStart } from "./GenerationActivity";
 import { ROUTED_PLANNING, VOLUME_TASKS, nextPlanningStep } from "./planningFlow";
 import CreativeCanvas from "./CreativeCanvas";
@@ -279,6 +284,7 @@ export default function Workspace({
   onBack,
   onConfigSaved,
   onSettings,
+  onSkillSettings,
   notify,
   closeGuard,
 }: {
@@ -288,10 +294,12 @@ export default function Workspace({
   onConfigSaved: (c: Config) => void;
   onBack: () => Promise<void>;
   onSettings: () => void;
+  onSkillSettings: () => void;
   notify: (message: string) => void;
   closeGuard: MutableRefObject<() => Promise<void>>;
 }) {
   const ws = useWorkspace(initial, notify);
+  const [recoveryRefresh, setRecoveryRefresh] = useState(0);
   const {
     book,
     current,
@@ -306,7 +314,7 @@ export default function Workspace({
   const [chapterId, setChapterId] = useState(() =>
     initial.chapters.some((item) => item.id === preferredChapterId)
       ? preferredChapterId!
-      : initial.chapters[0]?.id || "",
+      : (preferredChapterId ? [...initial.chapters].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id : initial.chapters[0]?.id) || "",
   );
   const [view, setView] = useState<View>("editor");
   const [sidebarSection, setSidebarSection] = useState<"chapters" | "features">(
@@ -525,8 +533,13 @@ export default function Workspace({
     message: string;
     action: () => Promise<void>;
   } | null>(null);
-  const [action, setAction] = useState<Kind>("write");
+  const [action, setAction] = useState<Kind>(initial.outline || initial.chapters.some(c => c.body.trim()) ? "write" : "bookOutline");
+  const preparedTask = useRef<{view: View; kind: Kind} | null>(null);
+  const [analyzeChanges, setAnalyzeChanges] = useState(true);
+  const [backupAt, setBackupAt] = useState("");
+  useEffect(() => { api<{backupAt:string}>("workflow:status").then(s => setBackupAt(s.backupAt)).catch(() => {}); }, []);
   const [intent, setIntent] = useState("write");
+  const [showMoreTasks, setShowMoreTasks] = useState(false);
   const [targetVolumeId, setTargetVolumeId] = useState("");
   const [distillProfileId, setDistillProfileId] = useState("");
   const [planningFocus, setPlanningFocus] = useState<{id:string;stamp:string}>();
@@ -541,7 +554,26 @@ export default function Workspace({
   );
   const [contextError, setContextError] = useState("");
   const [showContext, setShowContext] = useState(false);
+  const [assistantMode, setAssistantMode] = useState<"writing" | "knowledge">("writing");
   const [writingPickerOpen, setWritingPickerOpen] = useState(false);
+  const [skillPickerOpen, setSkillPickerOpen] = useState(false);
+  const [writingSkills, setWritingSkills] = useState<Skill[]>([]);
+  const [skillIds, setSkillIds] = useState<string[] | undefined>(undefined);
+  const [skillLoading, setSkillLoading] = useState(true);
+  const [skillError, setSkillError] = useState("");
+  const [skillRefresh, setSkillRefresh] = useState(0);
+  useEffect(() => { setSkillIds(undefined); }, [book.id]);
+  useEffect(() => {
+    let cancelled = false;
+    setSkillLoading(true);
+    api<Skill[]>("skills:list").then(skills => {
+      if (!cancelled) { setWritingSkills(skills); setSkillError(""); }
+    }).catch(error => { if (!cancelled) setSkillError(error.message); })
+      .finally(() => { if (!cancelled) setSkillLoading(false); });
+    return () => { cancelled = true; };
+  }, [config, skillRefresh]);
+  const invalidSkillChoice = !!skillIds && (skillIds.length > 30 || skillIds.some(id => !writingSkills.some(skill => skill.id === id)));
+  const applicableSkillCount = action === "style" && distillProfileId ? 0 : writingSkills.filter(skill => skill.tasks.includes(action) && (skillIds === undefined ? skill.enabled : skillIds.includes(skill.id!))).length;
   const [contextPending, setContextPending] = useState(true);
   const [contextRefresh, setContextRefresh] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -704,6 +736,7 @@ export default function Workspace({
     }
   }, [book.id, chapter?.id, view]);
   useEffect(() => setContextChapterIds(null), [chapter?.id]);
+  useEffect(() => { try { if (chapter) localStorage.setItem(`xm-last-chapter:${book.id}`, chapter.id); } catch {} }, [book.id, chapter?.id]);
   const modelReady = !!config.model || config.provider === "codex";
   /* 显示给作者的「第几章」用当前可见章节的位置，不用底层 order。
      order 是内部排序键（连回收站里的一起保持单调），拿它当编号会让
@@ -724,6 +757,7 @@ export default function Workspace({
   function openReferenceControls() {
     setAssistantOpen(true);
     setWritingPickerOpen(true);
+    setSkillPickerOpen(true);
     setShowContext(true);
     requestAnimationFrame(() => document.querySelector(".assistant-reference-controls")?.scrollIntoView({ block: "start" }));
   }
@@ -760,6 +794,7 @@ export default function Workspace({
   const activityJob = running || book.candidates.find(j => j.id === activityJobId);
   useEffect(() => { if (running) setActivityJobId(running.id); }, [running?.id]);
   function viewGenerationResult(id: string) {
+    setAssistantMode("writing");
     setSelectedJob(id);
     setCandidateDiff(false);
     requestAnimationFrame(() => document.querySelector(".candidate")?.scrollIntoView({ block: "start" }));
@@ -872,7 +907,8 @@ export default function Workspace({
   // 一律以「本页首选任务」为准：避免出现「人在世界设定页、助手却还停在
   // 上一个页面的任务」这种状态漂移。
   useEffect(() => {
-    const primary = (VIEW_KINDS[view] || [])[0];
+    const primary = preparedTask.current?.view === view ? preparedTask.current.kind : view === "editor" && !book.outline.trim() && !book.chapters.some(c => c.body.trim()) ? "bookOutline" : (VIEW_KINDS[view] || [])[0];
+    if (preparedTask.current?.view !== view) preparedTask.current = null;
     const group = INTENTS.find((g) => g.kinds.includes(primary));
     if (!group) return;
     setIntent(group.id);
@@ -892,6 +928,7 @@ export default function Workspace({
         targetVolumeId,
         chapterIds: contextChapterIds,
         writingProfileId: action === "style" ? distillProfileId : undefined,
+        skillIds,
       })
         .then((result) => {
           if (!cancelled) {
@@ -944,6 +981,8 @@ export default function Workspace({
     manuscriptFormat,
     distillProfileId,
     contextRefresh,
+    skillIds,
+    writingSkills,
   ]);
   /* 新建章节时继承「当前这一章」的归属分卷与目标字数。
      否则在正文页点添加，新章会掉进「未分卷」分组，还得回大纲重新归档。 */
@@ -970,9 +1009,17 @@ export default function Workspace({
     volumeId?: string,
     writingProfileId?: string,
   ) {
+    setAssistantMode("writing");
     if (running || generationStarting.current) return;
+    if (!writingProfileId && (skillLoading || skillError || invalidSkillChoice)) {
+      setAssistantOpen(true);
+      notify(tr(skillLoading ? "正在读取 Skill…" : skillError ? "请重新读取 Skill 后再生成。" : "部分所选 Skill 已删除，请重新选择或恢复默认。"));
+      return;
+    }
     setAssistantOpen(true);
     setAction(kind);
+    if (preparedTask.current?.kind !== kind) preparedTask.current = {view, kind};
+    setIntent(INTENTS.find(group => group.kinds.includes(kind))!.id);
     setDistillProfileId(writingProfileId || "");
     if (writingProfileId) setIntent(INTENTS.find(group => group.kinds.includes("style"))!.id);
     setTargetVolumeId(volumeId || "");
@@ -983,7 +1030,7 @@ export default function Workspace({
       return;
     }
     generationStarting.current = true;
-    setGenerationStart({ startedAt: Date.now(), label: `${tr(kinds[kind])} · ${writingProfileId ? book.writingProfiles?.find(item => item.id === writingProfileId)?.title || "" : book.volumes?.find(item => item.id === volumeId)?.title || chapter?.title || book.title}` });
+    setGenerationStart({ startedAt: Date.now(), label: `${tr(taskName(kind))} · ${writingProfileId ? book.writingProfiles?.find(item => item.id === writingProfileId)?.title || "" : book.volumes?.find(item => item.id === volumeId)?.title || chapter?.title || book.title}` });
     try { await run(async () => {
       let cid = targetChapterId || chapter?.id;
       if (!cid) {
@@ -1002,6 +1049,8 @@ export default function Workspace({
           : "",
         contextChapterIds,
         writingProfileId,
+        analyzeChanges,
+        skillIds,
       });
       mutate((b) => ({
         ...b,
@@ -1014,6 +1063,28 @@ export default function Workspace({
       generationStarting.current = false;
     }
   }
+  function prepareStep(step: ReturnType<typeof nextPlanningStep>) {
+    const destination: View = step.target === 'editor' || step.target === 'complete' || step.kind === 'write' ? 'editor' : 'outline';
+    const kind = step.kind || (destination === 'editor' ? 'check' : 'bookOutline');
+    preparedTask.current = { view: destination, kind };
+    setAction(kind); setIntent(INTENTS.find(group => group.kinds.includes(kind))!.id);
+    setTargetVolumeId(step.volumeId || ''); setDistillProfileId('');
+    if (step.chapterId) setChapterId(step.chapterId);
+    setView(destination); setSidebarSection(destination === 'editor' ? 'chapters' : 'features');
+    setOutlineTab(step.target === 'foundation' ? 'foundation' : 'volumes');
+    setAssistantOpen(!!step.kind); setSelectedJob('');
+  }
+  async function finishBook() {
+    await run(async () => replace(await api<Book>('book:complete', {id: book.id})));
+  }
+  async function backupLibrary() {
+    await run(async () => { const saved = await api<string | null>('backup:save'); if (saved) { setBackupAt(new Date().toISOString()); notify(tr('完整作品备份已保存：{0}', {0:saved})); } });
+  }
+  const canFinish = book.chapters.length > 0 && book.chapters.every(c => !!c.body.trim() && c.status === 'final');
+  const taskName = (kind: Kind) => book.creationMode === 'short' && kind === 'chapterPlan' ? '生成短篇章节规划' : book.creationMode === 'short' && kind === 'chapterDetails' ? '补全短篇章节细纲' : kinds[kind];
+  const chapterReview = book.candidates.find(j => j.chapterId === chapter?.id && j.adopted && ['write','continue','polish'].includes(j.kind))?.review;
+  const syncLabel = !chapterReview ? '未分析故事变化' : chapterReview.revision !== undefined && chapterReview.revision !== chapter?.revision ? '正文已变，变化需重核' : chapterReview.applied ? '故事资料已同步' : chapterReview.status === 'empty' ? '未发现新变化' : '故事变化待核对';
+  const pendingDecision = selected?.kind && ROUTED_PLANNING.includes(selected.kind) && /待定|待确认|二选一|或者|任选|父亲留言\/母亲道歉/.test(selected.output);
   async function generate() {
     await generateFor(action, chapter?.id, targetVolumeId, action === "style" ? distillProfileId : undefined);
   }
@@ -1026,7 +1097,7 @@ export default function Workspace({
           id: selected.id,
           mode: selected.kind === "continue" ? "append" : "replace",
         },
-      );
+      ).catch(async error => { await ws.reload().catch(() => undefined); setRecoveryRefresh(value => value + 1); throw error; });
       replace(b);
       if (ROUTED_PLANNING.includes(selected.kind)) {
         const adopted = b.candidates.find(j => j.id === selected.id) as Job & { planningPreview?: PlanningRow[] };
@@ -1056,7 +1127,7 @@ export default function Workspace({
           "timelinePlan",
         ].includes(selected.kind)
       ) {
-        notify(tr("{0}结果已写入对应位置", {0: tr(kinds[selected.kind])}));
+        notify(tr("{0}结果已写入对应位置", {0: tr(taskName(selected.kind))}));
         setView(
           selected.kind === "worldBuild"
             ? "world"
@@ -1096,23 +1167,18 @@ export default function Workspace({
     >
       <CreationGuideIsland
         book={book}
-        onNavigate={(step) => {
-          setSelectedJob("");
-          if (step === "premise" || step === "outline") {
-            setView("outline");
-            setOutlineTab("foundation");
-          } else if (["chapters", "volumePlans", "chapterPlans"].includes(step)) {
-            setView("outline");
-            setOutlineTab("volumes");
-          } else if (step === "draft" || step === "complete") {
-            const next = book.chapters.find(c => step === "draft" ? !c.body.trim() : c.status !== "final") || book.chapters[0];
-            if (next) {
-              setChapterId(next.id);
-              setView("editor");
-            } else {
-              void addChapter();
-            }
+        onNavigate={(step, intent) => {
+          if (step === 'premise' || step === 'outline') prepareStep({target:'foundation',kind:'bookOutline',label:''});
+          else if (step === 'chapters') prepareStep({target:'volumes',kind:'volumePlan',label:''});
+          else if (step === 'volumePlans') {
+            const volume = book.volumes?.find(v => v.id === targetVolumeId) || book.volumes?.[0];
+            prepareStep({target:'volumes',kind:volume?.outline.trim() && intent === 'continue' ? 'volumeDetail' : 'volumeOutline',volumeId:volume?.id,label:''});
+          } else if (step === 'chapterPlans') {
+            const volume = book.volumes?.find(v => v.id === targetVolumeId) || book.volumes?.[0];
+            const chapters = book.chapters.filter(c => book.creationMode === 'short' || c.volumeId === volume?.id);
+            prepareStep({target:'volumes',kind:intent === 'continue' && chapters.length > 0 && chapters.every(c => c.summary?.trim()) ? 'chapterDetails' : 'chapterPlan',volumeId:volume?.id,label:''});
           }
+          else prepareStep({target:'editor',kind:step === 'draft' ? 'write' : undefined,chapterId:book.chapters.find(c => step === 'draft' ? !c.body.trim() : c.status !== 'final')?.id || chapter?.id,label:''});
         }}
       />
       <aside className="workspace-sidebar">
@@ -1365,13 +1431,15 @@ export default function Workspace({
                     id: book.id,
                     format: "md",
                   });
-                  if (path) notify(tr("已导出：{0}", {0: path}));
+                  if (path) { await reload(); notify(tr("已导出：{0}", {0: path})); }
                 })
               }
             >
               <Export size={16} />{tr("导出作品")}</Button>
           </div>
         </header>
+      {!!running && <div className="generation-edit-warning" role="status">{tr('生成期间修改人物、设定或规划，会使当前候选需要重新核对；候选内容会保留。')}</div>}
+        {view === 'editor' && <div className="workflow-strip"><span><strong>{tr(nextStep.label)}</strong><small>{tr('定稿、故事资料同步、导出和备份分别核对。')}</small><small>{tr(syncLabel)}</small></span>{nextStep.target !== 'complete' && <Button disabled={!!running} onClick={() => prepareStep(nextStep)}>{tr('前往下一步')}</Button>}{canFinish && !book.completedAt && <Button disabled={busy} onClick={finishBook}>{tr('确认作品完结')}</Button>}<small>{tr('导出：')}{book.lastExportedAt ? date(book.lastExportedAt) : tr('尚未导出')} · {tr('备份：')}{backupAt ? date(backupAt) : tr('尚未备份')}</small></div>}
         {view === "editor" && !chapter && (
           <Empty
             icon={<BookOpen size={32} />}
@@ -1762,11 +1830,11 @@ export default function Workspace({
                   }
                 />
                 <div className="manuscript-end">
-                  <span />{tr("未完待续")}<span />
+                  <span />{tr(book.completedAt ? "作品已完结" : "未完待续")}<span />
                 </div>
                 {/* 连续写作入口：写完这一章直接进下一章，删掉「回大纲再加一章」那一趟 */}
                 <div className="chapter-next">
-                  {nextChapter ? (
+                  {book.completedAt ? <div className="completion-actions"><strong>{tr('作品已完结')}</strong><Button onClick={() => { setAction('check'); setIntent('check'); setAssistantOpen(true); }}>{tr('检查当前章')}</Button><Button onClick={backupLibrary}>{tr('备份整个作品库')}</Button></div> : canFinish ? <Button onClick={() => document.querySelector('.workflow-strip')?.scrollIntoView({block:'start'})}>{tr('前往完结确认')}</Button> : nextChapter ? (
                     <>
                       <Button
                         variant="primary-soft"
@@ -1893,9 +1961,8 @@ export default function Workspace({
                 <div className="planning-next-step" aria-label={tr("下一步创作")}>
                   <div><small>{tr("下一步")}</small><strong>{tr(nextStep.label)}</strong><p>{nextStep.chapterId ? book.chapters.find(c=>c.id===nextStep.chapterId)?.title : nextStep.volumeId ? book.volumes?.find(v=>v.id===nextStep.volumeId)?.title : tr("生成 → 核对 → 采用；名称和内容会同步到对应位置。")}</p></div>
                   {nextStep.target !== "complete" && <Button variant="primary-soft" disabled={busy || !!running} onClick={() => {
-                    if (nextStep.kind) void generateFor(nextStep.kind, nextStep.chapterId, nextStep.volumeId);
-                    else if (nextStep.target === "editor") { setChapterId(nextStep.chapterId!); setView("editor"); }
-                    else { setOutlineTab(nextStep.target === "foundation" ? "foundation" : "volumes"); }
+                    if (nextStep.kind) { prepareStep(nextStep); void generateFor(nextStep.kind, nextStep.chapterId, nextStep.volumeId); }
+                    else prepareStep(nextStep);
                   }}>{tr(nextStep.kind ? "生成下一步" : "前往这一步")}<ArrowRight size={15}/></Button>}
                 </div>
                 {outlineTab === "foundation" && (
@@ -1917,6 +1984,7 @@ export default function Workspace({
                         <Sparkle size={16} />{tr("生成全书总纲")}</Button>
                     </div>
                     <div className="outline-foundation-grid">
+                      <Field label={tr('创作路径')} hint={book.volumes?.length ? tr('已有分卷的作品保留长篇路径，避免忽略现有卷章。') : undefined}><select value={book.creationMode || 'long'} disabled={!!running} onChange={e => editBook({creationMode:e.target.value as 'short'|'long'})}><option value="long">{tr('长篇 · 分卷规划')}</option><option value="short" disabled={!!book.volumes?.length}>{tr('短篇 · 简化流程')}</option></select></Field>
                       <Field label={tr("作品名称")}>
                         <input
                           value={book.title}
@@ -3056,8 +3124,14 @@ export default function Workspace({
             <X size={18} />
           </IconButton>
         </div>
+        <nav className="assistant-mode-tabs" aria-label={tr("助手工作模式")}>
+          <button aria-pressed={assistantMode === "writing"} disabled={!!running || busy} onClick={() => setAssistantMode("writing")}>{tr("写作生成")}</button>
+          <button aria-pressed={assistantMode === "knowledge"} disabled={!!running || busy} onClick={() => setAssistantMode("knowledge")}>{tr("资料整理")}</button>
+        </nav>
+        <KnowledgeAssistant book={book} beforeAction={flush} onChanged={replace} disabled={busy || !!running} active={assistantMode === "knowledge"}/>
+        <div className="assistant-writing-mode" hidden={assistantMode !== "writing"}>
         <GenerationActivity job={activityJob} preparing={generationStart}
-          label={activityJob ? `${tr(kinds[activityJob.kind])} · ${activityJob.targetLabel || book.title}` : ""}
+          label={activityJob ? `${tr(taskName(activityJob.kind))} · ${activityJob.targetLabel || book.title}` : ""}
           onView={() => activityJob && viewGenerationResult(activityJob.id)}
           onStop={() => activityJob && api("ai:cancel", { id: activityJob.id }).catch(e => notify(e.message))} />
         <div className="assistant-body">
@@ -3078,6 +3152,8 @@ export default function Workspace({
                 aria-selected={intent === g.id}
                 className={intent === g.id ? "active" : ""}
                 onClick={() => {
+                  preparedTask.current = null;
+                  setShowMoreTasks(false);
                   setIntent(g.id);
                   setAction((prev) =>
                     g.kinds.includes(prev) ? prev : g.kinds[0],
@@ -3109,7 +3185,7 @@ export default function Workspace({
                   </div>
                   <small>{group.kinds.length}{" "}{tr("项")}</small>
                 </div>
-                <div className="action-grid">
+                <div className={`action-grid ${intent === 'plot' ? 'guided-tasks' : ''}`} data-expanded={showMoreTasks}>
                   {group.kinds.map((k) => (
                     <button
                       key={k}
@@ -3120,10 +3196,10 @@ export default function Workspace({
                         needsChapter
                           ? tr("请先在左侧选择一个章节")
                           : related.includes(k)
-                            ? tr("{0} · 与本页相关", {0: tr(kinds[k])})
-                            : tr(kinds[k])
+                            ? tr("{0} · 与本页相关", {0: tr(taskName(k))})
+                            : tr(taskName(k))
                       }
-                      onClick={() => setAction(k)}
+                      onClick={() => { preparedTask.current = null; setAction(k); }}
                     >
                       {k === "check" ? (
                         <Brain size={16} />
@@ -3134,11 +3210,12 @@ export default function Workspace({
                       ) : (
                         <Sparkle size={16} />
                       )}
-                      <span>{tr(kinds[k])}</span>
+                      <span>{tr(taskName(k))}</span>
                       {related.includes(k) && <i className="related-dot" />}
                     </button>
                   ))}
                 </div>
+                {intent === 'plot' && <Button variant="ghost" onClick={() => setShowMoreTasks(value => !value)} aria-expanded={showMoreTasks}>{tr(showMoreTasks ? '收起其他规划任务' : '展开其他规划任务')}</Button>}
                 {needsChapter && (
                   <p className="assistant-notice">
                     <WarningCircle size={15} />{tr("这些任务都要绑定章节。先在左侧选一个章节，或新建一章。")}</p>
@@ -3146,7 +3223,7 @@ export default function Workspace({
               </>
             );
           })()}
-          {VOLUME_TASKS.includes(action) && (
+          {VOLUME_TASKS.includes(action) && !(book.creationMode === "short" && ["chapterPlan", "chapterDetails"].includes(action)) && (
             <Field label={tr("生成目标分卷")}>
               <select
                 value={targetVolumeId}
@@ -3163,23 +3240,25 @@ export default function Workspace({
           )}
           {action === "style" && <Field label={tr("蒸馏目标")}><select value={distillProfileId} onChange={event => setDistillProfileId(event.target.value)} disabled={busy || !!running}><option value="">{tr("本书参考文章")}</option>{(book.writingProfiles || []).map(item => <option key={item.id} value={item.id}>{tr(item.kind === "style" ? "写作风格" : "写作要求")} · {item.title}</option>)}</select></Field>}
           <p className="generation-destination">{tr("生成去向：")}{action === "style" && distillProfileId ? (book.writingProfiles || []).find(item => item.id === distillProfileId)?.title || tr("资料已删除，请重新选择") : VOLUME_TASKS.includes(action)
-              ? `${book.volumes?.find((v) => v.id === targetVolumeId)?.title || tr("请先选择卷")} · ${tr(kinds[action])}`
-              : tr(kinds[action])}{" "}{tr("· 确认后写入")}</p>
+              ? `${book.volumes?.find((v) => v.id === targetVolumeId)?.title || tr("请先选择卷")} · ${tr(taskName(action))}`
+              : tr(taskName(action))}{" "}{tr("· 确认后写入")}</p>
           <div className="assistant-reference-controls">
+          <SkillPicker skills={writingSkills} kind={action} ids={skillIds} onChoose={setSkillIds} onManage={onSkillSettings} disabled={busy || !!running} loading={skillLoading} error={skillError} onRetry={() => setSkillRefresh(value => value + 1)} sourceOnly={action === "style" && !!distillProfileId} open={skillPickerOpen} onToggle={() => setSkillPickerOpen(value => !value)} />
           <WritingPicker book={book} sourceOnly={action === "style" && !!distillProfileId} open={writingPickerOpen} onToggle={() => setWritingPickerOpen(value => !value)} disabled={busy || !!running} onManage={() => { setView("style"); setAssistantOpen(false); }} onSelect={selection => run(async () => replace(await api<Book>("writing:select", { bookId: book.id, selection })))} />
+          <section className={`reference-disclosure context-disclosure${showContext ? ' is-open' : ''}`} aria-label={tr("本次参考资料")}>
           <button
-            className="context-toggle"
-            onClick={() => { setShowContext(!showContext); if (!showContext) setWritingPickerOpen(true); }}
+            className="context-toggle disclosure-toggle"
+            onClick={() => setShowContext(value => !value)}
             aria-expanded={showContext}
             aria-controls="assistant-context-detail"
           >
-            <FolderOpen size={16} />
-            <span><strong>{tr("本次参考资料")}</strong><em>{tr("核对这次模型会读取哪些内容")}</em></span>
-            <small>
+            <span className="disclosure-icon"><FolderOpen size={20} /></span>
+            <span className="disclosure-copy"><strong>{tr("本次参考资料")}</strong><small>
               {contextPending ? tr("更新中") : context ? tr("{0} 类", {0: refReady}) : tr("待准备")}
-            </small>
-            <CaretDown size={14} />
+            </small></span>
+            <span className="disclosure-action">{tr(showContext ? '收起' : '展开')}<CaretDown size={14}/></span>
           </button>
+          <p className="writing-picker-intro">{tr("核对这次模型会读取哪些内容")}</p>
           {showContext && (
             <div className="context-detail" id="assistant-context-detail" aria-busy={contextPending}>
               <p className="reference-help">{tr("按当前任务与选择准备；候选稿另有实际引用记录。")}</p>
@@ -3226,6 +3305,7 @@ export default function Workspace({
               ))}
             </div>
           )}
+          </section>
           </div>
           {selected && (
             <section className="candidate">
@@ -3297,7 +3377,7 @@ export default function Workspace({
                 >
                   {jobs.map((j) => (
                     <option value={j.id} key={j.id}>
-                      {tr(kinds[j.kind])} · {date(j.createdAt)}
+                      {tr(taskName(j.kind))} · {date(j.createdAt)}
                     </option>
                   ))}
                 </select>
@@ -3350,13 +3430,18 @@ export default function Workspace({
               <SyncReview
                 key={selected.id}
                 job={selected}
+                chapter={book.chapters.find(c => c.id === selected.chapterId)}
+                unsaved={ws.dirtyChapterIds.includes(selected.chapterId)}
                 onChange={replace}
                 flush={flush}
               />
+              <CandidateRecovery key={`recovery-${selected.id}`} job={selected} book={book} refresh={recoveryRefresh} flush={flush} onChange={replace}/>
+              {pendingDecision && !selected.adopted && <p className="notice">{tr('规划中可能有未决选项，请先确定谜底、动机与因果；可手动编辑规划或补充要求后重新生成。')}</p>}
+              {selected.chapterId !== chapter?.id && <p className="notice">{tr('这是其他章节或历史任务的结果：{0}', {0:selected.targetLabel || book.chapters.find(c => c.id === selected.chapterId)?.title || ''})}</p>}
               {selected.output && (
                 <>
                   <p className="generation-destination">
-                    {tr(kinds[selected.kind])}
+                    {tr(taskName(selected.kind))}
                     {selected.targetLabel
                       ? ` · ${selected.targetLabel}`
                       : ""} ·{" "}
@@ -3378,47 +3463,11 @@ export default function Workspace({
                       }
                     >
                       <Copy size={15} />{tr("复制")}</Button>
-                    {selected.kind !== "check" && (
-                      <Button
-                        variant="primary-soft"
-                        disabled={
-                          !!running ||
-                          busy ||
-                          selected.adopted ||
-                          (ROUTED_PLANNING.includes(selected.kind) && (selected.status !== "done" || routePreview?.id !== selected.id || !routePreview.rows)) ||
-                          !["done", "cancelled", "interrupted"].includes(
-                            selected.status,
-                          ) ||
-                          ([
-                            "memory",
-                            "characters",
-                            "timelinePlan",
-                            "bookOutline",
-                            "worldBuild",
-                            "volumeOutline",
-                            "volumeDetail",
-                            "summary",
-                          ].includes(selected.kind) &&
-                            selected.status !== "done")
-                        }
-                        onClick={adopt}
-                      >
-                        <Check size={16} />
-                        {selected.adopted
-                          ? tr("已采用")
-                          : selected.kind === "memory"
-                            ? tr("确认记忆")
-                            : selected.kind === "continue"
-                              ? tr("追加到正文")
-                              : tr("采用结果")}
-                      </Button>
-                    )}
+
                   </div>
                 </>
               )}
-              {selected.adopted && [...ROUTED_PLANNING, "write", "continue", "polish"].includes(selected.kind) && <div className="planning-continue">
-                <Button onClick={() => { setAssistantOpen(false); setView("outline"); setOutlineTab(nextStep.target === "foundation" ? "foundation" : "volumes"); }}>{tr("继续下一步")} · {tr(nextStep.label)}<ArrowRight size={14}/></Button>
-              </div>}
+
               {selected.usage?.total_tokens && (
                 <small className="usage">{tr("本次用量：")}{number(selected.usage.total_tokens)} Tokens
                 </small>
@@ -3434,6 +3483,9 @@ export default function Workspace({
             </div>
           )}
         </div>
+        {selected?.output && selected.kind !== 'check' && <div className="assistant-candidate-toolbar"><span>{tr(taskName(selected.kind))} · {selected.targetLabel || ''}</span><Button variant="primary-soft" disabled={!!running || busy || selected.adopted || (ROUTED_PLANNING.includes(selected.kind) && (selected.status !== 'done' || routePreview?.id !== selected.id || !routePreview.rows)) || !['done','cancelled','interrupted'].includes(selected.status) || (['memory','characters','timelinePlan','worldBuild'].includes(selected.kind) && selected.status !== 'done')} onClick={adopt}>{tr(selected.adopted ? selected.manualMerged ? '已手动合并' : '已采用' : selected.kind === 'memory' ? '确认记忆' : selected.kind === 'continue' ? '追加到正文' : '采用结果')}</Button>              {selected.adopted && [...ROUTED_PLANNING, "write", "continue", "polish"].includes(selected.kind) && <div className="planning-continue">
+                <Button onClick={() => prepareStep(nextStep)}>{tr("继续下一步")} · {tr(nextStep.label)}<ArrowRight size={14}/></Button>
+              </div>}</div>}
         {/* 助手内容 ↔ 底部设置区：拖动改设置区高度（往上拖是变高） */}
         <Splitter
           axis="y"
@@ -3451,8 +3503,9 @@ export default function Workspace({
           ref={composeBox}
           style={panes.compose ? { height: panes.compose } : undefined}
         >
+          <div className="assistant-compose-fields">
           <button className="compose-reference-trigger" onClick={openReferenceControls} aria-label={tr("选择风格并核对参考资料")}>
-            <FolderOpen size={17}/><span><strong>{tr("风格与参考")}</strong><small>{tr("风格 {0} · 要求 {1}", { 0: writingChoice.styleIds.length, 1: writingChoice.requirementIds.length })}{" · "}{tr(!chapter ? "请先选择章节" : contextPending ? "正在核对引用" : contextError ? "引用待核对" : action === "style" && distillProfileId ? "蒸馏只读目标原文" : "可查看引用清单")}</small></span><CaretRight size={16}/>
+            <FolderOpen size={17}/><span><strong>{tr("风格与参考")}</strong><small>{tr("风格 {0} · 要求 {1}", { 0: writingChoice.styleIds.length, 1: writingChoice.requirementIds.length })}{" · "}{tr("Skill {0}", { 0: applicableSkillCount })}{" · "}{tr(!chapter ? "请先选择章节" : contextPending ? "正在核对引用" : contextError ? "引用待核对" : action === "style" && distillProfileId ? "蒸馏只读目标原文" : "可查看引用清单")}</small></span><CaretRight size={16}/>
           </button>
           <details className="compose-advanced">
             <summary>{tr("参考范围与目标字数")}<span className="compose-setting-summary">{tr("目标 {0} 字", { 0: chapter?.targetWords || book.chapterTargetWords || 2000 })}</span></summary>
@@ -3559,6 +3612,7 @@ export default function Workspace({
               )}
             </div>
           </details>
+          {["write", "continue", "polish"].includes(action) && <label className="analysis-choice"><input type="checkbox" aria-label={tr('正文生成后自动分析故事变化')} checked={analyzeChanges} disabled={!!running} onChange={e => setAnalyzeChanges(e.target.checked)}/><span>{tr('正文生成后自动分析故事变化')}<small>{tr('会额外调用一次模型；关闭后可采用正文，再手动分析。')}</small></span></label>}
           <label htmlFor="instruction">{tr("补充创作要求")}</label>
           <textarea
             id="instruction"
@@ -3568,6 +3622,7 @@ export default function Workspace({
             placeholder={tr("例如：用动作呈现紧张感，结尾留下一个悬念……")}
             rows={3}
           />
+          </div>
           <div className="compose-bottom">
             <span>{tr("针对：")}{chapter?.title || tr("未选择章节")}</span>
             {running ? (
@@ -3583,14 +3638,17 @@ export default function Workspace({
             ) : (
               <Button
                 variant="primary"
-                disabled={busy || !modelReady || !chapter}
+                disabled={busy || !modelReady || !chapter || (!(action === "style" && distillProfileId) && (skillLoading || !!skillError || invalidSkillChoice))}
                 onClick={generate}
+                aria-label={tr("开始生成")}
+                title={tr(taskName(action))}
                 busy={busy}
               >
-                <PaperPlaneTilt size={17} />{tr("开始生成")}</Button>
+                <PaperPlaneTilt size={17} />{tr(taskName(action))}</Button>
             )}
           </div>
           <small>{tr("生成内容请核对后采用 · 不会自动覆盖正文")}</small>
+        </div>
         </div>
       </aside>
       <button

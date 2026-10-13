@@ -438,6 +438,7 @@ try {
     await waitPosition(bookId, "characters:archive", personRef, persistedPersonPosition);
     await page.getByRole("button", { name: "查阅变化清单", exact: true }).click();
     await page.getByLabel("人物描述", { exact: true }).fill("CANVAS_SYNC_NEW_PERSON_谨慎的访客");
+    for (const box of await page.getByRole("dialog", {name:"核对本章变化",exact:true}).getByRole("checkbox").all()) await box.check();
     await page.getByRole("button", { name: "确认同步并定稿", exact: true }).click();
     await expect(page.getByText("本章变化已确认同步", { exact: true })).toBeVisible();
     const after = await call("book:get", { id: bookId });

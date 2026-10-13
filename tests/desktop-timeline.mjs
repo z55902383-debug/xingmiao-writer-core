@@ -89,6 +89,7 @@ try {
   await expect(page.locator(".volume-block").first()).toContainText(
     first.title,
   );
+  await page.locator(".volume-chapter").filter({hasText:first.title}).locator(".chapter-plan-editor > summary").click();
   await page
     .getByLabel(`${first.title}章节概要`, { exact: true })
     .fill("陌生信件让陈默开始追查过去");

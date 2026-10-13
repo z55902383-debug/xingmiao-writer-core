@@ -5,6 +5,16 @@ export type PlanningStep = { label: string; kind?: Kind; chapterId?: string; vol
 export function nextPlanningStep(book: Book, preferredVolume?: string, preferredChapter?: string): PlanningStep {
   if (!book.premise.trim()) return { label: "写下故事想法", target: "foundation" };
   if (!book.outline.trim()) return { label: "生成全文大纲", kind: "bookOutline", target: "foundation" };
+  if (book.creationMode === 'short') {
+    const chapters = book.chapters.filter(c => !c.volumeId);
+    if (!chapters.length || chapters.some(c => !c.summary?.trim())) return { label: '生成短篇章节规划', kind: 'chapterPlan', target: 'volumes' };
+    if (chapters.some(c => !c.outline.trim())) return { label: '补全短篇章节细纲', kind: 'chapterDetails', target: 'volumes' };
+    const unwritten = book.chapters.find(c => c.id === preferredChapter && !c.body.trim()) || book.chapters.find(c => !c.body.trim());
+    if (unwritten) return { label: '按细纲写正文', kind: 'write', chapterId: unwritten.id, target: 'editor' };
+    const draft = book.chapters.find(c => c.status !== 'final');
+    if (draft) return { label: '核对正文并定稿', chapterId: draft.id, target: 'editor' };
+    return { label: book.completedAt ? '作品已完结，可导出或备份' : '确认作品完结', target: 'complete' };
+  }
   if (!book.volumes?.length) return { label: "生成分卷规划", kind: "volumePlan", target: "volumes" };
   const volumes = [...book.volumes].sort((a,b) => Number(b.id === preferredVolume) - Number(a.id === preferredVolume));
   for (const volume of volumes) {
@@ -15,11 +25,11 @@ export function nextPlanningStep(book: Book, preferredVolume?: string, preferred
     if (!chapters.length || chapters.some(c => !c.summary?.trim())) return { label: "生成本卷章节规划", kind: "chapterPlan", volumeId: volume.id, target };
     if (chapters.some(c => !c.outline.trim())) return { label: "补全本卷章节细纲", kind: "chapterDetails", volumeId: volume.id, target };
     const unwritten = chapters.find(c => c.id === preferredChapter && !c.body.trim()) || chapters.find(c => !c.body.trim());
-    if (unwritten) return { label: "按细纲写正文", kind: "write", chapterId: unwritten.id, volumeId: volume.id, target: "plan-" + unwritten.id };
+    if (unwritten) return { label: "按细纲写正文", kind: "write", chapterId: unwritten.id, volumeId: volume.id, target: "editor" };
   }
   const unassigned = book.chapters.find(c => !c.volumeId && !c.body.trim());
   if (unassigned) return { label: "继续规划未分卷章节", chapterId: unassigned.id, target: "plan-" + unassigned.id };
   const draft = book.chapters.find(c => c.status !== "final");
   if (draft) return { label: "核对正文并定稿", chapterId: draft.id, target: "editor" };
-  return { label: "全书章节已完成", target: "complete" };
+  return { label: book.completedAt ? '作品已完结，可导出或备份' : '确认作品完结', target: 'complete' };
 }

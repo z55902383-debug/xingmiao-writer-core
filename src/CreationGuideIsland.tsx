@@ -29,7 +29,7 @@ export default function CreationGuideIsland({
   onNavigate,
 }: {
   book: Book;
-  onNavigate: (step: GuideStep["id"]) => void;
+  onNavigate: (step: GuideStep["id"], intent: "view" | "continue") => void;
 }) {
   const [open, setOpen] = useState(() => localStorage.getItem(COLLAPSED_KEY) === "0");
   const steps = useMemo<GuideStep[]>(() => [
@@ -39,8 +39,8 @@ export default function CreationGuideIsland({
     { id: "volumePlans", title: "完善卷大纲与细纲", detail: "明确每卷目标、事件与转折", done: !!book.volumes?.length && book.volumes.every(v => !!v.outline.trim() && !!v.detail.trim()), icon: ListBullets },
     { id: "chapterPlans", title: "拆出章节大纲与细纲", detail: "采用后同步章名、归卷与章节规划", done: !!book.volumes?.length && book.volumes.every(v => book.chapters.some(c => c.volumeId === v.id)) && !!book.chapters.length && book.chapters.every(c => !!c.summary?.trim() && !!c.outline.trim()), icon: ListBullets },
     { id: "draft", title: "逐章生成与采用正文", detail: "按章细纲写作，核对后写入对应章节", done: !!book.chapters.length && book.chapters.every(c => !!c.body.trim()), icon: BookOpen },
-    { id: "complete", title: "核对并完成全书", detail: "复核每章内容、定稿并备份导出", done: !!book.chapters.length && book.chapters.every(c => !!c.body.trim() && c.status === "final"), icon: CheckCircle },
-  ], [book]);
+    { id: "complete", title: "确认作品完结", detail: "各章定稿后由作者确认；导出和备份分别操作", done: !!book.completedAt, icon: CheckCircle },
+  ].filter(step => book.creationMode !== 'short' || !['chapters', 'volumePlans'].includes(step.id)).map(step => book.creationMode === 'short' && step.id === 'chapterPlans' ? { ...step, title: '拆出短篇章节', detail: '由故事简纲生成章概要与细纲，无需分卷', done: !!book.chapters.length && book.chapters.every(c => !!c.summary?.trim() && !!c.outline.trim()) } : step) as GuideStep[], [book]);
   const completed = steps.filter((step) => step.done).length;
   const nextIndex = steps.findIndex((step) => !step.done);
   const nextStep = nextIndex < 0 ? null : steps[nextIndex];
@@ -49,6 +49,7 @@ export default function CreationGuideIsland({
     setOpen(next);
     localStorage.setItem(COLLAPSED_KEY, next ? "0" : "1");
   };
+  const navigate = (step: GuideStep['id'], intent: 'view' | 'continue' = 'view') => { toggle(false); onNavigate(step, intent); };
 
   return (
     <div className={`creation-island ${open ? "is-open" : ""}`}>
@@ -87,7 +88,7 @@ export default function CreationGuideIsland({
               const current = !step.done && index === nextIndex;
               return (
                 <li key={step.id} className={`${step.done ? "is-done" : ""} ${current ? "is-current" : ""}`}>
-                  <button onClick={() => onNavigate(step.id)} aria-label={`${tr(step.done ? "查看" : "前往")} ${tr(step.title)}`}>
+                  <button onClick={() => navigate(step.id, step.done ? 'view' : 'continue')} aria-label={`${tr(step.done ? "查看" : "前往")} ${tr(step.title)}`}>
                     <span className="creation-guide-status">{step.done ? <CheckCircle size={19} weight="fill" /> : <Icon size={17} />}</span>
                     <span className="creation-guide-copy">
                       <strong>{tr(step.title)}</strong>
@@ -103,7 +104,7 @@ export default function CreationGuideIsland({
 
           <footer className="creation-guide-footer">
             <span>{nextStep ? tr("建议先完成：{0}", {0: tr(nextStep.title)}) : tr("基础创作步骤已完成，可以继续完善作品")}</span>
-            {nextStep && <button onClick={() => onNavigate(nextStep.id)}>{tr("继续这一步")}{" "}<ArrowRight size={14} /></button>}
+            {nextStep && <button onClick={() => navigate(nextStep.id, 'continue')}>{tr("继续这一步")}{" "}<ArrowRight size={14} /></button>}
           </footer>
         </section>
       )}

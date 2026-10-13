@@ -7,6 +7,7 @@ export function useWorkspace(initial: Book, onError: (s: string) => void) {
   const [saveState, setSaveState] = useState("已保存");
   const pending = useRef(new Map<string, Partial<Chapter>>());
   const bookPatch = useRef<Partial<Book>>({});
+  const savingChapters = useRef(new Set<string>());
   const promise = useRef<Promise<void> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function mutate(fn: (b: Book) => Book) {
@@ -29,7 +30,9 @@ export function useWorkspace(initial: Book, onError: (s: string) => void) {
           const patch = bookPatch.current;
           bookPatch.current = {};
           try {
-            await api("book:update", { id: current.current.id, patch });
+            const saved = await api<Book>("book:update", { id: current.current.id, patch });
+            mutate(b => ({ ...b, updatedAt: saved.updatedAt,
+              completedAt: b.chapters.some(c => c.status !== "final") ? undefined : saved.completedAt }));
           } catch (e) {
             bookPatch.current = { ...patch, ...bookPatch.current };
             throw e;
@@ -38,6 +41,7 @@ export function useWorkspace(initial: Book, onError: (s: string) => void) {
         const entry = pending.current.entries().next().value;
         if (entry) {
           const [chapterId, patch] = entry;
+          savingChapters.current.add(chapterId);
           pending.current.delete(chapterId);
           const chapter = current.current.chapters.find(
             (c) => c.id === chapterId,
@@ -48,6 +52,7 @@ export function useWorkspace(initial: Book, onError: (s: string) => void) {
               patch,
               revision: chapter.revision,
             });
+            savingChapters.current.delete(chapterId);
             mutate((b) => ({
               ...b,
               chapters: b.chapters.map((c) =>
@@ -63,7 +68,12 @@ export function useWorkspace(initial: Book, onError: (s: string) => void) {
                   : c,
               ),
             }));
+            // Refresh parent metadata only; preserve edits made while saving.
+            const parent = await api<Book>("book:get", { id: current.current.id }).catch(e => { onError(e.message); return null; });
+            if (parent) mutate(b => ({ ...b, updatedAt: parent.updatedAt,
+              completedAt: b.chapters.some(c => c.status !== "final") ? undefined : parent.completedAt }));
           } catch (e) {
+            savingChapters.current.delete(chapterId);
             pending.current.set(chapterId, {
               ...patch,
               ...pending.current.get(chapterId),
@@ -101,6 +111,7 @@ export function useWorkspace(initial: Book, onError: (s: string) => void) {
       const source = b.chapters.find((c) => c.id === chapterId)!;
       return {
         ...b,
+        completedAt: undefined,
         chapters: b.chapters.map((c) =>
           c.id === chapterId ? { ...c, ...patch, status: "draft" } : c,
         ),
@@ -124,9 +135,11 @@ export function useWorkspace(initial: Book, onError: (s: string) => void) {
     mutate(() => ({
       ...remote,
       ...bookPatch.current,
+      completedAt: pending.current.size ? undefined : remote.completedAt,
       chapters: remote.chapters.map((c) => ({
         ...c,
         ...pending.current.get(c.id),
+        ...(pending.current.has(c.id) ? { status: "draft" as const } : {}),
       })),
     }));
   }
@@ -138,6 +151,7 @@ export function useWorkspace(initial: Book, onError: (s: string) => void) {
     book,
     current,
     saveState,
+    dirtyChapterIds: [...new Set([...pending.current.keys(), ...savingChapters.current])],
     mutate,
     editBook,
     editChapter,

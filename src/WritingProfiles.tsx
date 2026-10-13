@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, PencilSimple, Trash, UploadSimple, Export, Sparkle, ArrowCounterClockwise, DotsThree, Check, CaretDown } from "@phosphor-icons/react";
+import { Plus, PencilSimple, Trash, UploadSimple, Export, Sparkle, ArrowCounterClockwise, DotsThree, Check, CaretDown, PenNib } from "@phosphor-icons/react";
 import { api } from "./api";
 import { tr } from "./i18n";
 import { Button, Field, Modal, Menu } from "./ui";
@@ -21,8 +21,8 @@ export function WritingPicker({ book, disabled, onSelect, onManage, open, onTogg
   const all = profileRows(book);
   const chosen = all.filter(item => selected[item.kind === "style" ? "styleIds" : "requirementIds"].includes(item.id));
   async function choose(value: WritingSelection) { setPendingChoice(value); try { await onSelect(value); } finally { setPendingChoice(null); } }
-  return <section className="writing-picker" aria-label={tr("风格参考")}>
-    <button className="writing-picker-toggle" aria-expanded={open} aria-controls="writing-picker-options" onClick={onToggle}><PaintPickerIcon/><span><strong>{tr("选择写作风格与要求")}</strong><small>{tr("风格 {0} · 要求 {1}", { 0: selected.styleIds.length, 1: selected.requirementIds.length })}</small></span><CaretDown size={16}/></button>
+  return <section className={`writing-picker reference-disclosure${open ? ' is-open' : ''}`} aria-label={tr("风格参考")}>
+    <button className="writing-picker-toggle disclosure-toggle" aria-expanded={open} aria-controls="writing-picker-options" onClick={onToggle}><span className="disclosure-icon"><PaintPickerIcon/></span><span className="disclosure-copy"><strong>{tr("选择写作风格与要求")}</strong><small>{tr("风格 {0} · 要求 {1}", { 0: selected.styleIds.length, 1: selected.requirementIds.length })}</small></span><span className="disclosure-action">{tr(open ? '收起' : '展开')}<CaretDown size={14}/></span></button>
     <p className="writing-picker-intro">{tr("生成前可多选，决定这次怎么写。")}</p>
     {sourceOnly && <p className="writing-picker-intro">{tr("当前蒸馏只分析目标原文；所选风格与要求用于后续创作。")}</p>}
     {chosen.length ? <div className="writing-selected-preview" aria-label={tr("已选风格与要求")}>{chosen.slice(0, 2).map(item => <span key={item.id} title={item.title}><Check size={12}/><span>{item.title}</span></span>)}{chosen.length > 2 && <span>{tr("另 {0} 项", { 0: chosen.length - 2 })}</span>}</div> : <p className="writing-selection-empty">{tr("未选择风格或要求，可按默认写法生成。")}</p>}
@@ -54,7 +54,7 @@ export function WritingPicker({ book, disabled, onSelect, onManage, open, onTogg
     </div>}
   </section>;
 }
-function PaintPickerIcon() { return <Sparkle size={18} aria-hidden="true"/>; }
+function PaintPickerIcon() { return <PenNib size={20} aria-hidden="true"/>; }
 
 type Draft = Partial<WritingProfile> & Pick<WritingProfile, "kind" | "title" | "body" | "source" | "sourceName">;
 export default function WritingProfiles({ book, busy, onChanged, beforeChange, onGenerate, notify }: {

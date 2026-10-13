@@ -45,6 +45,11 @@ const manualBrainstorm = require("./manual-brainstorm.cjs").createManualBrainsto
 
 
 
+const knowledgeChat = require("./knowledge-chat.cjs").createKnowledgeChat({
+  getStore: () => store, getConfig: () => store.config(), getKey: keyFor,
+  requestModel, requestCodex,
+  emit: (state) => { if (win && !win.isDestroyed()) win.webContents.send("xm:knowledge-chat", state); },
+});
 if (!process.env.XM_TEST && !app.requestSingleInstanceLock()) app.quit();
 app.on("second-instance", () => { if (win) { win.restore(); win.show(); win.focus(); } });
 const publicConfig = () => {
@@ -141,7 +146,7 @@ async function generate(input) {
       input.kind,
       text(input.instruction || ""),
       store.skills(),
-      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat, writingProfileId: input.writingProfileId },
+      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat, writingProfileId: input.writingProfileId, skillIds: input.skillIds },
     );
     const config = store.config();
     assert(config.model || config.provider === "codex", "请先配置模型");
@@ -151,6 +156,8 @@ async function generate(input) {
       bookId: book.id,
       chapterId: chapter.id,
       baseRevision: chapter.revision,
+      adoptionBasis: require("./candidate-recovery.cjs").basis(book, chapter),
+      analyzeChanges: input.analyzeChanges !== false,
       ...(require("./planning-routes.cjs").routedKinds.includes(input.kind)
         ? { planningSignature: require("./planning-routes.cjs").planningSignature(book) } : {}),
       contextSignature: require("./timeline.cjs").contextSignature(
@@ -200,6 +207,7 @@ async function generate(input) {
           context.messages,
           (chunk) => {
             job.output += chunk;
+            job.lastOutputAt = now();
             if (Date.now() - lastEmit > 70) {
               emitProgress();
             } else if (!progressTimer) {
@@ -226,9 +234,9 @@ async function generate(input) {
         job.output = formatJobOutput(job);
         if (
           job.status === "done" &&
-          ["write", "continue", "polish"].includes(job.kind)
+          job.analyzeChanges && ["write", "continue", "polish"].includes(job.kind)
         ) {
-          job.review = { status: "analyzing" };
+          job.review = { status: "analyzing", lastOutputAt:now() };
           store.putJob(job);
           emit(job);
           try {
@@ -243,6 +251,8 @@ async function generate(input) {
               sync.messages(book, chapter, body),
               (chunk) => {
                 raw += chunk;
+                job.review.lastOutputAt = now();
+                if (Date.now() - lastEmit > 700) emitProgress();
               },
               controller.signal,
             );
@@ -332,7 +342,8 @@ async function restoreBackup() {
     data.format === "xingmiao-backup" &&
       data.version === 1 &&
       Array.isArray(data.books),
-    "这不是有效的星喵写作备份");
+    "这不是有效的星喵写作备份",
+  );
   // Import as new copies. Never overwrite existing books or configuration.
   return store.transaction(() => {
     assert(!data.canvasViews || (Array.isArray(data.canvasViews) && data.canvasViews.length <= 75000), "画布备份格式无效");
@@ -343,7 +354,8 @@ async function restoreBackup() {
           (Array.isArray(source.volumes) && source.volumes.length <= 100)) &&
           (!source.timeline ||
             (Array.isArray(source.timeline) && source.timeline.length <= 2000)),
-        "分卷或时间线备份格式无效");
+        "分卷或时间线备份格式无效",
+      );
       assert(Array.isArray(source.chapters) && source.chapters.length <= 5000, "备份章节格式无效");
       assert(!source.worldRecords || (Array.isArray(source.worldRecords) && source.worldRecords.length <= 500), "世界资料备份格式无效");
       assert(!source.foreshadows || (Array.isArray(source.foreshadows) && source.foreshadows.length <= 2000), "伏笔备份格式无效");
@@ -353,12 +365,14 @@ async function restoreBackup() {
       const eventMap = new Map((source.timeline || []).map((e) => [e.id, id()]));
       const foreshadowMap = new Map((source.foreshadows || []).map((f) => [f.id, id()]));
       const characterMap = new Map(
-        (source.characters || []).map((c) => [c.id, id()]));
+        (source.characters || []).map((c) => [c.id, id()]),
+      );
       for (const entry of data.trash || [])
         if (entry.bookId === source.id && entry.type === "character")
           characterMap.set(entry.item.id, id());
       const volumeMap = new Map(
-        (source.volumes || []).map((v) => [v.id, id()]));
+        (source.volumes || []).map((v) => [v.id, id()]),
+      );
       for (const entry of data.trash || [])
         if (entry.bookId === source.id && entry.type === "volume")
           volumeMap.set(entry.item.id, id());
@@ -385,7 +399,8 @@ async function restoreBackup() {
       });
       assert(
         Array.isArray(source.chapters) && source.chapters.length <= 5000,
-        "备份章节格式无效");
+        "备份章节格式无效",
+      );
       const restored = {
         id: bookId,
         title: text(source.title, 120) + "（恢复）",
@@ -397,13 +412,15 @@ async function restoreBackup() {
         referenceName: text(source.referenceName, 1000),
         ...store.restoreWritingProfileFields(source),
         target: Number(source.target) || 200000,
+        creationMode: source.creationMode === "short" ? "short" : "long",
         characters: [],
         contextChapters: Number.isInteger(source.contextChapters)
           ? Math.max(0, Math.min(100, source.contextChapters))
           : 2,
         chapterTargetWords: Math.min(
           20000,
-          Math.max(100, Number(source.chapterTargetWords) || 2000)),
+          Math.max(100, Number(source.chapterTargetWords) || 2000),
+        ),
         volumes: (source.volumes || []).map((v) => ({
           id: volumeMap.get(v.id),
           title: text(v.title, 160),
@@ -429,7 +446,8 @@ async function restoreBackup() {
       };
       assert(
         Array.isArray(source.characters) && source.characters.length <= 500,
-        "人物数据格式无效");
+        "人物数据格式无效",
+      );
       restored.characters = source.characters.map((c) => ({
         id: characterMap.get(c.id),
         name: text(c.name, 100),
@@ -548,7 +566,8 @@ async function restoreBackup() {
         else if (sourceEntry.type === "planning") {
           assert(
             ["title", "outline", "world", "detail"].includes(item.field),
-            "资料快照字段无效");
+            "资料快照字段无效",
+          );
           store.recycle("planning", bookId, {
             title: text(item.title, 200),
             field: item.field,
@@ -560,6 +579,10 @@ async function restoreBackup() {
             name: text(item.name, 1000),
             body: text(item.body),
           });
+        else if (sourceEntry.type === "worldRecord")
+          store.recycle("worldRecord", bookId, { id: id(), category: text(item.category, 60), title: text(item.title, 120), description: text(item.description), certainty: item.certainty === "fixed" ? "fixed" : "provisional" });
+        else if (sourceEntry.type === "foreshadow")
+          store.recycle("foreshadow", bookId, { id: id(), title: text(item.title, 240), note: text(item.note || ""), plantedChapterId: chapterMap.get(item.plantedChapterId) || "", payoffChapterId: chapterMap.get(item.payoffChapterId) || "", status: ["resolved", "abandoned"].includes(item.status) ? item.status : "open" });
         else if (sourceEntry.type === "memory")
           store.recycle("memory", bookId, {
             id: id(),
@@ -576,6 +599,7 @@ async function restoreBackup() {
       store.restoreCanvasViews(source, bookId, data.canvasViews, {
         chapterMap, characterMap, volumeMap, worldMap, memoryMap, eventMap, foreshadowMap,
       });
+      if (typeof source.completedAt === 'string' && Number.isFinite(Date.parse(source.completedAt))) store.putBook({...store.rawBook(bookId), completedAt:source.completedAt});
     }
     assert(!data.skills || Array.isArray(data.skills), "Skill 备份格式无效");
     for (const skill of data.skills || [])
@@ -587,7 +611,8 @@ async function restoreBackup() {
               s.name === skill.name &&
               s.body === skill.body &&
               s.description === skill.description &&
-              JSON.stringify(s.tasks) === JSON.stringify(skill.tasks))
+              JSON.stringify(s.tasks) === JSON.stringify(skill.tasks),
+          )
       )
         store.saveSkill({
           ...skill,
@@ -634,6 +659,10 @@ const actions = {
   "book:get": (d) => store.book(d.id),
   "book:create": (d) => store.createBook(d),
   "book:update": (d) => store.updateBook(d.id, d.patch),
+  "book:complete": (d) => require("./author-workflow.cjs").completeBook(store, d.id),
+  "candidate:recovery": (d) => require("./candidate-recovery.cjs").prepare(store, d.id),
+  "candidate:merge": (d) => require("./candidate-recovery.cjs").merge(store, d),
+  "workflow:status": () => ({ backupAt: store.setting("last-backup-at", "") }),
   "chapter:create": (d) => store.createChapter(d.bookId),
   "chapter:create-with-body": (d) => store.createChapterWithBody(d.bookId, d),
   "chapter:save": (d) => store.updateChapter(d.id, d.patch, d.revision),
@@ -654,10 +683,17 @@ const actions = {
       d.kind,
       d.instruction,
       store.skills(),
-      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId });
+      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId, skillIds: d.skillIds });
     return rest;
   },
   "ai:generate": generate,
+  "knowledge:get": (d) => knowledgeChat.get(text(d.bookId, 100)),
+  "knowledge:send": (d) => knowledgeChat.start(d),
+  "knowledge:cancel": (d) => knowledgeChat.cancel(text(d.bookId, 100)),
+  "knowledge:apply": (d) => knowledgeChat.apply(d),
+  "knowledge:recheck": (d) => knowledgeChat.recheck(d),
+  "knowledge:undo": (d) => knowledgeChat.undo(d),
+  "knowledge:clear": (d) => knowledgeChat.clear(text(d.bookId, 100)),
   
   
   "manual:brainstorm": (d) => manualBrainstorm.start(d),
@@ -801,21 +837,17 @@ const actions = {
     return saveFile(`写作资料-${profile.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")}.json`, JSON.stringify({ format: "xingmiao-writing-profile", version: 1, profile: { kind: profile.kind, title: profile.title, body: profile.body } }, null, 2), "json");
   },
   "book:export": async (d) => {
-    const b = store.book(d.id);
-    const ext = d.format === "txt" ? "txt" : "md";
-    const body = b.chapters
-      .map((c) => `${ext === "md" ? "## " : ""}${c.title}\n\n${c.body}`)
-      .join("\n\n");
-    return saveFile(
-      `${b.title.replace(/[<>:"/\\|?*]/g, "_")}.${ext}`,
-      `${ext === "md" ? "# " : ""}${b.title}\n\n${body}`,
-      ext);
+    const b = store.book(d.id), ext = d.format === "txt" ? "txt" : "md";
+    const body = b.chapters.map(c => (ext === "md" ? "## " : "") + c.title + "\n\n" + c.body).join("\n\n");
+    const file = await saveFile(b.title.replace(/[<>:"/\\|?*]/g, "_") + "." + ext, (ext === "md" ? "# " : "") + b.title + "\n\n" + body, ext);
+    if (file) store.putBook({...store.rawBook(b.id), lastExportedAt:now()});
+    return file;
   },
-  "backup:save": () =>
-    saveFile(
-      `星喵备份-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify(store.backup(), null, 2),
-      "json"),
+  "backup:save": async () => {
+    const file = await saveFile("星喵备份-" + require("./author-workflow.cjs").localDate() + ".json", JSON.stringify(store.backup(),null,2), "json");
+    if (file) store.setting("last-backup-at", now());
+    return file;
+  },
   "backup:restore": restoreBackup,
   "data:open": () => shell.openPath(app.getPath("userData")),
   // 切换存储位置后必须重启才会生效（数据库连接在启动时就定好了）。
@@ -823,6 +855,7 @@ const actions = {
   "data:restart": async () => {
     await closeLogin();
     await manualBrainstorm.cancelAll();
+    await knowledgeChat.cancelAll();
     for (const controller of running.values()) controller.abort("user");
     await Promise.allSettled([...jobPromises.values()]);
     closing = true;
@@ -833,6 +866,7 @@ const actions = {
   "app:close": async () => {
     await closeLogin();
     await manualBrainstorm.cancelAll();
+    await knowledgeChat.cancelAll();
     for (const controller of running.values()) controller.abort("user");
     await Promise.allSettled([...jobPromises.values()]);
     closing = true;
@@ -911,6 +945,7 @@ app.whenReady().then(() => {
 });
 app.on("window-all-closed", () => {
   void manualBrainstorm.cancelAll();
+  void knowledgeChat.cancelAll();
   for (const controller of running.values()) controller.abort("user");
   app.quit();
 });

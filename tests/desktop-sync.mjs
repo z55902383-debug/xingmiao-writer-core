@@ -90,6 +90,7 @@ try {
   await page.getByRole("button", { name: "采用结果", exact: true }).click();
   await page.getByRole("button", { name: "查阅变化清单", exact: true }).click();
   await page.getByLabel("人物描述", { exact: true }).fill("谨慎的访客");
+  for (const box of await page.getByRole("dialog", {name:"核对本章变化",exact:true}).getByRole("checkbox").all()) await box.check();
   await page
     .getByRole("button", { name: "确认同步并定稿", exact: true })
     .click();

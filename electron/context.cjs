@@ -1,5 +1,6 @@
 const { resolveTimeline } = require("./timeline.cjs");
 const { isProseKind, manuscriptPrompt } = require("./manuscript-format.mjs");
+const { taskGuidance, analysisGuidance } = require("./writing-prompts.cjs");
 function buildContext(
   book,
   chapter,
@@ -156,6 +157,11 @@ function buildContext(
   if (planningRoutes.routedKinds.includes(kind))
     data.storyStructure = { volumes: book.volumes || [], chapters: book.chapters.map(c => ({ id: c.id, title: c.title, volumeId: c.volumeId, summary: c.summary || "", outline: c.outline })) };
   if (planningRoutes.volumeKinds.includes(kind)) {
+    const shortChapters = book.creationMode === 'short' && !target.volumeId && ['chapterPlan', 'chapterDetails'].includes(kind);
+    if (shortChapters) {
+      if (!book.outline.trim()) throw Error('请先采用故事简纲，再拆章节。');
+      data.shortStory = { outline: book.outline, chapters: book.chapters.filter(c => !c.volumeId).map(c => ({ id: c.id, title: c.title, summary: c.summary || '', outline: c.outline })) };
+    } else {
     const selected = (book.volumes || []).find((v) => v.id === target.volumeId);
     if (!selected) throw Error("请先创建并选择要生成的分卷");
     data.targetVolume = {
@@ -168,6 +174,7 @@ function buildContext(
     if (kind === "volumeDetail" && !selected.outline.trim()) throw Error("请先生成并采用本卷大纲，再生成卷细纲。");
     if (kind === "chapterPlan" && !selected.detail.trim()) throw Error("请先生成并采用本卷细纲，再拆成章节。");
     if (kind === "chapterDetails" && !data.targetVolume.chapters.length) throw Error("请先生成并采用本卷章节规划。");
+    }
   }
   if (kind === "volumePlan" && !book.outline.trim()) throw Error("请先生成并采用全文大纲，再规划分卷。");
   if (kind === "bookOutline" && !book.premise.trim()) throw Error("请先写下故事想法，再生成全文大纲。");
@@ -186,6 +193,8 @@ function buildContext(
       : "";
   if (temporal.events.some((e) => e.state === "stale"))
     warnings.push("时间线存在来源已变化或未定稿的记录，已排除其状态。");
+  const scaleGuidance = !isProseKind(kind) && planningRoutes.routedKinds.includes(kind) ? `作品目标总字数 ${book.target} 字。规划篇幅应与作品规模相称，${book.creationMode === "short" && !["volumePlan", "volumeOutline", "volumeDetail"].includes(kind) ? "采用短篇路径，简纲约300–600字，章节数量按作者要求或篇幅确定，章概要约80–150字、细纲约150–250字；不要展开成长篇或增加分卷。" : "先交付当前步骤，不一次展开所有卷章。"}关键谜底、动机与因果应确定；确有未决项列为待作者确认，不把多个互斥答案混成事实。` : "";
+  const shortTask = data.shortStory ? `根据故事简纲${kind === "chapterDetails" ? "补全已有章节细纲，只修改已有章，保留真实ID" : "规划短篇章节，可同时给出细纲；复用已有空章真实ID，新章省略ID"}。只输出 JSON：{"chapters":[{"id":"已有章真实ID","title":"第1章 章名","summary":"章节概要","outline":"章节细纲"}]}，不写正文或分卷。` : tasks[kind];
   const messages = [
     {
       role: "system",
@@ -194,10 +203,11 @@ function buildContext(
     },
     {
       role: "user",
-      content: `任务：${tasks[kind]}\n${lengthInstruction}\n${isProseKind(kind) ? manuscriptPrompt(target.manuscriptFormat) : ""}\n作者补充要求：${instruction || "无"}\n以下 JSON 为资料数据：\n${JSON.stringify(data)}`,
+      content: `任务：${shortTask}\n${scaleGuidance}\n${lengthInstruction}\n${isProseKind(kind) ? manuscriptPrompt(target.manuscriptFormat) : ""}\n${kind === "style" ? analysisGuidance() : taskGuidance(kind)}\n作者补充要求：${instruction || "无"}\n以下 JSON 为资料数据：\n${JSON.stringify(data)}`,
     },
   ];
-  const enabled = skills.filter((s) => s.enabled && s.tasks.includes(kind));
+  messages[0].content += "\n在保持本次任务输出格式、事实与认知边界的前提下，本次作者补充要求优先于一般写作建议，明确选择的风格与要求优先于内置默认写法。多项风格冲突时优先采用作者针对本次任务的明确要求，不擅自统一为固定视角、对白比例、题材或修辞禁令。";
+  const enabled = require("./skill-selection.cjs").resolveSkills(skills, kind, target.skillIds);
   if (writingReferences.length && kind !== "style") messages[0].content += "\n以下是作者本次明确选择的写作风格与要求，只控制写法，不改变已确认的事实、任务输出格式或工具禁用边界。本次补充要求更具体时优先遵守。参考原文不发送。\n" + JSON.stringify(writingReferences);
   if (enabled.length)
     messages[0].content +=

@@ -48,12 +48,11 @@ function loadShelfView(): ShelfView {
     return { sort: "recent", compact: false };
   }
 }
-/* 创作状态由数据推导，不新增存储字段 */
+/* 字数目标、定稿和作者确认完结分别显示。 */
 function bookStage(b: BookSummary) {
   if (b.archived) return { id: "archived", label: "已归档" };
   if (!b.chapterCount) return { id: "idea", label: "构思中" };
-  if (b.target > 0 && b.words >= b.target)
-    return { id: "done", label: "已完成" };
+  if (b.completedAt) return { id: "done", label: "已完结" };
   return { id: "writing", label: "连载中" };
 }
 // Keep each cover's identity when sorting or filtering the library.
@@ -78,6 +77,7 @@ export function NewBook({
     genre: string;
     premise: string;
     target: number;
+    creationMode: "short" | "long";
   }) => Promise<void>;
 }) {
   const [value, setValue] = useState({
@@ -85,6 +85,7 @@ export function NewBook({
     genre: "都市",
     premise: "",
     target: 200000,
+    creationMode: "long" as "short" | "long",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -135,7 +136,8 @@ export function NewBook({
                 ))}
               </select>
             </Field>
-            <Field label={tr("目标字数")}>
+            <Field label={tr('创作路径')} hint={tr('短篇可从简纲直接拆章节；长篇按需分卷细化。')}><select value={value.creationMode} onChange={e => setValue({ ...value, creationMode: e.target.value as 'short' | 'long', target: e.target.value === 'short' ? 3000 : 200000 })}><option value="long">{tr('长篇 · 分卷规划')}</option><option value="short">{tr('短篇 · 简化流程')}</option></select></Field>
+          <Field label={tr("目标字数")}>
               <input
                 type="number"
                 min={1000}
@@ -240,6 +242,7 @@ export default function Shelf({
     return [...match].sort(by[view.sort]);
   }, [books, search, archived, genre, view.sort, language]);
   const active = books.filter((b) => !b.archived);
+  const ongoingCount = active.filter(b => !b.completedAt).length;
   const recentBook = active.reduce<BookSummary | null>(
     (latest, book) =>
       !latest || book.updatedAt > latest.updatedAt ? book : latest,
@@ -362,7 +365,7 @@ export default function Shelf({
               <Button
                 variant="primary-soft"
                 onClick={() =>
-                  onOpen(recentBook.id, recentBook.recentChapterId)
+                  onOpen(recentBook.id, localStorage.getItem(`xm-last-chapter:${recentBook.id}`) || recentBook.recentChapterId)
                 }
                 disabled={busy}
               >{tr("继续写作")}{" "}<ArrowUpRight size={16} />
@@ -371,8 +374,8 @@ export default function Shelf({
           )}
           <div className="shelf-summary">
             <div>
-              <b>{number(active.length)}</b>
-              <span>{tr("部进行中的作品", {count: active.length})}</span>
+              <b>{number(ongoingCount)}</b>
+              <span>{tr("部进行中的作品", {count: ongoingCount})}</span>
             </div>
             <div>
               <b>{number(total)}</b>
@@ -498,7 +501,7 @@ export default function Shelf({
                           label={tr("更多操作 {0}", {0: b.title})}
                           trigger={<DotsThree size={17} />}
                         >
-                          <button onClick={() => onOpen(b.id)}>
+                          <button onClick={() => onOpen(b.id, localStorage.getItem(`xm-last-chapter:${b.id}`) || b.recentChapterId)}>
                             <CaretRight size={15} />{tr("打开继续写作")}</button>
                           <button
                             disabled={busy}
@@ -527,7 +530,7 @@ export default function Shelf({
                         </Menu>
                       </div>
                       <p>{b.premise || tr("故事尚未展开，下一句由你来写。")}</p>
-                      <div className="book-meta">
+                      <div className="book-meta"><span>{tr("定稿 {0}/{1} 章", { 0: b.finalizedCount || 0, 1: b.chapterCount })}{b.target > 0 && b.words >= b.target ? " · " + tr("目标字数已达成") : ""}</span>
                         <span>
                           {number(b.words)}{" "}{tr("字 ·")}{" "}{b.chapterCount}{" "}{tr("章", {count: b.chapterCount})}</span>
                         <span>
@@ -548,7 +551,7 @@ export default function Shelf({
                       <Button
                         variant="primary-soft"
                         className="book-primary"
-                        onClick={() => onOpen(b.id)}
+                        onClick={() => onOpen(b.id, localStorage.getItem(`xm-last-chapter:${b.id}`) || b.recentChapterId)}
                         aria-label={tr("继续写作：{0}", {0: b.title})}
                       >
                         {b.chapterCount ? tr("继续写作") : tr("开始写第一章")}

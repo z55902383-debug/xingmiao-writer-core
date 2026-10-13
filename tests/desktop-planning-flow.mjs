@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 const output=resolve('test-results/planning-flow-'+Date.now());
+const skipScreenshots=process.argv.includes('--no-screenshots');
 await mkdir(output,{recursive:true});
 const requests=[];
 const longDetail=('# 卷内阶段\n\n- 调查线索\n- 冲突升级\n\n').repeat(100);
@@ -19,7 +20,7 @@ const server=createServer(async(req,res)=>{
     else if(prompt.includes('规划分卷'))result={volumes:[{title:'第一卷 雾中来客'}]};
     else if(prompt.includes('指定目标卷生成卷大纲'))result={id:v.id,title:v.title,outline:'追踪码头与旧宅线索。'};
     else if(prompt.includes('指定卷的大纲生成更细'))result={id:v.id,title:v.title,detail:longDetail};
-    else if(prompt.includes('生成本卷章节规划'))result={volumeId:v.id,chapters:[{title:'第1章 敲门声',summary:'访客带来失踪消息。'},{title:'第2章 旧码头',summary:'主角发现旧船票。'}]};
+    else if(prompt.includes('生成本卷章节规划'))result={volumeId:v.id,chapters:[{id:data.storyStructure.chapters[0].id,title:'第1章 敲门声',summary:'访客带来失踪消息。'},{title:'第2章 旧码头',summary:'主角发现旧船票。'}]};
     else if(prompt.includes('补全章节细纲'))result={volumeId:v.id,chapters:v.chapters.map(c=>({id:c.id,title:c.title,outline:'场景：夜雨。人物：侦探。冲突：线索被隐藏。结尾：发现新线索。'}))};
     else if(prompt.includes('创作本章正文'))result=data.chapter.title+'的正文：雨落在窗前，侦探打开门。';
     else throw Error('Unexpected prompt '+prompt.slice(0,100));
@@ -43,12 +44,14 @@ try{
   await page.getByRole('tab',{name:'功能',exact:true}).click();
   await page.getByRole('button',{name:'故事大纲',exact:true}).click();
   async function nextAndApply(label){
-    await expect(page.locator('.planning-next-step')).toContainText(label);
-    await page.locator('.planning-next-step').getByRole('button',{name:'生成下一步',exact:true}).click();
-    const apply=page.locator('.candidate').getByRole('button',{name:'采用结果',exact:true});
+    const drawer=page.getByRole('button',{name:'打开写作助手',exact:true});if(await drawer.isVisible().catch(()=>false))await drawer.click();
+    const next=page.getByRole('button',{name:'继续下一步 · '+label,exact:true});
+    if(await next.isVisible().catch(()=>false)){await next.click();await page.getByRole('button',{name:'开始生成',exact:true}).click();}
+    else {await expect(page.locator('.planning-next-step')).toContainText(label);await page.locator('.planning-next-step').getByRole('button',{name:'生成下一步',exact:true}).click();}
+    const apply=page.locator('.assistant-candidate-toolbar').getByRole('button',{name:'采用结果',exact:true});
     await expect(apply).toBeEnabled();
     await apply.click();
-    await expect(page.locator('.candidate').getByRole('button',{name:'已采用',exact:true})).toBeVisible();
+    await expect(page.locator('.assistant-candidate-toolbar').getByRole('button',{name:'已采用',exact:true})).toBeVisible();
   }
   for(const label of ['生成全文大纲','生成分卷规划','生成卷大纲','生成卷细纲','生成本卷章节规划','补全本卷章节细纲'])await nextAndApply(label);
   let saved=await call('book:get',{id:book.id});
@@ -61,24 +64,28 @@ try{
   await page.getByRole('button',{name:'查看完整卷细纲',exact:true}).click();
   const modal=page.getByRole('dialog',{name:'卷细纲',exact:true});await expect(modal.locator('.planning-rich-text')).toContainText('调查线索');
   await modal.getByRole('button',{name:'关闭',exact:true}).last().click();
-  await page.screenshot({path:resolve(output,'planning-dark.png')});
+  if(!skipScreenshots)await page.screenshot({path:resolve(output,'planning-dark.png')});
   await page.setViewportSize({width:1024,height:768});
   await expect(first.getByRole('button',{name:'进入正文',exact:true})).toBeVisible();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
-  await page.screenshot({path:resolve(output,'planning-compact.png')});
+  if(!skipScreenshots)await page.screenshot({path:resolve(output,'planning-compact.png')});
   await nextAndApply('按细纲写正文');await nextAndApply('按细纲写正文');
   saved=await call('book:get',{id:book.id});assert.ok(saved.chapters.every(c=>c.body.includes(c.title)));
-  await expect(page.locator('.planning-next-step')).toContainText('核对正文并定稿');
+  await expect(page.locator('.workflow-strip')).toContainText('核对正文并定稿');
   for(const chapter of saved.chapters)await call('chapter:finalize',{id:chapter.id,revision:chapter.revision});
   await page.reload();
   await page.getByRole('button',{name:'打开 雾城追踪',exact:true}).click();
+  await expect(page.locator('.creation-island-progress')).toContainText('6/7');
+  await page.getByRole('button',{name:'确认作品完结',exact:true}).click();
   await expect(page.locator('.creation-island-progress')).toContainText('7/7');
   await page.getByRole('button',{name:'切换到浅色模式',exact:true}).click();
   await page.getByRole('tab',{name:'功能',exact:true}).click();
   await page.getByRole('button',{name:'故事大纲',exact:true}).click();
   await page.getByRole('tab',{name:'分卷章节',exact:true}).click();
-  await page.screenshot({path:resolve(output,'planning-light.png')});
+  if(!skipScreenshots)await page.screenshot({path:resolve(output,'planning-light.png')});
   assert.deepEqual(errors,[]);
-  await writeFile(resolve(output,'report.json'),JSON.stringify({passed:true,bookId:book.id,requests:requests.length,chapters:2,planningHeight:bounds.height,screenshots:['planning-dark.png','planning-compact.png','planning-light.png']},null,2));
+  for (const rule of ['全书层面的规划','本步只交付分卷结构','卷末状态与下一卷承接','阶段目标','每章概要明确核心事件','区分读者、主角、对手','检查过程不写入正文'])
+    assert.ok(requests.some(prompt=>prompt.includes(rule)), 'Generated workflow must use prompt rule: '+rule);
+  await writeFile(resolve(output,'report.json'),JSON.stringify({passed:true,bookId:book.id,requests:requests.length,chapters:2,planningHeight:bounds.height,screenshots:skipScreenshots?[]:['planning-dark.png','planning-compact.png','planning-light.png']},null,2));
   console.log('Planning flow passed: idea to 2 finalized chapters, structured routing, long plan display, compact layout and light/dark themes. '+output);
 }finally{await app.close();server.closeAllConnections();await new Promise(done=>server.close(done));}

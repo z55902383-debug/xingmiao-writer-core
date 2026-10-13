@@ -17,6 +17,7 @@ export default function App() {
   const [config, setConfig] = useState<Config | null>(null);
   const [newBook, setNewBook] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState("models");
   const settingsReturnAction = useRef<(() => void) | null>(null);
   
   const [showManualTyping, setShowManualTyping] = useState(false);
@@ -30,7 +31,8 @@ export default function App() {
   const [archive, setArchive] = useState<BookSummary | null>(null);
   const closeGuard = useRef<() => Promise<void>>(async () => {});
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openSettings = useCallback((afterClose?: () => void) => {
+  const openSettings = useCallback((afterClose?: () => void, initialTab = "models") => {
+    setSettingsInitialTab(initialTab);
     settingsReturnAction.current = afterClose || null;
     setSettings(true);
   }, []);
@@ -180,6 +182,7 @@ export default function App() {
         />
       ) : book && config ? (
         <Workspace
+          onSkillSettings={() => openSettings(undefined, "skills")}
           key={`${book.id}-${workspaceKey}`}
           initial={book}
           preferredChapterId={preferredChapterId}
@@ -239,6 +242,7 @@ export default function App() {
       )}
       {settings && config && (
         <Settings
+          initialTab={settingsInitialTab}
           
           config={config}
           onClose={closeSettings}

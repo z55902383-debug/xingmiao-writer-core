@@ -102,6 +102,9 @@ export type SyncChange = {
   evidence: string;
 };
 export type Job = {
+  lastOutputAt?: string;
+  manualMerged?: boolean;
+  analyzeChanges?: boolean;
   writingProfileSnapshot?: WritingProfile;
   manuscriptFormat?: import("../electron/manuscript-format.mjs").ManuscriptFormat;
   review?: {
@@ -109,6 +112,8 @@ export type Job = {
     changes?: SyncChange[];
     error?: string;
     applied?: boolean;
+    lastOutputAt?: string;
+    revision?: number;
   };
   targetVolumeId?: string;
   targetLabel?: string;
@@ -134,6 +139,16 @@ export type Volume = {
   title: string;
   outline: string;
   detail: string;
+};
+export type PlanningRow = {
+  type: "book" | "volume" | "chapter";
+  id?: string;
+  title: string;
+  destination: string;
+  volumeId?: string;
+  action: "create" | "update";
+  preservesBody?: boolean;
+  fields: { title?: string; outline?: string; detail?: string; summary?: string };
 };
 export type TimelineEvent = {
   id?: string;
@@ -162,6 +177,9 @@ export type TimelineSnapshot = {
   relations: TimelineEvent[];
 };
 export type Book = {
+  creationMode?: 'short' | 'long';
+  completedAt?: string;
+  lastExportedAt?: string;
   writingProfiles?: WritingProfile[];
   writingProfileTrash?: WritingProfile[];
   writingSelection?: WritingSelection;
@@ -191,6 +209,13 @@ export type Book = {
   candidates: Job[];
   memos?: MemoNote[];
 };
+export type WritingSelection = { styleIds: string[]; requirementIds: string[] };
+export type WritingProfile = {
+  id: string; kind: "style" | "requirement"; title: string; body: string;
+  source: string; sourceName: string; revision: number;
+  createdAt?: string; updatedAt?: string;
+  history?: { title: string; body: string; savedAt?: string }[];
+};
 export type MemoNote = {
   id: string;
   title: string;
@@ -198,9 +223,27 @@ export type MemoNote = {
   createdAt: string;
   updatedAt: string;
 };
+export type BrainstormEvent = {
+  requestId: string;
+  bookId: string | null;
+  output: string;
+  status: "running" | "done" | "interrupted" | "cancelled" | "error";
+  error: string;
+};
+export type KnowledgeChange = {
+  key: string; target: string; id: string; operation: "update" | "create" | "delete";
+  before: Record<string, unknown> | null; after: Record<string, unknown> | null;
+};
+export type KnowledgeMessage = {
+  id: string; role: "user" | "assistant"; content: string;
+  status: "running" | "done" | "error" | "cancelled"; error?: string; received?: number;
+  proposal?: { id: string; status: "pending" | "applied" | "undone"; changes: KnowledgeChange[]; appliedIds?: string[] };
+};
+export type KnowledgeSession = { bookId: string; revision: number; messages: KnowledgeMessage[] };
 export type BookSummary = Omit<Book, "chapters" | "candidates"> & {
   words: number;
   chapterCount: number;
+  finalizedCount?: number;
   recentChapterId?: string;
   recentChapterTitle?: string;
 };
@@ -270,34 +313,10 @@ declare global {
       ) => Promise<{ ok: boolean; data: unknown; error?: string }>;
       onJob: (fn: (job: Job) => void) => () => void;
       onBrainstorm: (fn: (value: BrainstormEvent) => void) => () => void;
+      onKnowledgeChat: (fn: (value: KnowledgeSession) => void) => () => void;
       onClose: (fn: () => void) => () => void;
+      onUpdate: (fn: (value: UpdateState) => void) => () => void;
+      onAuthToken: (fn: (value: boolean) => void) => () => void;
     };
   }
 }
-
-export type PlanningRow = {
-  type: "book" | "volume" | "chapter";
-  id?: string;
-  title: string;
-  destination: string;
-  volumeId?: string;
-  action: "create" | "update";
-  preservesBody?: boolean;
-  fields: { title?: string; outline?: string; detail?: string; summary?: string };
-};
-
-export type BrainstormEvent = {
-  requestId: string;
-  bookId: string | null;
-  output: string;
-  status: "running" | "done" | "interrupted" | "cancelled" | "error";
-  error: string;
-};
-
-export type WritingSelection = { styleIds: string[]; requirementIds: string[] };
-export type WritingProfile = {
-  id: string; kind: "style" | "requirement"; title: string; body: string;
-  source: string; sourceName: string; revision: number;
-  createdAt?: string; updatedAt?: string;
-  history?: { title: string; body: string; savedAt?: string }[];
-};

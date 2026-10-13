@@ -169,28 +169,28 @@ function extendStore(Store) {
       );
     },
     initSkills() {
-      if (this.setting("writing-skills", null) !== null) return;
-      for (const skill of [
-        {
-          name: "场景与冲突",
-          description: "用具体目标和阻碍推进场景，避免空泛铺陈。",
-          tasks: ["write", "continue", "outline"],
-          body: "每个场景明确人物的当下目标、阻碍与代价。通过行动和对话推进冲突。结尾产生一个新的选择或尚未解决的问题。不得改变作者已确认的人物和世界设定。",
-        },
-        {
-          name: "人物连续性",
-          description: "核对人物关系、知情范围、状态与物品归属。",
-          tasks: ["write", "continue", "check", "memory"],
-          body: "区分角色知道的事情与读者知道的事情。遵守关系变化的时间顺序，核对人物状态和物品归属。只有原文支持的事实才可提取为记忆，信息不足则明确说明。",
-        },
-        {
-          name: "自然叙事",
-          description: "减少套话，用动作、细节与对白呈现人物。",
-          tasks: ["write", "continue", "polish"],
-          body: "优先选择具体动作与可感知细节，减少概括性评价和重复解释。对白符合人物身份，避免所有角色使用同一种语气。不靠堆叠形容词制造情绪。尊重本书的风格档案。",
-        },
-      ])
-        this.saveSkill({ ...skill, enabled: false, source: "星喵内置" });
+      const builtins = require("./builtin-writing-skills.cjs");
+      if (this.setting("builtin-writing-skills-revision", 0) >= builtins.revision) return;
+      return this.transaction(() => {
+        const fresh = this.setting("writing-skills", null) === null;
+        for (const skill of builtins.items) {
+          const all = this.skills();
+          const existing = all.find(item => item.name === skill.name);
+          const previous = builtins.previous.find(item => item.name === skill.name);
+          if (existing) {
+            // Preserve authored edits, custom imports and enablement. Only exact
+            // untouched previous defaults can be upgraded in place.
+            if (previous && existing.source === "星喵内置" &&
+              existing.body === previous.body && existing.description === previous.description &&
+              JSON.stringify(existing.tasks) === JSON.stringify(previous.tasks))
+              this.saveSkill({ ...existing, ...skill, enabled: existing.enabled });
+          } else if ((fresh || !previous) && all.length < 100) {
+            this.saveSkill({ ...skill, enabled: false, source: "星喵内置" });
+          }
+        }
+        // Do not recreate defaults removed by the author on later startups.
+        this.putSetting("builtin-writing-skills-revision", builtins.revision);
+      });
     },
     trash() {
       return this.setting("recycle-bin", []);
@@ -309,7 +309,7 @@ function extendStore(Store) {
             this.updateBook(b.id, { [item.field]: item.value });
           }
         } else if (entry.type === "timeline") {
-          b.timeline = [
+          if (!(b.timeline || []).some(row => row.id === entry.item.id)) b.timeline = [
             ...(b.timeline || []),
             { ...entry.item, phase: "planned" },
           ];
@@ -330,10 +330,15 @@ function extendStore(Store) {
             b.characters.push(entry.item);
           this.putBook(b);
         } else if (entry.type === "memory") {
-          b.memories.push({
+          if (!b.memories.some(row => row.id === entry.item.id)) b.memories.push({
             ...entry.item,
             stale: !!entry.item.sourceChapterId,
           });
+          this.putBook(b);
+        } else if (entry.type === "worldRecord" || entry.type === "foreshadow") {
+          const field = entry.type === "worldRecord" ? "worldRecords" : "foreshadows";
+          b[field] ||= [];
+          if (!b[field].some(row => row.id === entry.item.id)) b[field].push(entry.item);
           this.putBook(b);
         } else if (entry.type === "reference") {
           requireValue(

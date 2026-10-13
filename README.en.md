@@ -1,60 +1,40 @@
-# Xingmiao Writer · Open Core Edition
+# Xingmiao Writer · Open Core
 
-**Membership is free; there is no paid membership plan.** In the complete edition, member and regular-user roles distinguish permissions for managing the community prompt library. Third-party AI and image API providers may charge separately. The open core edition does not include accounts, membership or the community module.
+A local-first fiction workspace for manual writing and your own AI provider.
 
-A local-first workspace for long-form fiction. Includes the library, archive, editor, chapter and volume management, AI writing, outlines, characters, worldbuilding, timeline, relationships, material canvases, review, local writing skills, backup and recovery.
+**v0.6.10 · Windows x64 · MIT**
 
-[中文](README.md)
+[Windows installer](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.10/XingmiaoWriter-Core-0.6.10-x64-Setup.exe) · [Full edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.10) · [中文](README.md)
 
-The creative toolbox, image tools, shared community, Feishu accounts, membership and bundled update service belong to the complete desktop edition and are absent from this repository. No Xingmiao account is required. Official Codex sign-in remains an optional model connection.
+Full-edition membership is free and manages community template permissions. Model services may charge separately. Open Core needs no Xingmiao account.
 
-## Reference controls
+![Current library](docs/assets/library.png)
 
-A persistent Styles and references entry above Generate shows selection counts. Browse styles and requirements by category, search names or source filenames, view selected entries first, and clear each category independently. Current reference lists describe the actual request; each candidate preserves its own snapshot. Source-only distillation is explicitly distinguished from later writing references.
+![Writing workspace](docs/assets/workspace.png)
 
-## Live generation activity
+![Story data assistant](docs/assets/knowledge-assistant.png)
 
-The assistant keeps preparation, waiting, streaming and story-analysis states visible above its scrolling area, with elapsed time and received characters. Active motion respects reduced-motion preferences. Streamed text follows new content until you scroll up; you can resume following. Styles and requirements have clear purposes and selection badges, with original book profiles collapsed separately.
+Screenshots use isolated demonstration content; the application also supports English.
 
-## Style and requirement library
+## Features
 
-Create multiple editable writing styles and requirements per book, import text or reusable JSON, and distill source articles with your own model. Review the candidate before applying it to a specific entry. Select references for each generation; only selected contents are sent, with no distillation sources. Deletion is recoverable, and book JSON backups retain the library and selections.
-
-## Writing pad
-
-Both editions include a manual writing pad with chapter drafts, scratch draft recovery, focus timers, goals, find/replace, manuscript formatting, idea discussions and memo references. Saving a local draft differs from saving to a story. Model discussions require your own configured provider. Export or save important scratch drafts before moving devices.
+- Short-story and volume workflows, reviewed adoption into named targets, and chapter drafting.
+- Manual writing pad, independent drafts, focus timer, manuscript formatting and history.
+- Story data conversations: individual review, recheck, undo and deleted-record recovery.
+- Editable styles, requirements and skills with per-request reference selection.
+- Characters, world settings, relationships, timelines, canvases, memos, autosave and trash.
+- Author-confirmed completion, TXT/Markdown export, JSON backups and copy restore.
 
 ## Development
 
-Use Node.js 24 and npm. Windows 10/11 is the primary desktop platform.
+Use Node.js 24: `npm ci`, then `npm start`. Development: `npm run dev`.
 
-```sh
-npm ci
-npm start
-```
+Checks: `npm test`, `npm run build`, `npm run test:onboarding:ui` and `npm run test:ui`. Windows builds: `npm run package:win`.
 
-Use `npm run dev` for development, `npm run build` for a production build, `npm test` for business tests, and `npm run test:ui` for isolated desktop tests. Configure your own model endpoint/key or connect a locally installed official Codex client. Provider charges are separate.
+## Data and license
 
-On Windows, use `npm run package:win` for an installer or `npm run package:dir` for an unpacked app. Outputs go to `release/`.
+Books stay local. AI sends selected context to the configured provider. Backups include final story data, chapter history, skills and trash, but exclude credentials, account sessions, story-data conversations and proposal undo history. Restore creates copies.
 
-## Data and repository
+Full-edition accounts, community, creative tools, images and updates are excluded from this MIT repository. Editions use separate book directories. Mock tests do not certify real-provider quality or availability. Windows installers are unsigned.
 
-The default database lives in `%APPDATA%/星喵写作开源版/`, separate from the full edition. Use story backup/export and restore to migrate. AI tasks send the selected story context to your configured provider. This edition does not connect to Xingmiao membership/community services.
-
-`src/` contains the React UI, `electron/` the main process and SQLite/AI logic, `tests/` the automated checks, `scripts/` the development entry points, and `docs/` the architecture and edition boundary.
-
-Licensed under [MIT](LICENSE). Third-party dependencies retain their own licenses.
-
-[Download Windows x64](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.9/XingmiaoWriter-Core-0.6.9-x64-Setup.exe) · [Complete edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.9)
-
-## v0.6.5 verification
-
-On 2026-10-09, type checking, production build, 116 business tests and desktop workflow, compatibility and bilingual checks passed locally. Model tests use a local mock service. Windows x64 installers are provided through Releases after the maintainer uploads them. The binaries are not code signed.
-
-See [features](docs/features.md), [limitations and roadmap](docs/roadmap.md), and [publishing steps in Chinese](docs/GitHub上传步骤.md).
-
-## Step-by-step planning
-
-Idea → book outline → volumes → volume outlines/details → chapter outlines/details → prose → completion. Generate, review and apply each step. Titles and plans synchronize to their destinations, with a suggested next step. Long plans use compact previews and full reading dialogs.
-
-The v0.6.5 update passed type checks, production builds, 67 core business tests and isolated desktop workflow, compatibility and bilingual checks. Provider tests use local fixtures.
+[Features](docs/features.md) · [Verification](docs/检查记录-v0.6.10.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [MIT](LICENSE)

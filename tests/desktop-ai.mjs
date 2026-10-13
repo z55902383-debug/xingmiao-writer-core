@@ -97,6 +97,8 @@ try {
   await page
     .getByRole("textbox", { name: "本章细纲" })
     .fill("林晚把钥匙交给陈默，雨停了。");
+  await page.getByRole('tab', { name: '创作正文', exact: true }).click();
+  await page.getByRole('button', { name: '按大纲写正文', exact: true }).click();
   await page.getByRole("button", { name: "开始生成", exact: true }).click();
   await expect(page.locator(".candidate-text")).toContainText(
     "林晚把钥匙交给陈默。",

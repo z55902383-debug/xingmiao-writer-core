@@ -31,3 +31,15 @@ test("reference metadata labels and their action states have English translation
   const missing = [...labels, "请先选择章节", "正在核对引用", "引用待核对", "可查看引用清单", "蒸馏只读目标原文"].filter(key => !english[key]);
   assert.deepEqual(missing, []);
 });
+
+test('new author workflow controls cover both quote styles in translation calls', async () => {
+ const { english } = await import(pathToFileURL(path.resolve('src/locales/en.ts')));
+ const missing=[];
+ for(const file of ['CandidateRecovery.tsx','CreationGuideIsland.tsx','GenerationActivity.tsx','SyncReview.tsx','Workspace.tsx','Shelf.tsx','VolumePlanner.tsx']){
+  const source=fs.readFileSync(path.join('src',file),'utf8');
+  for(const match of source.matchAll(/\btr\((['"])([^'"\n]+)\1/g)){
+   const key=match[1] === '"' ? JSON.parse('"'+match[2]+'"') : match[2];if(/[\u3400-\u9fff]/.test(key)&&!english[key])missing.push(file+': '+key);
+  }
+ }
+ assert.deepEqual(missing,[]);
+});

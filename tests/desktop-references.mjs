@@ -22,6 +22,13 @@ try{
  await page.getByRole('button',{name:/继续.*参考选择专项/}).click();const close=page.locator('.creation-guide-close');if(await close.isVisible().catch(()=>false))await close.click();
  await page.getByRole('tab',{name:/章节/}).click();await page.getByRole('button',{name:/第2章/}).first().click();
  const entry=page.getByRole('button',{name:'选择风格并核对参考资料',exact:true}),picker=page.getByRole('region',{name:'风格参考',exact:true});
+ const contextToggle=page.locator('.context-toggle'),writingToggle=picker.locator('.writing-picker-toggle');
+ await expect(contextToggle).toHaveAttribute('aria-expanded','false');await expect(writingToggle).toHaveAttribute('aria-expanded','false');
+ await contextToggle.click();await expect(contextToggle).toHaveAttribute('aria-expanded','true');await expect(writingToggle).toHaveAttribute('aria-expanded','false');
+ await writingToggle.click();await expect(writingToggle).toHaveAttribute('aria-expanded','true');await expect(contextToggle).toHaveAttribute('aria-expanded','true');
+ await contextToggle.click();await expect(contextToggle).toHaveAttribute('aria-expanded','false');await expect(writingToggle).toHaveAttribute('aria-expanded','true');
+ await writingToggle.click();await expect(writingToggle).toHaveAttribute('aria-expanded','false');await expect(contextToggle).toHaveAttribute('aria-expanded','false');
+ await writingToggle.click();await expect(writingToggle).toHaveAttribute('aria-expanded','true');await expect(contextToggle).toHaveAttribute('aria-expanded','false');await writingToggle.click();
  await expect(entry).toBeVisible();await expect(entry).toContainText('风格 2 · 要求 1');await entry.click();
  await page.screenshot({path:resolve(data,'initial-discovery.png')});
  await expect(picker.getByRole('searchbox',{name:'搜索风格或要求名称',exact:true})).toBeVisible();

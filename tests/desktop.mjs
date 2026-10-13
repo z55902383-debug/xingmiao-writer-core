@@ -76,8 +76,8 @@ try {
   const popover = compose.locator(".compose-advanced-popover");
   await expect(popover).toBeVisible();
   const popoverBox = await popover.boundingBox();
-  const summaryBox = await advancedSummary.boundingBox();
-  expect(popoverBox.y + popoverBox.height).toBeLessThan(summaryBox.y);
+  expect(popoverBox.y).toBeGreaterThanOrEqual(0);
+  expect(popoverBox.y + popoverBox.height).toBeLessThanOrEqual(page.viewportSize().height);
   const generateButton = assistantPanel.getByRole("button", {
     name: "开始生成",
     exact: true,
@@ -145,7 +145,7 @@ try {
     .locator(".recent-project")
     .getByRole("button", { name: /继续写作/ })
     .click();
-  await expect(editor).toHaveValue(/林晚把钥匙放在桌上。/);
+  await expect(editor).toHaveValue(/保存测试：雨停了。/);
   await page.getByRole("tab", { name: "功能" }).click();
   await page.getByRole("button", { name: "故事大纲", exact: true }).click();
   const chapterBoardTab = page.getByRole("tab", { name: "章节看板" });

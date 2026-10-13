@@ -1,0 +1,33 @@
+const { test } = require('node:test'), assert = require('node:assert/strict');
+const { mkdtempSync, rmSync } = require('node:fs'), { tmpdir } = require('node:os'), { join } = require('node:path');
+const { Store } = require('../electron/store.cjs'), { buildContext } = require('../electron/context.cjs');
+const { resolveSkills } = require('../electron/skill-selection.cjs');
+test('本次明确选择覆盖全局默认，空选择关闭，适用任务隔离且不修改默认状态', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'xm-skill-choice-')), db = new Store(join(dir, 'test.sqlite'));
+  t.after(() => { db.close(); rmSync(dir, { recursive: true, force: true }); });
+  const book = db.createBook({ title: '隔离' }), chapter = book.chapters[0];
+  const a = db.saveSkill({ name: '默认', body: 'DEFAULT-CONTENT', tasks: ['write'], enabled: true });
+  const b = db.saveSkill({ name: '本次', body: 'CHOSEN-CONTENT', tasks: ['write'], enabled: false });
+  const c = db.saveSkill({ name: '其他任务', body: 'OTHER-TASK-CONTENT', tasks: ['outline'], enabled: true });
+  assert.deepEqual(buildContext(book, chapter, 'write', '', db.skills()).skills.map(s => s.id), [a.id]);
+  const context = buildContext(book, chapter, 'write', '', db.skills(), { skillIds: [b.id, c.id] });
+  assert.deepEqual(context.skills.map(s => s.id), [b.id]);
+  assert.match(context.messages[0].content, /CHOSEN-CONTENT/);
+  assert.ok(!context.messages[0].content.includes('DEFAULT-CONTENT') && !context.messages[0].content.includes('OTHER-TASK-CONTENT'));
+  assert.deepEqual(buildContext(book, chapter, 'write', '', db.skills(), { skillIds: [] }).skills, []);
+  assert.equal(db.skills().find(s => s.id === a.id).enabled, true);
+  assert.equal(db.skills().find(s => s.id === b.id).enabled, false);
+  db.saveSkill({ ...b, body: 'EDITED-CONTENT' });
+  assert.equal(context.skills[0].version, 1);
+  assert.match(context.messages[0].content, /CHOSEN-CONTENT/);
+  assert.deepEqual(context.referenceSections.find(s => s.key === 'skills').titles, ['本次']);
+});
+test('拒绝重复、不存在和超量编号；选择不适用任务不会发送指令', () => {
+  const skills = Array.from({ length: 31 }, (_, i) => ({ id: String(i), tasks: ['write'], enabled: false }));
+  assert.throws(() => resolveSkills(skills, 'write', ['0', '0']), /选择无效/);
+  assert.throws(() => resolveSkills(skills, 'write', ['missing']), /已删除/);
+  assert.throws(() => resolveSkills(skills, 'write', skills.map(s => s.id)), /最多30/);
+  assert.throws(() => resolveSkills(skills, 'write', [null]), /选择无效/);
+  assert.throws(() => resolveSkills(skills, 'write', '0'), /选择无效/);
+  assert.deepEqual(resolveSkills(skills, 'memory', ['0']), []);
+});

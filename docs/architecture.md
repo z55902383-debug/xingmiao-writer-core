@@ -2,7 +2,7 @@
 
 界面为 React + TypeScript，Vite 生成静态资源；Electron 主进程通过 SQLite 保存作品、章节、人物、世界、计划、记忆、时间线和候选。
 
-`electron/preload.cjs` 只暴露调用、生成任务事件与关闭事件。`main.cjs` 验证 IPC 来自本应用主窗口，`store.cjs` 管理持久化，`context.cjs` 构建写作上下文，`ai.cjs` 和 `codex.cjs` 连接用户选择的模型。
+`electron/preload.cjs` 只暴露受控调用、写作/灵感/资料对话事件与关闭事件。`main.cjs` 验证 IPC 来自本应用主窗口，`store.cjs` 管理持久化，`context.cjs` 构建写作上下文，`ai.cjs` 和 `codex.cjs` 连接用户选择的模型。
 
 开源版没有 CreativeToolbox、Plaza、Account、ImageApiSettings、auth.cjs、共享服务部署目录、会员二维码或自动更新实现；相关界面入口和 IPC 操作也已移除。资料画布属于核心写作功能，名称 CreativeCanvas 与创意工具箱不是同一模块。
 
@@ -13,3 +13,6 @@
 项目组织参考：
 - https://github.com/electron-react-boilerplate/electron-react-boilerplate
 - https://github.com/JCodesMore/ai-website-cloner-template
+
+
+资料整理由knowledge-chat.cjs构建受限作品资料、解析建议并事务确认；界面逐项核对后才写入。最终资料及回收站参与备份，对话与方案撤销历史不参与JSON备份。

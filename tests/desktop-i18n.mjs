@@ -37,7 +37,7 @@ try {
   if (await closeGuide.isVisible().catch(() => false)) await closeGuide.click();
   await page.screenshot({ path: resolve(output, "i18n-editor-en.png"), animations: "disabled" });
   await page.getByRole("tab", { name: "Tools", exact: true }).click();
-  for (const name of ["Story outline", "Characters", "Worldbuilding", "Relationships & memory"]) {
+  for (const name of ["Story outline", "Characters", "World setting", "Relationships & memory"]) {
     await page.locator(".workspace-nav").getByRole("button", { name, exact: true }).click();
     await page.getByRole("button", { name: "Canvas", exact: true }).click();
     await expect(page.locator(".cc-toolbar")).toBeVisible();

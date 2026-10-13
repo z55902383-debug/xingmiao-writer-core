@@ -169,6 +169,7 @@ function installTimeline(Store) {
       };
       check(v.title, "请填写卷名");
       b.volumes = old ? all.map((x) => (x.id === v.id ? v : x)) : [...all, v];
+      if (b.creationMode === 'short') b.creationMode = 'long';
       this.putBook(b);
       return this.book(bookId);
     },
@@ -239,6 +240,7 @@ function contextSignature(book, chapter) {
         (book.chapters || []).filter(c=>c.order < chapter.order).map(c=>[c.id,c.revision,c.status,c.order]),
         chapter.volumeId || "",
         chapter.targetWords || 0,
+        ...(book.creationMode === 'short' ? ['short'] : []),
       ]),
     )
     .digest("hex");

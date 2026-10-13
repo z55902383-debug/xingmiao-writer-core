@@ -1,0 +1,15 @@
+.skill-picker { margin-top: 12px; }
+.skill-choice-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
+.skill-choice-field { border: 0; padding: 0; margin: 0; min-width: 0; }
+.skill-choice-field legend { color: var(--muted); padding-block: 8px; }
+.skill-library-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-block: 16px; }
+.skill-library-filters .field { flex: 1 1 150px; min-width: 0; }
+.skill-library-preview { color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; line-height: 1.7; margin-block: 12px; overflow-wrap: anywhere; }
+.skill-library-content { margin-block: 12px; color: var(--muted); }
+.skill-library-content .writing-profile-text { max-height: 280px; overflow: auto; margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.skill-task-tags { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.skill-task-tags span { font-size: 11px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); }
+.skill-row .skill-heading { gap: 12px; align-items: flex-start; }
+.skill-row .skill-name { min-width: 0; overflow-wrap: anywhere; }
+.skill-picker .writing-choice small { display: block; margin-block: 8px; }
+.skill-picker input[type="checkbox"] { min-height: 14px; width: 14px; height: 14px; flex: 0 0 14px; }

@@ -1,0 +1,289 @@
+/* Separate task areas with space before relying on divider lines. */
+:root {
+  --section-gap: 16px;
+  --section-inset: 12px;
+  --section-padding: 16px;
+  --section-radius: 10px;
+}
+
+/* The assistant keeps its scrollable task area and fixed generation controls. */
+.assistant-panel {
+  background: var(--sunken);
+}
+.assistant-header {
+  border-bottom: 0;
+  padding-inline: 16px;
+}
+.assistant-body {
+  margin: 0 var(--section-inset) var(--section-inset);
+  padding: var(--section-padding) 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--section-radius);
+  scrollbar-gutter: stable;
+}
+.assistant-intro {
+  padding: 0;
+  margin-bottom: var(--section-gap);
+}
+.assistant-reference-controls {
+  margin-block: 24px;
+}
+.assistant-body > .candidate {
+  margin-top: 24px;
+}
+.assistant-candidate-toolbar {
+  margin: 0 var(--section-inset) var(--section-inset);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--section-radius);
+  background: var(--panel);
+}
+.assistant-writing-mode > .splitter[data-axis="y"] {
+  margin-inline: var(--section-inset);
+  margin-top: calc(-1 * var(--section-inset));
+  height: var(--section-inset);
+}
+.assistant-writing-mode > .splitter[data-axis="y"]::before {
+  background: transparent;
+}
+.assistant-writing-mode > .splitter[data-axis="y"]:is(:hover, :focus-visible)::before {
+  background: var(--accent);
+}
+.assistant-compose {
+  margin: 0 var(--section-inset) var(--section-inset);
+  padding: var(--section-padding) 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--section-radius);
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 180px;
+  max-height: min(52dvh, 480px);
+}
+.assistant-compose-fields { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding-right: 4px; }
+.assistant-compose-fields > label { display: block; font-size: 12px; color: var(--soft); margin-bottom: 9px; }
+.assistant-compose-fields .compose-advanced-popover { position: static; max-height: none; overflow: visible; box-shadow: none; }
+.assistant-compose > .compose-bottom, .assistant-compose > small { flex-shrink: 0; }
+.assistant-body { min-height: 48px; }
+.assistant-candidate-toolbar { max-height: 112px; overflow: auto; flex-shrink: 1; }
+.assistant-writing-mode > .generation-activity { max-height: 128px; overflow: auto; flex-shrink: 1; }
+.assistant-compose .compose-reference-trigger {
+  margin-bottom: 12px;
+}
+.assistant-compose .analysis-choice {
+  margin-block: 16px;
+}
+.assistant-compose .compose-bottom {
+  margin-top: 12px;
+}
+
+/* Document pages share the same rhythm without boxing in the manuscript. */
+.module-section-intro {
+  margin-bottom: 24px;
+}
+.document-page > .field,
+.document-page > section[role="tabpanel"] > .field {
+  margin-bottom: 24px;
+}
+.document-page > .field:last-child,
+.document-page > section[role="tabpanel"] > .field:last-child {
+  margin-bottom: 0;
+}
+.writing-profile-row {
+  margin-top: var(--section-gap);
+  padding: var(--section-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--section-radius);
+  background: var(--panel);
+}
+.writing-library > .writing-tabs {
+  margin-bottom: var(--section-gap);
+}
+.settings-panel {
+  gap: 24px;
+}
+.settings-card + .settings-card {
+  margin-top: 0;
+}
+.mt-setting-section + .mt-setting-section {
+  margin-top: 24px;
+  padding-top: 16px;
+}
+
+/* Brainstorming, reference selection and memo editing are distinct work areas. */
+.mt-idea-panel,
+.mt-memo-panel {
+  background: var(--sunken);
+}
+.mt-side-head {
+  border-bottom: 0;
+}
+.mt-idea-context,
+.mt-idea-composer,
+.mt-memo-filter,
+.mt-memo-editor {
+  margin: 0 var(--section-inset) var(--section-inset);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--section-radius);
+  background: var(--panel);
+}
+.mt-idea-messages {
+  margin-inline: var(--section-inset);
+}
+.mt-idea-composer {
+  gap: 8px;
+}
+.mt-memo-expanded .mt-memo-editor {
+  margin-top: var(--section-inset);
+}
+.memo-drawer-book {
+  border-bottom: 0;
+  margin-bottom: var(--section-inset);
+}
+
+/* Toolbox source and generation panes keep their own scrolling. */
+.creative-workbench {
+  gap: var(--section-gap);
+  padding: var(--section-inset);
+  background: var(--sunken);
+}
+.creative-context-panel,
+.creative-compose-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--section-radius);
+  background: var(--panel);
+}
+
+/* Clear headings identify each disclosure and scroll with its contents. */
+.assistant-reference-controls > .reference-disclosure {
+  padding: 0;
+  margin: 0 0 var(--section-gap);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--section-radius);
+  background: var(--surface);
+}
+.assistant-reference-controls > .reference-disclosure.is-open {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+}
+.reference-disclosure > .disclosure-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 72px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--section-radius) var(--section-radius) 0 0;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+.reference-disclosure.is-open > .disclosure-toggle {
+  background: color-mix(in srgb, var(--accent-soft) 65%, var(--surface));
+}
+.reference-disclosure > .disclosure-toggle:hover {
+  background: color-mix(in srgb, var(--accent-soft) 65%, var(--surface));
+}
+.reference-disclosure .disclosure-toggle > .disclosure-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+}
+.reference-disclosure .disclosure-toggle > .disclosure-copy {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.reference-disclosure .disclosure-copy strong {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.reference-disclosure .disclosure-copy small {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  white-space: normal;
+}
+.reference-disclosure .disclosure-toggle > .disclosure-action {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.disclosure-toggle[aria-expanded="true"] .disclosure-action svg {
+  transform: rotate(180deg);
+}
+.reference-disclosure > :is(.writing-picker-intro, .writing-selection-empty, .writing-selected-preview, .muted, .error-box) {
+  margin: 0 12px 12px;
+}
+.reference-disclosure > :is(.writing-picker-options, .context-detail) {
+  margin: 0;
+  padding: 16px 12px;
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+  border-radius: 0 0 var(--section-radius) var(--section-radius);
+  background: var(--panel);
+}
+.reference-disclosure .writing-section-head > strong,
+.reference-disclosure .reference-group h4 {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.reference-disclosure .writing-choice {
+  margin-bottom: 8px;
+  border-bottom: 0;
+  border-radius: 6px;
+  padding: 12px 8px;
+}
+.reference-disclosure .writing-choice:not(.is-selected) {
+  background: var(--bg);
+}
+.reference-disclosure .writing-choice > details {
+  margin-top: 6px;
+}
+.reference-disclosure .reference-group + .reference-group {
+  margin-top: 24px;
+  padding-top: 16px;
+}
+.candidate-reference-snapshot > summary {
+  min-height: 36px;
+  font-weight: 500;
+}
+.candidate-reference-snapshot[open] {
+  background: var(--panel);
+}
+.candidate-reference-snapshot[open] > summary {
+  color: var(--ink);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+@media (max-height: 760px), (max-width: 1100px) {
+  :root {
+    --section-gap: 12px;
+    --section-inset: 8px;
+    --section-padding: 12px;
+  }
+  .assistant-reference-controls,
+  .assistant-body > .candidate {
+    margin-top: 16px;
+  }
+  .assistant-compose .analysis-choice {
+    margin-block: 12px;
+  }
+}

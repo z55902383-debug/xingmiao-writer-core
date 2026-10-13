@@ -626,6 +626,54 @@ select:focus {
 }
 
 /* ── 滚动条（Webkit）────────────────────────────────── */
+.account-secondary-btn { display: block; margin-top: 8px; padding: 4px; border: 0; background: transparent; color: var(--dim); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.account-secondary-btn:hover { color: var(--accent); }
+.account-secondary-btn:disabled { opacity: .6; cursor: not-allowed; }
+.account-username { margin: 4px; color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+.account-login .account-login-btn { width: 100%; gap: 10px; padding: 11px 10px; background: var(--surface); color: var(--ink); border-color: var(--border); text-align: left; }
+.account-login .account-login-btn:hover:not(:disabled) { background: var(--raised); border-color: var(--border-strong); }
+.account-entry-icon { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); color: var(--accent); }
+.account-entry-copy { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.account-entry-copy strong { font-size: 13px; font-weight: 600; }
+.account-entry-copy small { font-size: 12px; line-height: 1.5; color: var(--dim); }
+.password-account-modal { width: 480px; }
+.password-account-modal .modal-head { padding: 20px 24px; }
+.password-account-modal .modal-head h2 { display: flex; align-items: center; gap: 12px; font-size: 20px; }
+.password-account-logo { width: 38px; height: 38px; object-fit: contain; border-radius: 10px; flex-shrink: 0; }
+.password-account-form { display: grid; gap: 16px; padding: 20px 24px 24px; }
+.password-account-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+.password-account-tabs button { min-height: 34px; padding: 6px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--dim); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.password-account-tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); border-color: var(--border-strong); }
+.password-account-tabs button:hover:not(:disabled) { color: var(--ink); }
+.password-account-tabs button:disabled { cursor: not-allowed; opacity: .6; }
+.password-account-fields { display: grid; gap: 14px; }
+.password-account-form .field { margin: 0; min-width: 0; gap: 6px; }
+.password-account-form .field small, .password-account-password-hint { display: block; color: var(--dim); font-size: 12px; line-height: 1.5; }
+.password-account-form input { width: 100%; min-width: 0; min-height: 42px; padding: 9px 12px; font-size: 14px; }
+.password-account-intro { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.6; }
+.password-account-passwords { display: grid; gap: 12px; }
+.password-account-passwords.pair { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+.password-account-password-hint { margin-top: -8px; }
+.password-account-secret-control { position: relative; }
+.password-account-secret-control input { padding-right: 44px; }
+.password-account-reveal { position: absolute; right: 4px; top: 3px; bottom: 3px; width: 36px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--dim); cursor: pointer; }
+.password-account-reveal:hover:not(:disabled) { background: var(--raised); color: var(--ink); }
+.password-account-reveal:disabled { opacity: .6; cursor: not-allowed; }
+.password-account-actions .button { width: 100%; min-height: 42px; justify-content: center; }
+.password-account-help, .password-account-alternatives { font-size: 12px; color: var(--dim); }
+.password-account-help summary { cursor: pointer; width: fit-content; padding-block: 3px; }
+.password-account-help p { margin: 8px 0 0; line-height: 1.6; }
+.password-account-alternatives { border-top: 1px solid var(--border); padding-top: 14px; }
+.password-account-alternatives > summary { display: flex; justify-content: center; align-items: center; gap: 5px; cursor: pointer; padding-block: 3px; list-style: none; }
+.password-account-alternatives > summary::-webkit-details-marker { display: none; }
+.password-account-alternatives[open] > summary svg { transform: rotate(90deg); }
+.password-account-legacy { display: grid; gap: 12px; padding-top: 12px; }
+.password-account-legacy p { margin: 0; line-height: 1.6; }
+.password-account-legacy .button { justify-content: center; }
+.password-account-legacy .account-secondary-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin: 0; }
+@media (max-width: 520px) { .password-account-passwords.pair { grid-template-columns: 1fr; } .password-account-form { padding-inline: 18px; } }
+.password-account-error { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--danger); background: var(--surface); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {

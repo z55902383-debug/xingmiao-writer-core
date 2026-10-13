@@ -29,6 +29,8 @@ export default function GenerationActivity({ job, preparing, label, onView, onSt
     : job?.review?.status === "error" ? "内容已生成，分析未完成" : "生成完成";
   const chars = preparing ? 0 : job?.output.replace(/\s/g, "").length || 0;
   const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const lastOutput = Date.parse((analyzing ? job?.review?.lastOutputAt : job?.lastOutputAt) || '') || startedAt;
+  const silentSeconds = Math.max(0, Math.floor((now - lastOutput) / 1000));
   const warning = job?.status === "error" || job?.status === "interrupted" || job?.review?.status === "error";
   return <section className={`generation-activity ${active ? "is-active" : ""}`} aria-label={tr("生成进度")} data-active={active}>
     <div className="generation-activity-heading">
@@ -44,6 +46,7 @@ export default function GenerationActivity({ job, preparing, label, onView, onSt
       {job && !preparing && <Button variant="ghost" onClick={onView}><ArrowDown size={13} />{tr(active ? "查看实时结果" : "查看结果")}</Button>}
     </div>
     {active && <>
+      <p className="generation-activity-hint">{tr('距上次输出 {0} 秒', { 0: silentSeconds })}{silentSeconds >= 45 ? ` · ${tr('暂未收到新内容，可继续等待或停止后重试。')}` : ''}</p>
       <div className="generation-activity-track" aria-hidden="true"><i /></div>
       <p className="generation-activity-hint">{tr(preparing ? "保存当前编辑，整理本次参考资料。" : analyzing ? "正文已保留，正在核对人物、世界与记忆变化。" : chars ? "内容正在逐段更新，可随时查看或停止。" : "已发出请求，模型返回内容后会逐段显示。")}</p>
     </>}

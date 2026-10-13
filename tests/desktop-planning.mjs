@@ -1,7 +1,7 @@
 import { _electron as electron, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { resolve } from "node:path";
 const requests = [];
 const server = createServer(async (req, res) => {
@@ -53,10 +53,9 @@ const server = createServer(async (req, res) => {
   );
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
-const output = resolve("test-results"),
-  dir = resolve(output, "planning-data");
+const output = resolve("test-results");
 await mkdir(output, { recursive: true });
-await rm(dir, { recursive: true, force: true });
+const dir = await mkdtemp(resolve(output, "planning-data-"));
 const env = { ...process.env, XM_TEST: "1", XM_DATA_DIR: dir };
 delete env.ELECTRON_RUN_AS_NODE;
 delete env.XM_DEV_URL;
@@ -97,16 +96,16 @@ try {
     await expect(page.locator(".candidate")).toContainText(label);
     await expect(
       page
-        .locator(".candidate")
+        .locator(".assistant-candidate-toolbar")
         .getByRole("button", { name: "采用结果", exact: true }),
     ).toBeEnabled();
     await page
-      .locator(".candidate")
+      .locator(".assistant-candidate-toolbar")
       .getByRole("button", { name: "采用结果", exact: true })
       .click();
     await expect(
       page
-        .locator(".candidate")
+        .locator(".assistant-candidate-toolbar")
         .getByRole("button", { name: "已采用", exact: true }),
     ).toBeVisible();
   }
@@ -155,7 +154,8 @@ try {
       .getByRole("button", { name: /生成本章细纲/ }),
     "章节细纲候选",
   );
-  await page.screenshot({ path: resolve(output, "v031-generation.png") });
+  if (!process.argv.includes("--no-screenshots"))
+    await page.screenshot({ path: resolve(output, "v031-generation.png") });
   await page.getByRole("button", { name: "世界设定", exact: true }).click();
   await expect(
     page

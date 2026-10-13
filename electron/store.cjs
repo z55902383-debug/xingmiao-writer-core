@@ -130,6 +130,7 @@ class Store {
         return {
           ...book,
           chapterCount: chapters.length,
+          finalizedCount: chapters.filter(c => c.status === 'final' && c.body.trim()).length,
           recentChapterId: recentChapter?.id || "",
           recentChapterTitle: recentChapter?.title || "",
           words: chapters.reduce(
@@ -142,6 +143,10 @@ class Store {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
   putBook(book) {
+    if (book.completedAt) {
+      const chapters = this.chapters(book.id);
+      if (!chapters.length || chapters.some(c => !c.body.trim() || c.status !== 'final')) delete book.completedAt;
+    }
     book.updatedAt = now();
     this.db
       .prepare(
@@ -151,6 +156,13 @@ class Store {
     return book;
   }
   putChapter(chapter) {
+    const existing = this.db.prepare('SELECT data FROM chapters WHERE id=?').get(chapter.id);
+    const parentRow = this.db.prepare('SELECT data FROM books WHERE id=?').get(chapter.bookId);
+    const parent = parentRow ? JSON.parse(parentRow.data) : null;
+    if (parent?.completedAt && (!existing || ['body', 'title', 'status', 'deletedAt', 'volumeId', 'order'].some(k => JSON.parse(existing.data)[k] !== chapter[k]))) {
+      delete parent.completedAt;
+      this.putBook(parent);
+    }
     this.db
       .prepare(
         "INSERT INTO chapters VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
@@ -177,7 +189,8 @@ class Store {
       characters: [],
       volumes: [],
       timeline: [],
-      chapterTargetWords: 2000,
+      chapterTargetWords: input.creationMode === 'short' ? 1000 : 2000,
+      creationMode: input.creationMode === 'short' ? 'short' : 'long',
       contextChapters: 100,
       world: "",
       memories: [],
@@ -225,6 +238,11 @@ class Store {
       book.chapterTargetWords = n;
     }
     if ("archived" in patch) book.archived = !!patch.archived;
+    if ('creationMode' in patch) {
+      assert(['short', 'long'].includes(patch.creationMode), '请选择短篇或长篇创作路径。');
+      assert(patch.creationMode !== 'short' || !book.volumes?.length, '已有分卷的作品请使用长篇路径；删除分卷并保留章节后才可切换短篇。');
+      book.creationMode = patch.creationMode;
+    }
     if ("characters" in patch) {
       assert(
         Array.isArray(patch.characters) && patch.characters.length <= 500,
@@ -668,6 +686,7 @@ class Store {
     return {
       format: "xingmiao-backup",
       version: 1,
+      excludedHistory: ["knowledge-chat", "knowledge-proposal-undo"],
       createdAt: now(),
       books: this.list(true).map((b) => this.book(b.id, true)),
       skills: this.skills(),

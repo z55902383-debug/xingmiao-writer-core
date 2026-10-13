@@ -52,11 +52,15 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  className = "",
+  icon,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
+  icon?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -67,7 +71,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={`modal ${wide ? "wide" : ""}`}
+      className={`modal ${wide ? "wide" : ""} ${className}`}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
@@ -78,7 +82,7 @@ export function Modal({
       aria-label={title}
     >
       <div className="modal-head">
-        <h2>{title}</h2>
+        <h2>{icon}{title}</h2>
         <IconButton label={tr("关闭弹窗")} onClick={onClose}>
           <X size={20} />
         </IconButton>

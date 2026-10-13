@@ -3,7 +3,7 @@ const { createHash } = require("node:crypto");
 const routedKinds = ["bookOutline", "volumePlan", "volumeOutline", "volumeDetail", "chapterPlan", "chapterDetails", "summary", "outline"];
 const volumeKinds = ["volumeOutline", "volumeDetail", "chapterPlan", "chapterDetails"];
 function planningSignature(book) {
-  return createHash("sha256").update(JSON.stringify([book.title, book.premise, book.outline, book.volumes || [], book.chapters.map(c => [c.id, c.title, c.volumeId, c.summary, c.outline, c.revision, c.order])])).digest("hex");
+  return createHash("sha256").update(JSON.stringify([book.title, book.premise, book.outline, book.volumes || [], book.chapters.map(c => [c.id, c.title, c.volumeId, c.summary, c.outline, c.revision, c.order]), ...(book.creationMode === 'short' ? ['short'] : [])])).digest("hex");
 }
 function readResult(output) {
   const raw = output.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -44,13 +44,14 @@ function fieldPatch(record, fields) {
 }
 function chapterRows(book, volume, records, kind) {
   if (!Array.isArray(records) || !records.length || records.length > 200) throw Error("章节规划应包含 1–200 章，请按卷生成。");
-  const existing = book.chapters.filter(c => c.volumeId === volume.id);
-  const placeholder = book.chapters.length === 1 && !book.chapters[0].volumeId && !book.chapters[0].body && !book.chapters[0].summary && !book.chapters[0].outline && /^第\s*1\s*章$/.test(book.chapters[0].title) ? book.chapters[0] : null;
+  const existing = book.chapters.filter(c => (c.volumeId || '') === volume.id);
+  const placeholder = require('./author-workflow.cjs').safePlaceholder(book);
+  const targets = kind !== 'chapterDetails' && placeholder && !existing.some(c => c.id === placeholder.id) ? [...existing, placeholder] : existing;
   const rows = records.map((record, i) => {
     if (!record || typeof record !== "object") throw Error("章节规划字段不完整。");
     if (record.volumeId && record.volumeId !== volume.id) throw Error("章节规划包含其他分卷，未采用任何内容。");
     if (record.body !== undefined) throw Error("章节规划不能写入正文，请使用按细纲写正文。");
-    let { target, title } = namedTarget(record, existing, "章节名称");
+    let { target, title } = namedTarget(record, targets, "章节名称");
     if (!target && !record.id) {
       const number = title.match(/^第\s*(\d+)\s*章/)?.[1];
       const emptyMatches = number ? existing.filter(c => !c.body.trim() && !c.summary?.trim() && !c.outline.trim() && c.title.replace(/\s/g, "") === `第${Number(number)}章`) : [];
@@ -85,6 +86,10 @@ function planningRows(book, job, chapter) {
     return rows;
   }
   if (volumeKinds.includes(job.kind)) {
+    if (book.creationMode === 'short' && !job.targetVolumeId && ['chapterPlan', 'chapterDetails'].includes(job.kind)) {
+      if (data.volumeId) throw Error('短篇章节规划不能指定其他分卷。');
+      return chapterRows(book, { id: '', title: book.title }, data.chapters, job.kind);
+    }
     const volume = (book.volumes || []).find(v => v.id === job.targetVolumeId);
     if (!volume) throw Error("目标分卷已删除，请重新生成。");
     if (data.id && data.id !== volume.id || data.volumeId && data.volumeId !== volume.id) throw Error("生成结果指向其他分卷，未采用任何内容。");
@@ -152,4 +157,4 @@ function applyRows(store, bookId, rows) {
     base.sort((a,b)=>a.order-b.order);
   }
 }
-module.exports = { routedKinds, volumeKinds, planningSignature, planningRows, applyRows };
+module.exports = { readResult, routedKinds, volumeKinds, planningSignature, planningRows, applyRows };

@@ -20,6 +20,8 @@ import { api } from "./api";
 import type { Config, Skill, Kind, TrashEntry } from "./types";
 import { Button, Field, Modal } from "./ui";
 import ModelSettings from "./ModelSettings";
+import "./skill-library.css";
+import "./writing-profiles.css";
 
 const tasks: Record<Kind, string> = {
   bookOutline: "全书总纲",
@@ -71,22 +73,26 @@ type Applied = {
 };
 export default function Settings({
   config,
+  initialTab = "models",
   onClose,
   onSaved,
   onDataChanged,
   
 }: {
   config: Config;
+  initialTab?: string;
   onClose: () => void;
   onSaved: (c: Config) => void;
   onDataChanged: () => Promise<void>;
   
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState("models"),
+  const [tab, setTab] = useState(initialTab),
     [skills, setSkills] = useState<Skill[]>([]),
     [draft, setDraft] = useState<Skill | null>(null),
     [search, setSearch] = useState("");
+  const [skillStatus, setSkillStatus] = useState("all");
+  const [skillTask, setSkillTask] = useState<Kind | "all">("all");
   const [trash, setTrash] = useState<TrashEntry[]>([]);
   const [dataInfo, setDataInfo] = useState<DataInfo | null>(null),
     [move, setMove] = useState<DirCandidate | null>(null),
@@ -204,6 +210,7 @@ export default function Settings({
               <div className="section-intro">
                 <h3>{tr("写作 Skill")}</h3>
                 <p>{tr("把常用写法整理成可复用指令，只在选定任务中生效。")}</p>
+                <p>{tr("这里管理默认启用状态；生成前可在风格与参考中单独选择本次 Skill。")}</p>
               </div>
               <div className="notice">{tr("导入后默认关闭。当前支持 SKILL.md 中的文字指令，不运行脚本或读取引用文件。启用前请查看内容。")}</div>
               <div className="settings-actions">
@@ -244,12 +251,19 @@ export default function Settings({
               </div>
               <p className="muted">{tr("已启用")}{" "}{skills.filter((s) => s.enabled).length}{" "}{tr("/ 共")}{" "}
                 {skills.length}{" "}{tr("· 相关指令完整发送，不设应用内字数上限")}</p>
+              <div className="skill-library-filters">
+                <Field label={tr("筛选 Skill 状态")}><select value={skillStatus} onChange={event => setSkillStatus(event.target.value)}><option value="all">{tr("全部状态")}</option><option value="enabled">{tr("已启用")}</option><option value="disabled">{tr("未启用")}</option></select></Field>
+                <Field label={tr("筛选适用任务")}><select value={skillTask} onChange={event => setSkillTask(event.target.value as Kind | "all")}><option value="all">{tr("全部任务")}</option>{(Object.keys(tasks) as Kind[]).map(kind => <option key={kind} value={kind}>{tr(tasks[kind])}</option>)}</select></Field>
+              </div>
+              {!skills.some(s => (skillStatus === "all" || (skillStatus === "enabled" ? s.enabled : !s.enabled)) && (skillTask === "all" || s.tasks.includes(skillTask)) && (s.name + " " + s.description).toLowerCase().includes(search.toLowerCase())) && <p className="muted">{tr("没有匹配的 Skill。")}<Button variant="ghost" onClick={() => { setSearch(""); setSkillStatus("all"); setSkillTask("all"); }}>{tr("清除 Skill 筛选")}</Button></p>}
               <div className="skill-list">
                 {skills
                   .filter((s) =>
                     `${s.name} ${s.description}`
                       .toLowerCase()
-                      .includes(search.toLowerCase()))
+                      .includes(search.toLowerCase()) &&
+                    (skillStatus === "all" || (skillStatus === "enabled" ? s.enabled : !s.enabled)) &&
+                    (skillTask === "all" || s.tasks.includes(skillTask)))
                   .map((s) => (
                     <article className="skill-row" key={s.id}>
                       <div className="skill-heading">
@@ -282,8 +296,11 @@ export default function Settings({
                         </label>
                       </div>
                       <p>{s.description || tr("暂无说明")}</p>
+                      <div className="skill-task-tags">{s.tasks.map(task => <span key={task}>{tr(tasks[task])}</span>)}</div>
+                      <p className="skill-library-preview">{s.body}</p>
+                      <details className="skill-library-content"><summary>{tr("查看完整指令")}</summary><div className="writing-profile-text">{s.body}</div></details>
                       <div className="skill-bottom">
-                        <span>{s.tasks.map((t) => tasks[t]).join(" · ")}</span>
+                        <span>{tr("默认启用状态可随时调整")}</span>
                         <Button onClick={() => setDraft({ ...s })}>{tr("编辑")}</Button>
                         <Button
                           disabled={busy}
@@ -373,6 +390,7 @@ export default function Settings({
               <div className="settings-card">
                 <h4>{tr("备份与恢复")}</h4>
                 <p>{tr("包含作品、章节历史、写作 Skill 和回收站，不包含账号密钥。恢复会创建副本。")}</p>
+                <p>{tr("已写入的资料修改会备份；资料对话及方案撤销历史不包含在备份中。")}</p>
                 <div className="settings-actions">
                   <Button
                     disabled={busy}

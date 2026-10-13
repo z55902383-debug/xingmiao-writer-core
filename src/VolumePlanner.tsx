@@ -70,7 +70,7 @@ export default function VolumePlanner({
   }
   const groups = [
     ...(book.volumes || []),
-    ...(book.chapters.some(c=>!c.volumeId) ? [{ id: "", title: "未分卷章节", outline: "", detail: "" }] : []),
+    ...(book.chapters.some(c=>!c.volumeId) ? [{ id: "", title: book.creationMode === 'short' ? tr('短篇章节') : tr('未分卷章节'), outline: "", detail: "" }] : []),
   ];
   const plannedChapterCount = book.chapters.filter((chapter) => chapter.summary?.trim()).length;
   const finalizedChapterCount = book.chapters.filter((chapter) => chapter.status === "final").length;
@@ -186,13 +186,13 @@ export default function VolumePlanner({
       {panel === "volumes" && <>
         <div className="timeline-top">
           <div>
-            <h3>{tr("分卷与章节规划")}</h3>
-            <p>{tr("全文大纲 → 分卷 → 卷大纲/细纲 → 章节大纲/细纲 → 正文。每步生成后核对并采用。")}</p>
+            <h3>{tr(book.creationMode === 'short' ? '短篇章节规划' : '分卷与章节规划')}</h3>
+            <p>{tr(book.creationMode === 'short' ? '故事简纲 → 章节概要与细纲 → 正文 → 核对与完结。高级分卷可切换长篇路径使用。' : "全文大纲 → 分卷 → 卷大纲/细纲 → 章节大纲/细纲 → 正文。每步生成后核对并采用。")}</p>
           </div>
-          <div className="planner-heading-actions"><Button disabled={generating || !book.outline.trim()} onClick={() => onGenerate("volumePlan")}>{tr("生成分卷规划")}</Button><Button
+          <div className="planner-heading-actions"><Button disabled={generating || !book.outline.trim()} onClick={() => onGenerate(book.creationMode === 'short' ? 'chapterPlan' : 'volumePlan')}>{tr(book.creationMode === 'short' ? '生成短篇章节规划' : "生成分卷规划")}</Button>{book.creationMode !== 'short' && <Button
             onClick={() => setDraft({ title: "", outline: "", detail: "" })}
           >
-            <Plus size={16} />{tr("新建分卷")}</Button></div>
+            <Plus size={16} />{tr("新建分卷")}</Button>}</div>
         </div>
         <div className="planner-filters"><Field label={tr("查看分卷")}><select value={volumeFilter} onChange={e => setVolumeFilter(e.target.value)}><option value="all">{tr("全部分卷")}</option>{groups.map(v => <option key={v.id || "none"} value={v.id || "none"}>{v.title}</option>)}</select></Field><Field label={tr("查找章节")}><input value={query} onChange={e => setQuery(e.target.value)} placeholder={tr("输入卷名或章名")}/></Field></div>
       {groups.filter(v => (volumeFilter === "all" || (v.id || "none") === volumeFilter) && (!query.trim() || v.title.includes(query.trim()) || book.chapters.some(c => (c.volumeId || "") === v.id && c.title.includes(query.trim())))).map((v) => (

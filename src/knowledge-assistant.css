@@ -1,0 +1,276 @@
+.assistant-mode-tabs {
+  display: flex;
+  flex-shrink: 0;
+  margin: 0 12px 12px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.assistant-mode-tabs button {
+  flex: 1;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.assistant-mode-tabs button[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--raised);
+  font-weight: 600;
+}
+.assistant-mode-tabs button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.assistant-writing-mode {
+  display: contents;
+}
+.assistant-writing-mode[hidden],
+.knowledge-assistant[hidden] {
+  display: none;
+}
+.knowledge-assistant {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+.knowledge-scope {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-strong);
+  flex-shrink: 0;
+}
+.knowledge-scope > strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.knowledge-scope p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 8px 0;
+}
+.knowledge-scope > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 12px 0;
+}
+.knowledge-scope span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-size: 12px;
+}
+.knowledge-scope > small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  display: block;
+}
+.knowledge-log {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 4px;
+}
+.knowledge-empty {
+  display: grid;
+  gap: 10px;
+  padding: 16px 8px;
+}
+.knowledge-empty > strong {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.knowledge-empty button {
+  padding: 10px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  cursor: pointer;
+}
+.knowledge-empty button:hover {
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+.knowledge-message {
+  padding: 16px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.knowledge-message > strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.knowledge-message.user {
+  background: var(--panel);
+  border-radius: 8px;
+  border-bottom: 0;
+  margin-block: 12px;
+}
+.knowledge-reply {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.85;
+}
+.knowledge-message > p[role="status"] {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.knowledge-message > p[role="status"] small {
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.knowledge-proposal {
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border-strong);
+}
+.knowledge-proposal > strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.knowledge-change {
+  margin-bottom: 16px;
+}
+.knowledge-change > label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  cursor: pointer;
+}
+.knowledge-change input {
+  flex: 0 0 14px;
+  width: 14px;
+  min-height: 14px;
+  height: 14px;
+  margin-top: 4px;
+  accent-color: var(--accent);
+}
+.knowledge-change label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.knowledge-change label small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.knowledge-change label .knowledge-item-status { padding-top: 4px; font-weight: 600; color: var(--accent); }
+.knowledge-change label .knowledge-item-status[data-applied="false"] { color: var(--muted); }
+.knowledge-change-detail {
+  margin: 6px 0 0 22px;
+}
+.knowledge-change-detail > summary {
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  padding-block: 6px;
+}
+.knowledge-field-diff {
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.knowledge-field-diff > strong {
+  display: block;
+  margin-top: 12px;
+}
+.knowledge-field-diff > div {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px;
+  margin-top: 6px;
+  background: var(--panel);
+}
+.knowledge-field-diff span {
+  color: var(--muted);
+}
+.knowledge-field-diff p {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  margin: 4px 0 0;
+}
+.knowledge-proposal .button {
+  min-height: 34px;
+  font-size: 12px;
+  white-space: normal;
+}
+.knowledge-composer {
+  flex-shrink: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.knowledge-composer > label {
+  font-size: 12px;
+  color: var(--soft);
+}
+.knowledge-composer textarea {
+  width: 100%;
+  min-height: 90px;
+  max-height: 180px;
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.knowledge-composer > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.knowledge-composer .button {
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 12px;
+  white-space: normal;
+}
+.knowledge-composer .error-box {
+  font-size: 12px;
+  margin: 0;
+  max-height: 110px;
+  overflow: auto;
+}
+@media (max-height: 760px) {
+  .knowledge-scope {
+    padding: 8px;
+  }
+  .knowledge-scope > div {
+    margin: 6px 0;
+  }
+  .knowledge-composer textarea {
+    min-height: 70px;
+  }
+}
