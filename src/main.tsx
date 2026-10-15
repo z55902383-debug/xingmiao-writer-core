@@ -7,6 +7,7 @@ import "./ui-polish.css";
 import "./manual-typing.css";
 import "./reference-controls.css";
 import "./section-spacing.css";
+import "./display-refinement.css";
 applySavedTheme();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

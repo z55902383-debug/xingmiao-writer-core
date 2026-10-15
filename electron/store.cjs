@@ -191,7 +191,7 @@ class Store {
       timeline: [],
       chapterTargetWords: input.creationMode === 'short' ? 1000 : 2000,
       creationMode: input.creationMode === 'short' ? 'short' : 'long',
-      contextChapters: 100,
+      contextChapters: 10,
       world: "",
       memories: [],
       memos: [],
@@ -229,6 +229,9 @@ class Store {
       assert(Number.isInteger(n) && n >= 0 && n <= 100, "关联章节数应为 0–100");
       book.contextChapters = n;
     }
+    if ('techniques' in patch) book.techniques = require('./author-tools.cjs').techniques(patch.techniques);
+    if ('includeContinuity' in patch) { assert(typeof patch.includeContinuity === 'boolean', '续写状态卡选项无效'); book.includeContinuity = patch.includeContinuity; }
+    if ('relatedMemoryOnly' in patch) { assert(typeof patch.relatedMemoryOnly === 'boolean', '关系记忆引用选项无效'); book.relatedMemoryOnly = patch.relatedMemoryOnly; }
     if ("chapterTargetWords" in patch) {
       const n = Number(patch.chapterTargetWords);
       assert(
@@ -259,6 +262,8 @@ class Store {
         knowledgeFromChapterId: text(c.knowledgeFromChapterId || "", 100),
         secretFromChapterId: text(c.secretFromChapterId || "", 100),
         introducedOrder: Math.max(0, Number(c.introducedOrder) || 0),
+        knowledgeStale: (() => { const old = book.characters.find(p => p.id === c.id); return !!old?.knowledgeStale && ['characterKnown','readerKnown','knowledgeFromChapterId'].every(key => (old[key] || '') === (c[key] || '')); })(),
+        secretStale: (() => { const old = book.characters.find(p => p.id === c.id); return !!old?.secretStale && ['authorNotes','secretFromChapterId'].every(key => (old[key] || '') === (c[key] || '')); })(),
       }));
     }
     if ("worldRecords" in patch) {
@@ -288,6 +293,8 @@ class Store {
           ? f.status
           : "open",
         note: text(f.note || ""),
+        stale: (() => { const old = (book.foreshadows || []).find(p => p.id === f.id); return !!old?.stale && ['title','note','status','plantedChapterId','payoffChapterId'].every(key => (old[key] || '') === (f[key] || '')); })(),
+        staleSourceId: (book.foreshadows || []).find(p => p.id === f.id)?.staleSourceId || '',
       }));
     }
     if ("memos" in patch) {
@@ -355,6 +362,8 @@ class Store {
       body: c.body,
       outline: c.outline,
       summary: c.summary || "",
+      ...(c.writingCard ? { writingCard: c.writingCard } : {}),
+      ...(c.proseSources ? { proseSources: c.proseSources } : {}),
       createdAt: now(),
       label,
       revision: c.revision,
@@ -382,6 +391,9 @@ class Store {
   }
   invalidate(book, c) {
     const order = new Map(this.chapters(book.id).map((x) => [x.id, x.order]));
+    const affected = chapterId => chapterId && (order.get(chapterId) ?? -1) >= c.order;
+    book.characters = book.characters.map(p => ({ ...p, ...(affected(p.knowledgeFromChapterId) ? { knowledgeStale: true } : {}), ...(affected(p.secretFromChapterId) ? { secretStale: true } : {}) }));
+    book.foreshadows = (book.foreshadows || []).map(f => affected(f.plantedChapterId) || affected(f.payoffChapterId) ? { ...f, stale: true, staleSourceId: affected(f.plantedChapterId) ? f.plantedChapterId : f.payoffChapterId } : f);
     book.timeline = (book.timeline || []).map((e) =>
       e.chapterId && (order.get(e.chapterId) ?? 0) >= c.order
         ? { ...e, stale: true }
@@ -409,11 +421,13 @@ class Store {
       for (const key of ["title", "outline", "body", "summary"])
         if (key in patch)
           next[key] = text(patch[key], key === "title" ? 160 : Infinity);
+      if ('writingCard' in patch) next.writingCard = require('./author-tools.cjs').writingCard(patch.writingCard);
       if (
         c.title === next.title &&
         c.outline === next.outline &&
         c.body === next.body &&
-        c.summary === next.summary
+        c.summary === next.summary &&
+        JSON.stringify(c.writingCard) === JSON.stringify(next.writingCard)
       )
         return c;
       this.snapshot(c, label);
@@ -467,17 +481,21 @@ class Store {
   restoreVersion(chapterId, versionId, revision) {
     const version = this.versions(chapterId).find((v) => v.id === versionId);
     assert(version, "版本不存在");
-    return this.updateChapter(
+    const restored = this.updateChapter(
       chapterId,
       {
         title: version.title,
         body: version.body,
         outline: version.outline,
         summary: version.summary || "",
+        writingCard: version.writingCard || {},
       },
       revision,
       "恢复版本前快照",
     );
+    restored.proseSources = version.proseSources || [];
+    this.putChapter(restored);
+    return restored;
   }
   addMemory(bookId, input) {
     const book = this.rawBook(bookId);
@@ -556,7 +574,20 @@ class Store {
       .run(job.id, job.bookId, JSON.stringify(job));
     return job;
   }
-  adopt(jobId, mode) {
+  recordProseSources(job) {
+    const c = this.chapter(job.chapterId), chapters = this.chapters(job.bookId);
+    const sources = [...(c.proseSources || [])];
+    const cardSources = (job.context?.continuityCard?.sections || []).flatMap(section => section.items).filter(item => item.source.chapterId).map(item => ({ id: item.source.chapterId, revision: item.source.revision }));
+    const usedSources = [...(job.context?.sourceChapters || []).filter(s => s.selected), ...(job.context?.relationSources || []).map(s => ({ id: s.chapterId, revision: s.revision })), ...(job.context?.retrievedExcerpts || []).map(s => ({ id: s.chapterId, revision: s.revision })), ...cardSources];
+    for (const row of usedSources.filter(s => Number.isInteger(s.revision))) {
+      const source = chapters.find(item => item.id === row.id);
+      if (!source || source.order >= c.order) continue;
+      const prior = sources.find(s => s.chapterId === row.id);
+      if (!prior) sources.push({ chapterId: row.id, revision: row.revision });
+    }
+    c.proseSources = sources; this.putChapter(c);
+  }
+  adopt(jobId, mode, planningSelection) {
     return this.transaction(() => {
       const job = this.job(jobId);
       assert(
@@ -590,7 +621,8 @@ class Store {
         c.revision === job.baseRevision,
         "生成后原文已修改。请复制候选稿，手动合并，避免覆盖新内容。",
       );
-      if (require("./planning.cjs").applyPlanning(this, job, c)) {
+      if (require("./planning.cjs").applyPlanning(this, job, c, planningSelection)) {
+        if (planningSelection !== undefined) job.planningSelection = planningSelection;
         job.adopted = true;
         this.putJob(job);
         return this.book(job.bookId);
@@ -628,6 +660,7 @@ class Store {
           c.revision,
           "采用 AI 候选前快照",
         );
+      if (isProseKind(job.kind)) this.recordProseSources(job);
       job.adopted = true;
       this.putJob(job);
       return this.book(job.bookId);
@@ -686,7 +719,7 @@ class Store {
     return {
       format: "xingmiao-backup",
       version: 1,
-      excludedHistory: ["knowledge-chat", "knowledge-proposal-undo"],
+      excludedHistory: ["knowledge-chat", "knowledge-proposal-undo", "craft-analysis-runs"],
       createdAt: now(),
       books: this.list(true).map((b) => this.book(b.id, true)),
       skills: this.skills(),
@@ -703,4 +736,6 @@ require("./extensions.cjs").extendStore(Store);
 require("./timeline.cjs").installTimeline(Store);
 require("./canvas.cjs").installCanvas(Store);
 require("./writing-profiles.cjs").extendStore(Store);
+Store.prototype.cleanWritingCard = require('./author-tools.cjs').writingCard;
+Store.prototype.cleanTechniques = require('./author-tools.cjs').techniques;
 module.exports = { Store, assert, text, id, now };

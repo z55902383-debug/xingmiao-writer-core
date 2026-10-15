@@ -4,6 +4,7 @@ import { tr } from "./i18n";
 import { Button } from "./ui";
 import type { Job } from "./types";
 import "./generation-activity.css";
+import GenerationProcess from './GenerationProcess';
 
 export type GenerationStart = { startedAt: number; label: string };
 
@@ -15,6 +16,7 @@ export default function GenerationActivity({ job, preparing, label, onView, onSt
   const active = !!preparing || job?.status === "running" || job?.review?.status === "analyzing";
   const startedAt = preparing?.startedAt || (job ? Date.parse(job.createdAt) : 0);
   const [now, setNow] = useState(Date.now());
+  const [processOpen, setProcessOpen] = useState(false);
   useEffect(() => {
     setNow(Date.now());
     if (!active) return;
@@ -28,7 +30,8 @@ export default function GenerationActivity({ job, preparing, label, onView, onSt
     : job?.status === "cancelled" ? "已停止生成" : job?.status === "interrupted" ? "生成已中断"
     : job?.review?.status === "error" ? "内容已生成，分析未完成" : "生成完成";
   const chars = preparing ? 0 : job?.output.replace(/\s/g, "").length || 0;
-  const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const endedAt = Date.parse(job?.progress?.endedAt || '');
+  const seconds = Math.max(0, Math.floor(((active || !Number.isFinite(endedAt) ? now : endedAt) - startedAt) / 1000));
   const lastOutput = Date.parse((analyzing ? job?.review?.lastOutputAt : job?.lastOutputAt) || '') || startedAt;
   const silentSeconds = Math.max(0, Math.floor((now - lastOutput) / 1000));
   const warning = job?.status === "error" || job?.status === "interrupted" || job?.review?.status === "error";
@@ -43,6 +46,7 @@ export default function GenerationActivity({ job, preparing, label, onView, onSt
     <p className="generation-activity-target">{preparing?.label || label}</p>
     <div className="generation-activity-meta">
       <span>{tr("耗时 {0} 秒", { 0: seconds })}{chars > 0 && ` · ${tr("已生成 {0} 字符", { 0: chars.toLocaleString() })}`}</span>
+      <Button variant="ghost" onClick={() => setProcessOpen(true)}>{tr('本次生成过程')}</Button>
       {job && !preparing && <Button variant="ghost" onClick={onView}><ArrowDown size={13} />{tr(active ? "查看实时结果" : "查看结果")}</Button>}
     </div>
     {active && <>
@@ -50,5 +54,6 @@ export default function GenerationActivity({ job, preparing, label, onView, onSt
       <div className="generation-activity-track" aria-hidden="true"><i /></div>
       <p className="generation-activity-hint">{tr(preparing ? "保存当前编辑，整理本次参考资料。" : analyzing ? "正文已保留，正在核对人物、世界与记忆变化。" : chars ? "内容正在逐段更新，可随时查看或停止。" : "已发出请求，模型返回内容后会逐段显示。")}</p>
     </>}
+    {processOpen && <GenerationProcess job={preparing ? undefined : job} preparing={!!preparing} now={now} onClose={() => setProcessOpen(false)}/>}
   </section>;
 }

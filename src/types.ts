@@ -1,4 +1,6 @@
 export type Character = {
+  knowledgeStale?: boolean;
+  secretStale?: boolean;
   introducedOrder?: number;
   authorNotes?: string;
   readerKnown?: string;
@@ -11,6 +13,8 @@ export type Character = {
   description: string;
 };
 export type Foreshadow = {
+  staleSourceId?: string;
+  stale?: boolean;
   id: string;
   title: string;
   plantedChapterId: string;
@@ -38,6 +42,9 @@ export type Memory = {
   createdAt: string;
 };
 export type Chapter = {
+  proseSources?: { chapterId: string; revision: number }[];
+  writingCard?: WritingCard;
+  volumePlanIndex?: number;
   volumeId?: string;
   summary?: string;
   targetWords?: number;
@@ -70,9 +77,13 @@ export type Kind =
   | "summary"
   | "timelinePlan";
 export type ContextInfo = {
+  continuityCard?: ContinuityCard;
+  relationSources?: { chapterId: string; revision: number }[];
+  retrievedExcerpts?: RetrievedExcerpt[];
   referenceSections?: { key: string; group: "story" | "writing" | "task"; count?: number; titles?: string[] }[];
   writingReferences?: { id: string; kind: "style" | "requirement"; title: string; body: string }[];
   sourceChapters?: {
+    revision?: number;
     id: string;
     title: string;
     order: number;
@@ -102,6 +113,8 @@ export type SyncChange = {
   evidence: string;
 };
 export type Job = {
+  progress?: { requestedAt?: string; firstOutputAt?: string; generationEndedAt?: string; analysisStartedAt?: string; analysisEndedAt?: string; endedAt?: string };
+  planningBatch?: import('../electron/chapter-batches.mjs').ChapterBatch;
   lastOutputAt?: string;
   manualMerged?: boolean;
   analyzeChanges?: boolean;
@@ -135,6 +148,8 @@ export type Job = {
   usage?: { total_tokens: number };
 };
 export type Volume = {
+  planInBatches?: boolean;
+  targetChapters?: number;
   id: string;
   title: string;
   outline: string;
@@ -150,6 +165,7 @@ export type PlanningRow = {
   preservesBody?: boolean;
   fields: { title?: string; outline?: string; detail?: string; summary?: string };
 };
+export type PlanningSelection = { index: number; title: string; summary?: string; outline?: string };
 export type TimelineEvent = {
   id?: string;
   kind: "world" | "character" | "relation";
@@ -177,6 +193,10 @@ export type TimelineSnapshot = {
   relations: TimelineEvent[];
 };
 export type Book = {
+  includeContinuity?: boolean;
+  relatedMemoryOnly?: boolean;
+  techniques?: Technique[];
+  importedSource?: { name: string; content: string; importedAt: string };
   creationMode?: 'short' | 'long';
   completedAt?: string;
   lastExportedAt?: string;
@@ -210,6 +230,10 @@ export type Book = {
   memos?: MemoNote[];
 };
 export type WritingSelection = { styleIds: string[]; requirementIds: string[] };
+export type WritingCard = { must: string; avoid: string; knowledge: string; stop: string };
+export type ContinuityCard = { asOfChapterId: string; asOfTitle: string; warning: string; sections: { key: string; title: string; items: { id: string; text: string; source: { chapterId: string; title: string; revision: number; evidence?: string; start?: number; end?: number } }[] }[] };
+export type RetrievedExcerpt = { id: string; chapterId: string; revision: number; title: string; order?: number; start: number; end: number; text: string; selected?: boolean; reasons?: string[]; semanticReason?: string };
+export type Technique = { id: string; title: string; method: string; useWhen: string; sourceName: string; source: string; evidence: string; enabled: boolean; note: string };
 export type WritingProfile = {
   id: string; kind: "style" | "requirement"; title: string; body: string;
   source: string; sourceName: string; revision: number;
@@ -268,11 +292,14 @@ export type Skill = {
   description: string;
   body: string;
   tasks: Kind[];
+  toolTags?: string[];
   enabled: boolean;
   version?: number;
   source?: string;
 };
 export type TrashEntry = {
+  cleanupAt?: string;
+  remainingDays?: number | null;
   id: string;
   type: string;
   title: string;

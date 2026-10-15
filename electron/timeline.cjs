@@ -166,7 +166,10 @@ function installTimeline(Store) {
         title: str(input.title, 160),
         outline: str(input.outline || ""),
         detail: str(input.detail || ""),
+        targetChapters: Number(input.targetChapters ?? old?.targetChapters ?? 0),
+        planInBatches: input.planInBatches === undefined ? !!old?.planInBatches : input.planInBatches === true,
       };
+      check(Number.isInteger(v.targetChapters) && v.targetChapters >= 0 && v.targetChapters <= 200, "计划章数应为1–200，留空表示由模型建议");
       check(v.title, "请填写卷名");
       b.volumes = old ? all.map((x) => (x.id === v.id ? v : x)) : [...all, v];
       if (b.creationMode === 'short') b.creationMode = 'long';
@@ -180,6 +183,7 @@ function installTimeline(Store) {
         check(v, "分卷不存在");
         this.recycle("volume", bookId, {
           ...v,
+          chapterPlanPositions: Object.fromEntries(this.chapters(bookId,true).filter(c=>c.volumeId===volumeId && c.volumePlanIndex).map(c=>[c.id,c.volumePlanIndex])),
           chapterIds: this.chapters(bookId, true)
             .filter((c) => c.volumeId === volumeId)
             .map((c) => c.id),
@@ -188,6 +192,7 @@ function installTimeline(Store) {
         for (const c of this.chapters(bookId, true))
           if (c.volumeId === volumeId) {
             c.volumeId = "";
+            delete c.volumePlanIndex;
             this.putChapter(c);
           }
         this.putBook(b);
@@ -204,7 +209,8 @@ function installTimeline(Store) {
             (b.volumes || []).some((v) => v.id === input.volumeId),
           "分卷不属于本书",
         );
-        c.volumeId = input.volumeId || "";
+          if (c.volumeId !== (input.volumeId || "")) delete c.volumePlanIndex;
+          c.volumeId = input.volumeId || "";
       }
       if ("targetWords" in input) {
         const n = Number(input.targetWords);
@@ -236,10 +242,14 @@ function contextSignature(book, chapter) {
         book.timeline || [],
         book.volumes || [],
         book.chapterTargetWords || 2000,
-        book.contextChapters ?? 2,
+        book.contextChapters ?? 10,
+        book.includeContinuity !== false,
+        book.relatedMemoryOnly === true,
         (book.chapters || []).filter(c=>c.order < chapter.order).map(c=>[c.id,c.revision,c.status,c.order]),
         chapter.volumeId || "",
         chapter.targetWords || 0,
+        chapter.writingCard || {},
+        (book.techniques || []).filter(row => row.enabled).map(row => [row.id, row.title, row.method, row.useWhen, row.note]),
         ...(book.creationMode === 'short' ? ['short'] : []),
       ]),
     )

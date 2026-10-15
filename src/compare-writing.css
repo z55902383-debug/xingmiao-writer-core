@@ -1,0 +1,41 @@
+.chapter-heading-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; border-bottom:1px solid var(--border-strong); }
+.chapter-heading-row .chapter-title-input { flex:1; min-width:0; border-bottom:0; margin-bottom:0; }
+.chapter-quick-tools { display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex-shrink:0; }
+.chapter-tools-drawer { position:fixed; z-index:70; top:72px; right:16px; bottom:16px; width:min(460px, calc(100vw - 32px)); background:var(--panel); color:var(--soft); border:1px solid var(--border-strong); border-radius:10px; box-shadow:0 12px 36px #0005; display:flex; flex-direction:column; }
+.chapter-tools-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px; border-bottom:1px solid var(--border-strong); }
+.chapter-tools-body { overflow:auto; min-height:0; padding:0 16px 16px; }
+.chapter-tools-drawer .continuity-panel,.chapter-tools-drawer .writing-card { margin:16px 0; }
+.compare-writer { min-width:0; color:var(--soft); font-size:13px; }
+.compare-controls,.compare-footer,.compare-footer>div { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:16px 0; }
+.compare-controls>label:first-child { display:flex; align-items:center; gap:10px; min-width:0; }
+.compare-controls select { max-width:280px; min-width:140px; }
+.compare-sync { display:flex; align-items:center; gap:8px; }
+.compare-sync input { width:16px; height:16px; min-height:16px; padding:0; flex-shrink:0; }
+.compare-columns { display:grid; min-height:420px; }
+.compare-column { display:flex; flex-direction:column; min-width:0; }
+.compare-column-head { display:flex; justify-content:space-between; gap:8px; padding:12px 8px; border-bottom:1px solid var(--border-strong); }
+.compare-column-head span { color:var(--muted); }
+.compare-column textarea { width:100%; min-height:420px; height:calc(100dvh - 410px); resize:none; border:0; border-radius:0; padding:20px 16px; background:var(--reading-surface,var(--surface)); color:var(--soft); font-size:18px; line-height:1.9; overflow:auto; }
+.compare-column textarea[readonly] { color:var(--muted); }
+.compare-columns>[role=separator] { cursor:col-resize; touch-action:none; border-inline:5px solid var(--reading-surface,var(--surface)); background:var(--border-strong); }
+.compare-columns>[role=separator]:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.compare-footer { justify-content:space-between; }
+.compare-note { color:var(--muted); line-height:1.8; margin:16px 0; }
+.compare-paste textarea { width:100%; min-height:120px; margin:12px 0; }
+.compare-error { padding:12px; border:1px solid var(--border-strong); border-radius:6px; }
+.compare-error p { white-space:pre-wrap; }
+.compare-error button { margin:8px 12px 0 0; }
+.workspace.compare-mode:not(.assistant-open) { grid-template-columns:var(--side-w,230px) 5px minmax(0,1fr) 0 0 !important; }
+.workspace.compare-mode:not(.assistant-open)>.assistant-panel { display:none; }
+.workspace.compare-mode:not(.assistant-open)>.splitter { display:none; }
+.workspace.compare-mode:not(.assistant-open)>.work-area { grid-column:3; }
+.workspace.compare-mode:not(.assistant-open)>.workspace-sidebar { grid-column:1; }
+.workspace.compare-mode.is-focused:not(.assistant-open) { grid-template-columns:0 0 minmax(0,1fr) 0 0 !important; }
+.workspace.compare-mode.sidebar-collapsed:not(.is-focused):not(.assistant-open) { grid-template-columns:72px 0 minmax(0,1fr) 0 0 !important; }
+.workspace.compare-mode .manuscript { max-width:none !important; padding-left:24px; padding-right:24px; }
+.workspace.compare-mode .chapter-quickbar,.workspace.compare-mode .chapter-find,.workspace.compare-mode .chapter-display { display:none; }
+.mt-root.mt-comparing .mt-editor-wrap { max-width:none; width:100%; overflow:auto; padding:20px 24px 0; }
+.mt-root.mt-comparing .mt-writing-layout { grid-template-columns:minmax(0,1fr); }
+.mt-root.mt-comparing .mt-writing-layout>aside { display:none; }
+.mt-root.mt-comparing .mt-tool-group[inert] { display:none; }
+@media(max-width:1100px) { .chapter-heading-row { flex-wrap:wrap; gap:8px; padding-bottom:12px; } .chapter-quick-tools { margin-left:auto; } .compare-column textarea { padding:16px 10px; } .workspace.compare-mode .manuscript { padding-left:12px; padding-right:12px; } }

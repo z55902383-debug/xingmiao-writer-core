@@ -48,6 +48,7 @@ async function restore(db, backup) {
   assert.ok(start >= 0 && end > start);
   const json = JSON.stringify(backup);
   const action = runInNewContext("(" + source.slice(start, end).trim() + ")", {
+    require: require('node:module').createRequire(require('node:path').resolve('electron/main.cjs')),
     store: db, win: null, assert: check, text, id, now,
     dialog: { showOpenDialog: async () => ({ canceled: false, filePaths: ["isolated-backup.json"] }) },
     fs: { stat: async () => ({ size: Buffer.byteLength(json) }), readFile: async () => json },

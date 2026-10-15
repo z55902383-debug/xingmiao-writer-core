@@ -19,6 +19,11 @@ function describeReferences(data, writingReferences = [], skills = [], instructi
   add('targetVolume','task',data.targetVolume,undefined,[data.targetVolume?.title]);
   add('chapterOutline','task',text(data.chapter?.outline)); add('chapterBody','task',text(data.chapter?.body));
   add('chapterSummary','task',text(data.chapter?.summary));
+  add('writingCard','task', data.writingCard && Object.values(data.writingCard).some(text));
+  add('techniques','writing',data.techniques?.length,data.techniques?.length,data.techniques?.map(row=>row.title));
+  const stateItems = data.continuityCard?.sections.flatMap(section=>section.items) || [];
+  add('continuity','story',stateItems.length,stateItems.length);
+  add('retrieved','story',data.retrievedExcerpts?.length,data.retrievedExcerpts?.length,data.retrievedExcerpts?.map(row=>row.title));
   add('availableIds','task',data.availableIds, (data.availableIds?.characters.length || 0) + (data.availableIds?.chapters.length || 0));
   add('recent','story',data.recent?.length,data.recent?.length,data.recent?.map(row => row.title));
   for (const [key, kind] of [['writingStyles','style'], ['writingRequirements','requirement']]) {

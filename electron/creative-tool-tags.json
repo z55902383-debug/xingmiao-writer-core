@@ -1,0 +1,18 @@
+[
+  { "id": "cover", "label": "封面生成器" },
+  { "id": "brainstorm", "label": "脑洞生成器" },
+  { "id": "bookName", "label": "书名生成器" },
+  { "id": "nameTest", "label": "书名测试" },
+  { "id": "intro", "label": "简介生成器" },
+  { "id": "outline", "label": "大纲生成器" },
+  { "id": "detail", "label": "细纲生成器" },
+  { "id": "opening", "label": "黄金开篇生成器" },
+  { "id": "cheat", "label": "金手指生成器" },
+  { "id": "names", "label": "名字生成器" },
+  { "id": "character", "label": "人设生成器" },
+  { "id": "world", "label": "世界观生成器" },
+  { "id": "glossary", "label": "词条生成器" },
+  { "id": "matchIdea", "label": "对标脑洞" },
+  { "id": "matchName", "label": "对标书名" },
+  { "id": "matchIntro", "label": "对标简介" }
+]

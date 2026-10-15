@@ -55,6 +55,11 @@ try {
   await expect(activity).toContainText('正在准备资料'); await expect(activity).toHaveAttribute('data-active', 'true');
   await expect(activity).toContainText('短段对白');
   await expect.poll(() => responses.length).toBe(1); await expect(activity).toContainText('等待模型响应');
+  await activity.getByRole('button', { name: '本次生成过程', exact: true }).click();
+  const process = page.getByRole('dialog', { name: '本次生成过程', exact: true });
+  await expect(process.locator('[data-stage="generation"]')).toContainText('进行中');
+  await process.getByText('查看本次发送的资料', { exact: true }).click(); await expect(process).toContainText('分析参考原文');
+  await process.getByRole('button', { name: '返回写作', exact: true }).click();
   await expect(activity).not.toContainText('%');
   assert.notEqual(await activity.locator('.generation-activity-icon svg').evaluate(el => getComputedStyle(el).animationName), 'none');
   chunk(responses[0], '风格正在逐段生成。\n'); await expect(activity).toContainText('正在生成内容'); await expect(activity).toContainText('已生成');
@@ -85,6 +90,12 @@ try {
   await page.setViewportSize({ width: 1460, height: 900 });
   await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
   done(responses[0]); await expect(activity).toHaveAttribute('data-active', 'false'); await expect(activity).toContainText('生成完成');
+  await activity.getByRole('button', { name: '本次生成过程', exact: true }).click();
+  await expect(process.locator('[data-stage="generation"]')).toContainText('已完成'); await expect(process.locator('[data-stage="analysis"]')).toContainText('不适用'); await expect(process.locator('[data-stage="confirmation"]')).toContainText('等待作者核对');
+  const recorded = (await call('book:get', { id: book.id })).candidates[0].progress;
+  assert.ok(recorded.firstOutputAt && recorded.generationEndedAt && recorded.endedAt);
+  await page.screenshot({ path: resolve(data, 'generation-process-desktop.png') });
+  await process.getByRole('button', { name: '返回写作', exact: true }).click();
   await activity.getByRole('button', { name: '查看结果', exact: true }).click();
   await page.getByRole('button', { name: '采用结果', exact: true }).click();
   await expect(page.locator('.writing-row-badge')).toHaveText('可选用');
@@ -95,9 +106,12 @@ try {
   await expect(activity).not.toContainText('已生成');
   chunk(responses[1], '林晚推开门，听见雨滴落在窗沿。'); done(responses[1]);
   await expect.poll(() => responses.length).toBe(3); assert.ok(responses[2].analysis);
+  await activity.getByRole('button', { name: '本次生成过程', exact: true }).click(); await expect(process.locator('[data-stage="generation"]')).toContainText('已完成'); await expect(process.locator('[data-stage="analysis"]')).toContainText('进行中'); await process.getByRole('button', { name: '返回写作', exact: true }).click();
   await expect(activity).toContainText('正在分析故事变化'); await expect(activity).toHaveAttribute('data-active', 'true');
   await activity.getByRole('button', { name: '停止当前生成', exact: true }).click(); await expect(activity).toHaveAttribute('data-active', 'false');
   book = await call('book:get', { id: book.id }); assert.match(book.candidates[0].output, /林晚推开门/); assert.equal(book.chapters[0].body, '');
+  assert.ok(book.candidates[0].progress.analysisStartedAt && book.candidates[0].progress.analysisEndedAt);
+  await activity.getByRole('button', { name: '本次生成过程', exact: true }).click(); await expect(process.locator('[data-stage="analysis"]')).toContainText('已停止'); await expect(process).toContainText('正文已保留'); await page.setViewportSize({ width: 1024, height: 768 }); await page.screenshot({ path: resolve(data, 'generation-process-compact.png') }); await process.getByRole('button', { name: '返回写作', exact: true }).click(); await page.setViewportSize({ width: 1460, height: 900 });
   // Stop a stream and preserve received text; the next request must return to waiting.
   await page.getByRole('button', { name: '开始生成', exact: true }).click(); await expect.poll(() => responses.length).toBe(4);
   chunk(responses[3], '这段内容会在停止后保留。'); await expect(activity).toContainText('正在生成内容');

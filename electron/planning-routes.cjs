@@ -3,7 +3,7 @@ const { createHash } = require("node:crypto");
 const routedKinds = ["bookOutline", "volumePlan", "volumeOutline", "volumeDetail", "chapterPlan", "chapterDetails", "summary", "outline"];
 const volumeKinds = ["volumeOutline", "volumeDetail", "chapterPlan", "chapterDetails"];
 function planningSignature(book) {
-  return createHash("sha256").update(JSON.stringify([book.title, book.premise, book.outline, book.volumes || [], book.chapters.map(c => [c.id, c.title, c.volumeId, c.summary, c.outline, c.revision, c.order]), ...(book.creationMode === 'short' ? ['short'] : [])])).digest("hex");
+  return createHash("sha256").update(JSON.stringify([book.title, book.premise, book.outline, book.volumes || [], book.chapters.map(c => [c.id, c.title, c.volumeId, c.summary, c.outline, c.revision, c.order,...(c.volumePlanIndex===undefined?[]:[c.volumePlanIndex])]), ...(book.creationMode === 'short' ? ['short'] : [])])).digest("hex");
 }
 function readResult(output) {
   const raw = output.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -42,7 +42,7 @@ function uniqueRows(rows) {
 function fieldPatch(record, fields) {
   return Object.fromEntries(fields.filter(k => record[k] !== undefined).map(k => [k, string(record[k], k)]));
 }
-function chapterRows(book, volume, records, kind) {
+function chapterRows(book, volume, records, kind, reusePlaceholder = true) {
   if (!Array.isArray(records) || !records.length || records.length > 200) throw Error("章节规划应包含 1–200 章，请按卷生成。");
   const existing = book.chapters.filter(c => (c.volumeId || '') === volume.id);
   const placeholder = require('./author-workflow.cjs').safePlaceholder(book);
@@ -57,7 +57,7 @@ function chapterRows(book, volume, records, kind) {
       const emptyMatches = number ? existing.filter(c => !c.body.trim() && !c.summary?.trim() && !c.outline.trim() && c.title.replace(/\s/g, "") === `第${Number(number)}章`) : [];
       if (emptyMatches.length === 1) target = emptyMatches[0];
     }
-    if (!target && !record.id && i === 0 && placeholder && kind !== "chapterDetails") target = placeholder;
+    if (!target && !record.id && i === 0 && placeholder && kind !== "chapterDetails" && reusePlaceholder) target = placeholder;
     if (kind === "chapterDetails" && !target) throw Error("请先采用本卷章节规划，再生成已有章节的细纲。");
     const fields = fieldPatch(record, ["summary", "outline"]);
     if (kind === "chapterPlan") string(fields.summary, "章节大纲", true);
@@ -93,7 +93,28 @@ function planningRows(book, job, chapter) {
     const volume = (book.volumes || []).find(v => v.id === job.targetVolumeId);
     if (!volume) throw Error("目标分卷已删除，请重新生成。");
     if (data.id && data.id !== volume.id || data.volumeId && data.volumeId !== volume.id) throw Error("生成结果指向其他分卷，未采用任何内容。");
-    if (job.kind === "chapterPlan" || job.kind === "chapterDetails") return chapterRows(book, volume, data.chapters, job.kind);
+    if (job.kind === "chapterPlan" || job.kind === "chapterDetails") {
+      if (!job.planningBatch) return chapterRows(book, volume, data.chapters, job.kind);
+      const {chapterBatch,chapterSlots}=require('./chapter-batches.mjs');
+      const batch=chapterBatch(book,volume.id,job.kind);
+      if (!batch || JSON.stringify(batch)!==JSON.stringify(job.planningBatch)) throw Error('本卷分批进度已变化，请重新生成当前批次');
+      if (!Array.isArray(data.chapters) || data.chapters.length!==batch.positions.length || data.chapters.length>10) throw Error('本批章节数量不完整或超过10章，请重新生成当前批次');
+      const slots=chapterSlots(book,volume.id),seen=new Set();
+      const records=data.chapters.map(record=>{
+        if (!Number.isInteger(record?.position) || !batch.positions.includes(record.position) || seen.has(record.position)) throw Error('生成结果包含重复或其他批次的位置，未采用任何章节');
+        seen.add(record.position);
+        const existing=slots.find(row=>row.position===record.position)?.chapter;
+        if (record.id && record.id!==existing?.id) throw Error('本批章节编号不属于对应规划位置');
+        return {...record,id:existing?.id};
+      }).sort((a,b)=>a.position-b.position);
+      const rows=chapterRows(book,volume,records,job.kind,false);
+      rows.forEach((row,i)=>{
+        const expected=slots.find(slot=>slot.position===records[i].position)?.chapter;
+        if (row.id!==expected?.id) throw Error('章名与已确认位置冲突，不能改写其他批次');
+        row.volumePlanIndex=records[i].position;
+      });
+      return rows;
+    }
     const field = job.kind === "volumeOutline" ? "outline" : "detail";
     const title = legacy ? volume.title : string(data.title, "卷名", false, 160) || volume.title;
     if ((book.volumes || []).some(v => v.id !== volume.id && sameTitle(v.title, title))) throw Error("卷名与其他分卷重名，请重新生成。");
@@ -129,6 +150,7 @@ function applyRows(store, bookId, rows) {
       row.id = chapter.id;
       store.updateChapter(chapter.id, { title: row.title, ...row.fields }, chapter.revision, "采用章节规划前快照");
       if (row.volumeId && chapter.volumeId !== row.volumeId) store.organizeChapter(chapter.id, { volumeId: row.volumeId });
+      if (row.volumePlanIndex) store.putChapter({...store.chapter(chapter.id),volumePlanIndex:row.volumePlanIndex});
     }
   }
   // A chapter added to an earlier volume belongs before later volumes even
@@ -156,5 +178,38 @@ function applyRows(store, bookId, rows) {
     }
     base.sort((a,b)=>a.order-b.order);
   }
+  // Fill skipped positions in their original place without moving other volumes.
+  const batchVolumes=new Set(rows.filter(row=>row.volumePlanIndex).map(row=>row.volumeId));
+  for (const volumeId of batchVolumes) {
+    const current=store.book(bookId);
+    const slots=require('./chapter-batches.mjs').chapterSlots(current,volumeId);
+    const orders=slots.map(row=>row.chapter.order).sort((a,b)=>a-b);
+    slots.forEach(({chapter,position},i)=>store.putChapter({...chapter,order:orders[i],volumePlanIndex:position}));
+  }
 }
-module.exports = { readResult, routedKinds, volumeKinds, planningSignature, planningRows, applyRows };
+function reviewChapterRows(book, job, chapter, selection) {
+  if (!['chapterPlan','chapterDetails'].includes(job.kind)) throw Error('当前任务不支持逐章选择采用');
+  const original = planningRows(book, job, chapter);
+  if (!Array.isArray(selection) || !selection.length || selection.length > original.length) throw Error('请至少选择一个章节规划');
+  const indexes = new Set();
+  const chosen = selection.map(edit => {
+    if (!edit || !Number.isInteger(edit.index) || edit.index < 0 || edit.index >= original.length || indexes.has(edit.index)) throw Error('章节选择编号无效或重复');
+    indexes.add(edit.index);
+    if (Object.keys(edit).some(key => !['index','title','summary','outline'].includes(key))) throw Error('只能编辑章名、概要和细纲');
+    const row = original[edit.index];
+    if (row.type !== 'chapter') throw Error('不能通过章节选择修改其他资料');
+    const fields = { ...row.fields };
+    for (const key of ['summary','outline']) if (edit[key] !== undefined) fields[key] = string(edit[key],key,false,100000);
+    return { index:edit.index, row, record:{ id:row.id, title:string(edit.title ?? row.title,'章名',true,160), ...fields } };
+  }).sort((a,b)=>a.index-b.index);
+  const volume = job.targetVolumeId ? book.volumes?.find(row=>row.id===job.targetVolumeId) : {id:'',title:book.title};
+  if (!volume) throw Error('目标分卷不存在');
+  const reviewed = chapterRows(book, volume, chosen.map(item=>item.record), job.kind, false);
+  for (const [index,row] of reviewed.entries()) {
+    const source=chosen[index].row;
+    if (source.id ? row.id!==source.id : row.id) throw Error('编辑后的章名与已有章节重名，不能改变采用目标');
+    if (source.volumePlanIndex) row.volumePlanIndex=source.volumePlanIndex;
+  }
+  return reviewed;
+}
+module.exports = { readResult, routedKinds, volumeKinds, planningSignature, planningRows, applyRows, reviewChapterRows };

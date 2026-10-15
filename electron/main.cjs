@@ -50,6 +50,15 @@ const knowledgeChat = require("./knowledge-chat.cjs").createKnowledgeChat({
   requestModel, requestCodex,
   emit: (state) => { if (win && !win.isDestroyed()) win.webContents.send("xm:knowledge-chat", state); },
 });
+const askAuthorModel = async (messages, onChunk, signal) => {
+    assert(running.size === 0 && !preparing, '请先完成或停止当前生成');
+    const config = store.config();
+    assert(config.model || config.provider === 'codex', '请先配置模型');
+    const result = await (config.provider === 'codex' ? requestCodex : requestModel)(config, config.provider === 'codex' ? '' : await keyFor(config), messages, onChunk, signal);
+    assert(result.finishReason !== 'length', '分析达到输出上限，已保留内容，请缩小范围重试');
+};
+const authorTools = require('./author-tools.cjs').createAuthorTools({ getStore: () => store, ask: askAuthorModel });
+const semanticSearch = require('./continuity.cjs').createSemanticSearch({ getStore: () => store, ask: askAuthorModel });
 if (!process.env.XM_TEST && !app.requestSingleInstanceLock()) app.quit();
 app.on("second-instance", () => { if (win) { win.restore(); win.show(); win.focus(); } });
 const publicConfig = () => {
@@ -146,7 +155,7 @@ async function generate(input) {
       input.kind,
       text(input.instruction || ""),
       store.skills(),
-      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat, writingProfileId: input.writingProfileId, skillIds: input.skillIds },
+      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat, writingProfileId: input.writingProfileId, skillIds: input.skillIds, excerptIds: input.excerptIds, retrievalQuery: input.retrievalQuery },
     );
     const config = store.config();
     assert(config.model || config.provider === "codex", "请先配置模型");
@@ -171,6 +180,7 @@ async function generate(input) {
         ? { baseStyle: book.style, baseReference: book.reference }
         : {}),
       kind: input.kind,
+      ...(context.planningBatch ? {planningBatch:context.planningBatch} : {}),
       ...(context.writingProfileSnapshot ? { writingProfileSnapshot: context.writingProfileSnapshot } : {}),
       ...(isProseKind(input.kind) ? { manuscriptFormat } : {}),
       targetVolumeId: input.targetVolumeId || "",
@@ -181,6 +191,7 @@ async function generate(input) {
       output: "",
       status: "running",
       createdAt: now(),
+      progress: { requestedAt: now() },
       adopted: false,
       context: { ...context, messages: undefined, writingProfileSnapshot: undefined },
       error: "",
@@ -207,6 +218,7 @@ async function generate(input) {
           context.messages,
           (chunk) => {
             job.output += chunk;
+            job.progress.firstOutputAt ||= now();
             job.lastOutputAt = now();
             if (Date.now() - lastEmit > 70) {
               emitProgress();
@@ -225,6 +237,7 @@ async function generate(input) {
           job.output.trim(),
           "模型未返回正文，可能只返回了推理内容；请增加输出上限或更换模型",
         );
+        job.progress.generationEndedAt = now();
         job.status = "done";
         job.usage = result.usage;
         if (result.finishReason === "length") {
@@ -236,6 +249,7 @@ async function generate(input) {
           job.status === "done" &&
           job.analyzeChanges && ["write", "continue", "polish"].includes(job.kind)
         ) {
+          job.progress.analysisStartedAt = now();
           job.review = { status: "analyzing", lastOutputAt:now() };
           store.putJob(job);
           emit(job);
@@ -271,7 +285,7 @@ async function generate(input) {
                 ? "已停止分析，正文已保留"
                 : e.message,
             };
-          }
+          } finally { job.progress.analysisEndedAt = now(); }
         }
       } catch (e) {
         job.status = controller.signal.aborted ? "cancelled" : "error";
@@ -281,6 +295,7 @@ async function generate(input) {
       } finally {
         // Partial prose remains usable after interruption, cancellation or error.
         clearTimeout(progressTimer);
+        job.progress.endedAt = now();
         job.output = formatJobOutput(job);
         store.putJob(job);
         running.delete(job.id);
@@ -411,12 +426,16 @@ async function restoreBackup() {
         reference: text(source.reference),
         referenceName: text(source.referenceName, 1000),
         ...store.restoreWritingProfileFields(source),
+        techniques: store.cleanTechniques(source.techniques || []),
+        includeContinuity: source.includeContinuity !== false,
+        relatedMemoryOnly: source.relatedMemoryOnly === true,
+        ...(source.importedSource ? { importedSource: { name: text(source.importedSource.name, 240), content: text(source.importedSource.content, 8000000), importedAt: text(source.importedSource.importedAt, 100) } } : {}),
         target: Number(source.target) || 200000,
         creationMode: source.creationMode === "short" ? "short" : "long",
         characters: [],
         contextChapters: Number.isInteger(source.contextChapters)
           ? Math.max(0, Math.min(100, source.contextChapters))
-          : 2,
+          : 10,
         chapterTargetWords: Math.min(
           20000,
           Math.max(100, Number(source.chapterTargetWords) || 2000),
@@ -426,6 +445,8 @@ async function restoreBackup() {
           title: text(v.title, 160),
           outline: text(v.outline || ""),
           detail: text(v.detail || ""),
+          targetChapters: Number.isInteger(v.targetChapters) && v.targetChapters >= 0 && v.targetChapters <= 200 ? v.targetChapters : 0,
+          planInBatches: v.planInBatches === true,
         })),
         world: text(source.world),
         worldRecords: (source.worldRecords || []).map((r) => ({
@@ -436,9 +457,10 @@ async function restoreBackup() {
           id: foreshadowMap.get(f.id), title: text(f.title, 240),
           plantedChapterId: chapterMap.get(f.plantedChapterId) || "",
           payoffChapterId: chapterMap.get(f.payoffChapterId) || "",
-          status: ["resolved", "abandoned"].includes(f.status) ? f.status : "open", note: text(f.note || ""),
+          status: ["resolved", "abandoned"].includes(f.status) ? f.status : "open", note: text(f.note || ""), stale: !!f.stale, staleSourceId: chapterMap.get(f.staleSourceId) || "",
         })),
         memories: [],
+        comparisonDrafts: require('./comparison.cjs').restoreDrafts(source.comparisonDrafts, chapterMap),
         archived: !!source.archived,
         ...(source.deletedAt ? { deletedAt: now() } : {}),
         createdAt: now(),
@@ -456,6 +478,7 @@ async function restoreBackup() {
         authorNotes: text(c.authorNotes || ""), readerKnown: text(c.readerKnown || ""), characterKnown: text(c.characterKnown || ""),
         knowledgeFromChapterId: chapterMap.get(c.knowledgeFromChapterId) || "", secretFromChapterId: chapterMap.get(c.secretFromChapterId) || "",
         introducedOrder: Number(c.introducedOrder) || 0,
+        knowledgeStale: !!c.knowledgeStale, secretStale: !!c.secretStale,
       }));
       store.putBook(restored);
       source.chapters.forEach((c, index) => {
@@ -466,7 +489,10 @@ async function restoreBackup() {
           title: text(c.title, 160),
           outline: text(c.outline),
           summary: text(c.summary || ""),
+          ...(c.writingCard ? { writingCard: store.cleanWritingCard(c.writingCard) } : {}),
+          proseSources: (Array.isArray(c.proseSources) ? c.proseSources : []).filter(s => chapterMap.has(s.chapterId) && Number.isInteger(s.revision)).map(s => ({ chapterId: chapterMap.get(s.chapterId), revision: s.revision })),
           volumeId: volumeMap.get(c.volumeId) || "",
+          ...(volumeMap.has(c.volumeId) && Number.isInteger(c.volumePlanIndex) && c.volumePlanIndex>=1 && c.volumePlanIndex<=200 ? {volumePlanIndex:c.volumePlanIndex} : {}),
           targetWords: Math.min(20000, Math.max(0, Number(c.targetWords) || 0)),
           body: text(c.body),
           revision: Number.isInteger(c.revision) ? c.revision : 1,
@@ -501,6 +527,8 @@ async function restoreBackup() {
             body: text(version.body),
             outline: text(version.outline),
             summary: text(version.summary || ""),
+            ...(version.writingCard ? { writingCard: store.cleanWritingCard(version.writingCard) } : {}),
+            proseSources: (Array.isArray(version.proseSources) ? version.proseSources : []).filter(s => chapterMap.has(s.chapterId) && Number.isInteger(s.revision)).map(s => ({ chapterId: chapterMap.get(s.chapterId), revision: s.revision })),
             revision: Number(version.revision) || 1,
             createdAt: text(version.createdAt, 100),
             label: text(version.label, 100),
@@ -525,6 +553,7 @@ async function restoreBackup() {
             status:
               old.status === "running" ? "interrupted" : text(old.status, 40),
             createdAt: text(old.createdAt, 100),
+            ...(old.progress ? { progress: Object.fromEntries(['requestedAt', 'firstOutputAt', 'generationEndedAt', 'analysisStartedAt', 'analysisEndedAt', 'endedAt'].filter(key => typeof old.progress[key] === 'string' && Number.isFinite(Date.parse(old.progress[key]))).map(key => [key, old.progress[key]])) } : {}),
             adopted: !!old.adopted,
             context: old.context,
             baseStyle: old.baseStyle,
@@ -559,6 +588,9 @@ async function restoreBackup() {
             title: text(item.title, 160),
             outline: text(item.outline || ""),
             detail: text(item.detail || ""),
+            targetChapters: Number.isInteger(item.targetChapters) && item.targetChapters>=0 && item.targetChapters<=200 ? item.targetChapters : 0,
+            planInBatches: item.planInBatches === true,
+            chapterPlanPositions: Object.fromEntries(Object.entries(item.chapterPlanPositions || {}).filter(([cid,position])=>chapterMap.has(cid) && Number.isInteger(position) && position>=1 && position<=200).map(([cid,position])=>[chapterMap.get(cid),position])),
             chapterIds: (item.chapterIds || [])
               .map((cid) => chapterMap.get(cid))
               .filter(Boolean),
@@ -611,7 +643,8 @@ async function restoreBackup() {
               s.name === skill.name &&
               s.body === skill.body &&
               s.description === skill.description &&
-              JSON.stringify(s.tasks) === JSON.stringify(skill.tasks),
+              JSON.stringify(s.tasks) === JSON.stringify(skill.tasks) &&
+              JSON.stringify(s.toolTags || []) === JSON.stringify(skill.toolTags || []),
           )
       )
         store.saveSkill({
@@ -658,6 +691,45 @@ const actions = {
   "books:list": () => store.list(),
   "book:get": (d) => store.book(d.id),
   "book:create": (d) => store.createBook(d),
+  'craft:parse': d => require('./author-tools.cjs').parseManuscript(d.content),
+  'continuity:preview': d => {
+    const b = store.book(d.bookId), c = b.chapters.find(row => row.id === d.chapterId);
+    assert(c && !b.deletedAt, '请选择有效作品章节');
+    return require('./continuity.cjs').prepare(b, c, { query: text(d.query || '', 4000), chapterIds: d.chapterIds, excerptIds: d.excerptIds });
+  },
+  'relations:inspect': d => {
+    const b = store.book(d.bookId), c = b.chapters.find(c => c.id === d.chapterId && !c.deletedAt);
+    assert(c && !b.deletedAt, '请选择有效章节');
+    const at = d.focusId ? { ...c, order: Math.max(...b.chapters.map(row => row.order)) + 1, body: '', outline: '', summary: '', writingCard: {} } : d.body === undefined ? c : { ...c, body: text(d.body) };
+    return require('./relation-index.cjs').inspect(b, at, { query: text(d.query || '', 4000), focusId: d.focusId });
+  },
+  'continuity:search': d => semanticSearch.run(d),
+  'continuity:cancel': d => semanticSearch.cancel(d.bookId),
+  'continuity:confirm': d => require('./continuity.cjs').confirmReview(store, d),
+  'craft:import': d => require('./author-tools.cjs').importManuscript(store, d),
+  'craft:runs': d => authorTools.list(d.bookId),
+  'craft:analyze': d => authorTools.analyze(d),
+  'craft:cancel': d => authorTools.cancel(d.bookId),
+  'craft:apply': d => authorTools.apply(d),
+  'craft:retire': d => authorTools.retireStale(d),
+  'craft:impact': d => require('./author-tools.cjs').impact(store.book(d.bookId)),
+  'craft:confirm-source': d => store.transaction(() => {
+    const c = store.chapter(d.chapterId), source = store.chapter(d.sourceId);
+    assert(!c.deletedAt && !source.deletedAt && !store.rawBook(c.bookId).deletedAt && c.bookId === source.bookId && c.revision === d.revision && source.revision === d.sourceRevision && source.status === 'final', '关联正文已变化或来源未定稿，请重新核对');
+    assert((c.proseSources || []).some(row => row.chapterId === source.id), '没有记录此章节依赖');
+    c.proseSources = c.proseSources.map(row => row.chapterId === source.id ? { ...row, revision: source.revision } : row); store.putChapter(c); return store.book(c.bookId);
+  }),
+  'craft:read': async () => {
+    const result = await dialog.showOpenDialog(win, { title: '导入已有书稿', filters: [{ name: '小说文本', extensions: ['txt', 'md'] }], properties: ['openFile'] });
+    if (result.canceled) return null;
+    const file = result.filePaths[0]; assert((await fs.stat(file)).size <= 16000000, '书稿过大，请分批导入');
+    const bytes = await fs.readFile(file);
+    let content;
+    try { content = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+    catch { content = new TextDecoder('gb18030', { fatal: true }).decode(bytes); }
+    assert(content.length <= 8000000, '书稿过大，请分批导入');
+    return { content, sourceName: basename(file) };
+  },
   "book:update": (d) => store.updateBook(d.id, d.patch),
   "book:complete": (d) => require("./author-workflow.cjs").completeBook(store, d.id),
   "candidate:recovery": (d) => require("./candidate-recovery.cjs").prepare(store, d.id),
@@ -666,6 +738,10 @@ const actions = {
   "chapter:create": (d) => store.createChapter(d.bookId),
   "chapter:create-with-body": (d) => store.createChapterWithBody(d.bookId, d),
   "chapter:save": (d) => store.updateChapter(d.id, d.patch, d.revision),
+  'comparison:read': d => require('./comparison.cjs').read(store, d),
+  'comparison:save': d => require('./comparison.cjs').save(store, d),
+  'comparison:apply': d => require('./comparison.cjs').apply(store, d),
+  'comparison:rescue': d => require('./comparison.cjs').rescue(store, d),
   "chapter:finalize": (d) => store.finalize(d.id, d.revision),
   "versions:list": (d) => store.versions(d.id),
   "version:restore": (d) => store.restoreVersion(d.id, d.versionId, d.revision),
@@ -724,7 +800,8 @@ const actions = {
     const job = store.job(d.id);
     assert(
       job.adopted && ["write", "continue", "polish"].includes(job.kind),
-      "请先采用章节正文");
+      "请先采用章节正文",
+    );
     const book = store.book(job.bookId),
       c = store.chapter(job.chapterId),
       config = store.config(),
@@ -732,6 +809,9 @@ const actions = {
     assert(!book.deletedAt && !c.deletedAt, "请先恢复作品和章节");
     running.set(job.id, controller);
     job.review = { status: "analyzing" };
+    job.progress ||= {};
+    job.progress.analysisStartedAt = now();
+    delete job.progress.analysisEndedAt;
     store.putJob(job);
     emit(job);
     const work = (async () => {
@@ -748,7 +828,8 @@ const actions = {
           (chunk) => {
             raw += chunk;
           },
-          controller.signal);
+          controller.signal,
+        );
         if (result.finishReason === "length") throw Error("分析未完成");
         const changes = sync.parse(raw, c.body);
         job.review = {
@@ -761,6 +842,8 @@ const actions = {
       } catch (e) {
         job.review = { status: "error", error: e.message };
       } finally {
+        job.progress.analysisEndedAt = now();
+        job.progress.endedAt = now();
         store.putJob(job);
         running.delete(job.id);
         jobPromises.delete(job.id);
@@ -886,6 +969,12 @@ app.whenReady().then(() => {
     store.db.prepare("VACUUM INTO ?").run(backupPath);
   }
   store.initSkills();
+  const cleanTrash = () => {
+    if (running.size || preparing) return;
+    try { require('./trash-retention.cjs').sweep(store); } catch (e) { console.error('回收站自动清理失败', e); }
+  };
+  cleanTrash();
+  const cleanupTimer = setInterval(cleanTrash, 3600000); cleanupTimer.unref();
   store.db.exec("PRAGMA user_version=3");
   
   

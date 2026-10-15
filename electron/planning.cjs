@@ -12,7 +12,7 @@ const tasks = {
   volumeDetail:
     '根据指定卷的大纲生成更细的阶段事件与章节分配建议，包含每阶段事件、冲突、转折、伏笔埋设及回收。只输出 JSON：{"id":"目标卷真实ID","title":"目标卷名称","detail":"完整卷细纲"}。章节安排先作为建议；作者接下来会生成本卷章节规划，不直接写正文。若作者要求同时拆出明确章节，可增加 chapters 数组，结构为 {"id":"仅已有章节填真实ID，新章省略","title":"第1章 章名","summary":"章节大纲","outline":"可选章节细纲"}，采用时将同步到该卷章节。',
   chapterPlan:
-    '根据指定卷的卷大纲和卷细纲生成本卷章节规划。只输出 JSON：{"volumeId":"目标卷真实ID","chapters":[{"id":"已有章节真实ID，新章省略","title":"第1章 具体章名","summary":"章节大纲：目标、事件、人物、转折、章末钩子"}]}。覆盖本卷计划章节并按故事顺序排列，每章标题明确，不写正文，不输出其他卷章节。已有章节保留ID，不重复创建。',
+    '根据指定卷的卷大纲和卷细纲生成本卷章节规划。只使用已提供的规划；细纲为空时依据卷大纲拆章，不虚构已经发生的前情。只输出 JSON：{"volumeId":"目标卷真实ID","chapters":[{"id":"已有章节真实ID，新章省略","title":"第1章 具体章名","summary":"章节大纲：目标、事件、人物、转折、章末钩子","outline":"可执行章节细纲：场景顺序、视角、对白作用、关键选择和结果"}]}。targetVolume.targetChapters大于0时，按该目标总章数规划（不是额外新增数量）；若已有章节多于目标，不删除已有章，保留并说明需要调整目标。未设置章数时依照事件复杂度建议合理章数，未指定分批范围时一次最多20章，不凑章；提供batch时必须只规划batch.positions指定位置，不能覆盖本卷全部章节。覆盖本卷计划章节并按故事顺序排列，每章标题明确，不写正文，不输出其他卷章节。已有章节保留ID，不重复创建。作者将在逐章核对、编辑和选择后采用。',
   chapterDetails:
     '根据已采用的本卷章节规划补全章节细纲。只输出 JSON：{"volumeId":"目标卷真实ID","chapters":[{"id":"本卷已有章节真实ID","title":"章节名称","outline":"可执行细纲：场景顺序、视角、人物、冲突、转折、伏笔、章末钩子"}]}。只完善本卷已有章节，不创建新章或写正文，保留真实ID。',
   outline:
@@ -30,12 +30,16 @@ function parseObject(output) {
     throw Error("模型未返回有效结构，请重新生成");
   return value;
 }
-function applyPlanning(store, job, c) {
+function applyPlanning(store, job, c, selection) {
   const book = store.rawBook(job.bookId);
   const routes = require("./planning-routes.cjs");
-  const rows = routes.planningRows(store.book(job.bookId), job, c);
+  const rows = selection === undefined ? routes.planningRows(store.book(job.bookId), job, c) : routes.reviewChapterRows(store.book(job.bookId), job, c, selection);
   if (rows) {
     routes.applyRows(store, job.bookId, rows);
+    if (job.planningBatch) {
+      const volume=store.rawBook(job.bookId).volumes.find(v=>v.id===job.targetVolumeId);
+      if (!volume.targetChapters) store.saveVolume(job.bookId,{...volume,targetChapters:job.planningBatch.total});
+    }
     job.planningPreview = rows;
     return true;
   }

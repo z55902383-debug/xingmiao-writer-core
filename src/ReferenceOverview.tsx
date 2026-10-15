@@ -8,6 +8,8 @@ const labels: Record<string, string> = {
   volume: "本章所属卷", structure: "卷章结构", targetVolume: "目标分卷", chapterOutline: "本章细纲", chapterBody: "当前章正文",
   recent: "已定稿前文", writingStyles: "写作风格", writingRequirements: "写作要求", skills: "写作 Skill", source: "分析参考原文", instruction: "补充创作要求",
   chapterSummary: "本章概要", availableIds: "规划可用对象",
+  writingCard: "本章写前卡", techniques: "已选拆文技法",
+  continuity: "续写状态卡", retrieved: "已选旧文片段",
 };
 export default function ReferenceOverview({ context, snapshot = false }: { context: ContextInfo; snapshot?: boolean }) {
   const rows = context.referenceSections;
@@ -25,5 +27,7 @@ export default function ReferenceOverview({ context, snapshot = false }: { conte
     }) : <p className="reference-help">{tr(snapshot ? "这份旧记录未保存完整清单，下方显示已记录的资料。" : "正在准备引用清单。")}</p>}
     {snapshot && !!context.writingReferences?.length && <details className="reference-snapshot-styles"><summary>{tr("查看当时的风格与要求内容")} · {context.writingReferences.length}</summary>{context.writingReferences.map(item => <details key={item.id}><summary>{tr(item.kind === "style" ? "写作风格" : "写作要求")} · {item.title}</summary><div className="writing-profile-text">{item.body}</div></details>)}</details>}
     <p className="reference-total">{tr(snapshot ? "这次请求约 {0} 字符" : "预计请求约 {0} 字符", { 0: number(context.characters) })}</p>
+    {snapshot && context.continuityCard && <details className="continuity-snapshot"><summary>{tr('查看当时的续写状态')}</summary>{context.continuityCard.sections.filter(section => section.items.length).map(section => <section key={section.key}><h4>{tr(section.title)}</h4>{section.items.map(item => <div key={item.id}><p>{item.text}</p><small>{item.source.title} · {item.source.revision ? tr('版本 {0}', { 0: item.source.revision }) : tr('作者确认资料')}</small>{item.source.evidence && <blockquote>{item.source.evidence}</blockquote>}</div>)}</section>)}</details>}
+    {snapshot && !!context.retrievedExcerpts?.length && <details className="continuity-snapshot"><summary>{tr('查看实际引用的旧文片段')}</summary>{context.retrievedExcerpts.map(item => <div key={item.id}><strong>{item.title} · {tr('版本 {0}', { 0: item.revision })}</strong><blockquote>{item.text}</blockquote></div>)}</details>}
   </div>;
 }

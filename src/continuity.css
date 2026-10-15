@@ -1,0 +1,27 @@
+.continuity-panel { margin: 20px 0; padding: 16px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; color: var(--soft); font-size: 13px; line-height: 1.8; }
+.continuity-panel > summary { cursor: pointer; padding: 4px 0; }
+.continuity-panel > summary > span { margin-left: 12px; color: var(--muted); font-size: 12px; }
+.continuity-panel p { margin: 12px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.continuity-tabs, .continuity-actions, .continuity-source { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.continuity-tabs button { border: 1px solid var(--border-strong); border-radius: 6px; padding: 8px 14px; color: var(--soft); background: var(--panel); cursor: pointer; }
+.continuity-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-bright); border-color: var(--accent-mid); }
+.continuity-panel input[type="checkbox"] { width: 16px; height: 16px; margin-right: 8px; vertical-align: middle; }
+.continuity-choice, .retrieved-excerpt > label { display: flex; align-items: center; gap: 6px; }
+.continuity-panel .field { margin: 20px 0 12px; }
+.continuity-panel .field > label { display: block; margin-bottom: 8px; }
+.continuity-hint { color: var(--muted); font-size: 12px; }
+.continuity-section { border-top: 1px solid var(--border-strong); padding: 12px 0; }
+.continuity-section > summary { cursor: pointer; }
+.continuity-section > article, .retrieved-excerpt { padding: 16px 0; border-bottom: 1px solid var(--border-strong); }
+.continuity-panel blockquote, .continuity-snapshot blockquote { margin: 12px 0; padding: 12px; border-radius: 6px; background: var(--sunken); color: var(--soft); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.8; max-height: 260px; overflow: auto; }
+.continuity-source { justify-content: space-between; margin: 8px 0; }
+.continuity-snapshot { padding: 12px 0; }
+.continuity-snapshot section { margin-top: 16px; }
+.continuity-snapshot p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.relation-memory h4 { margin: 20px 0 12px; font-size: 14px; }
+.relation-records { max-height: 520px; overflow: auto; padding-right: 8px; }
+.relation-records > article { padding: 16px 0; border-bottom: 1px solid var(--border-strong); }
+.relation-records .continuity-actions { margin: 4px 0; }
+.relation-conflicts { padding: 12px; margin: 16px 0; border: 1px solid var(--border-strong); border-radius: 6px; }
+.relation-check p { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 1100px) { .continuity-panel > summary > span { display: block; margin-left: 16px; margin-top: 4px; } }

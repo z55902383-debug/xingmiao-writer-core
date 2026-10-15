@@ -1,0 +1,42 @@
+/* Display refinement: preserve the writing surface and the existing theme. */
+:root { --dim: #8f98a3; }
+:root[data-theme=light] { --dim: #66717e; }
+.toolbox-group { margin-block: 26px; }
+.toolbox-group h2, .toolbox-recent h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 16px; color: var(--ink); }
+.toolbox-group h2 small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.toolbox-group .toolbox-card { min-height: 108px; padding: 16px; border-radius: 12px; }
+.toolbox-group .toolbox-card-watermark { display: none; }
+.toolbox-group .toolbox-card:hover { transform: translateY(-1px); }
+.toolbox-recent { margin-block: 20px 26px; }
+.toolbox-recent > div { display: flex; flex-wrap: wrap; gap: 10px; }
+.toolbox-recent button { display: inline-flex; align-items: center; gap: 12px; min-height: 38px; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; color: var(--ink); background: var(--surface); font: inherit; font-size: 13px; cursor: pointer; }
+.toolbox-recent button:hover { border-color: var(--accent); }
+.creative-tool-dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 40px); overflow: hidden; }
+.creative-tool-dialog .modal-head, .creative-tool-dialog .modal-footer { flex: 0 0 auto; }
+.creative-tool-dialog > .creative-workbench, .creative-tool-dialog > .cover-form-layout { min-height: 0; max-height: 72dvh; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.creative-tool-dialog .creative-compose-panel { overflow: visible; }
+.creative-tool-dialog .creative-context-panel { position: sticky; top: 0; align-self: start; overflow: visible; }
+.creative-tool-dialog .creative-result pre { max-height: none; overflow: visible; }
+.creative-tool-dialog .creative-instruction-list { max-height: none; overflow: visible; padding: 0; }
+.creative-tool-dialog .creative-instruction-item pre { max-height: none; overflow: visible; }
+.creative-tool-dialog .modal-footer { flex-wrap: wrap; align-items: center; }
+.creative-tool-dialog .creative-safe-note { flex: 1 1 180px; line-height: 1.6; font-size: 12px; }
+.creative-tool-dialog :is(.cover-fields label, .creative-model-caption, .creative-panel-heading small, .creative-source-toggle small, .creative-selected-summary) { font-size: 12px; }
+.creative-tool-dialog :is(.cover-fields input:not([type=checkbox]), .cover-fields textarea, .creative-compose-panel > textarea) { font-size: 14px; }
+.creative-selected-summary { display: block; padding: 6px 0 0 15px; overflow-wrap: anywhere; font-weight: 400; line-height: 1.7; }
+.cover-advanced { border-top: 1px solid var(--border); padding-top: 12px; }
+.cover-advanced > summary { font-size: 13px; cursor: pointer; color: var(--soft); padding-block: 6px; }
+.cover-advanced > div { display: grid; gap: 16px; padding-top: 12px; }
+.creative-instructions .creative-only-selected { display: flex; align-items: center; gap: 8px; padding-block: 8px; color: var(--ink); font-size: 12px; }
+.creative-instructions .creative-only-selected input { width: 15px; height: 15px; min-height: 15px; padding: 0; margin: 0; accent-color: var(--accent); }
+.creative-tool-dialog .creative-instruction-item label { min-height: 28px; align-items: center; }
+.creative-tool-dialog .creative-instruction-item summary { padding-block: 5px; }
+.toolbox-shell :is(button, input, select, textarea):focus-visible, .plaza-shell :is(button, input, select):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.workspace .workflow-strip { padding-block: 8px; gap: 10px; }
+.workflow-details { flex: 0 1 auto; color: var(--muted); font-size: 12px; }
+.workflow-details > summary { cursor: pointer; padding: 9px 4px; }
+.workflow-details[open] { flex: 1 0 100%; }
+.workflow-details > div { display: grid; gap: 6px; padding: 8px 0; border-top: 1px solid var(--border); }
+.chapter-quick-tools .icon-button { min-width: 38px; min-height: 38px; }
+@media(max-width: 760px) { .creative-tool-dialog .creative-context-panel { position: static; } .creative-tool-dialog { max-height: calc(100dvh - 20px); } }
+@media(prefers-reduced-motion: reduce) { .toolbox-group .toolbox-card:hover { transform: none; } }

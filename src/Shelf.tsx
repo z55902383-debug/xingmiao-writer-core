@@ -1,3 +1,4 @@
+import { ManuscriptImport } from "./AuthorTools";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { tr, genreLabel, useLanguage } from "./i18n";
 import { useMemo, useState } from "react";
@@ -205,6 +206,7 @@ export default function Shelf({
   onRestore: () => void;
   busy: boolean;
 }) {
+  const [importOpen, setImportOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [archived, setArchived] = useState(false);
   
@@ -271,6 +273,7 @@ export default function Shelf({
   const chartMax = Math.max(1, ...week.map((n) => Math.max(0, n)));
   return (
     <div className="shelf-shell">
+      {importOpen && <ManuscriptImport onClose={() => setImportOpen(false)} onCreated={book => { setImportOpen(false); onOpen(book.id, book.chapters.at(-1)?.id); }}/>}
       <aside className="shelf-nav">
         <div className="brand">
           <div className="brand-mark">
@@ -348,8 +351,9 @@ export default function Shelf({
               </h1>
               <p>{tr("写下一个念头，让它成为一个世界。")}</p>
             </div>
+            <div className="shelf-heading-actions"><Button onClick={() => setImportOpen(true)} disabled={busy}>{tr("导入已有书稿")}</Button>
             <Button variant="primary" onClick={onNew} disabled={busy}>
-              <Plus size={19} />{tr("新建作品")}</Button>
+              <Plus size={19} />{tr("新建作品")}</Button></div>
           </div>
           {!archived && !search && !genre && recentBook && (
             <section className="recent-project" aria-label={tr("最近创作")}>

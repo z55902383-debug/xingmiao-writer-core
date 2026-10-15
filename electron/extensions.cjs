@@ -1,6 +1,7 @@
 const { randomUUID } = require("node:crypto");
 const stamp = () => new Date().toISOString();
 const { parse, stringify } = require("yaml");
+const creativeTags = require('./creative-tags.cjs');
 const KINDS = [
   "write",
   "continue",
@@ -36,12 +37,13 @@ function parseSkill(markdown, source = "导入文件") {
     description: typeof meta.description === "string" ? meta.description : "",
     body: body.trim(),
     tasks: Array.isArray(meta.tasks) ? meta.tasks : KINDS,
+    toolTags: creativeTags.normalize(meta.toolTags || (Array.isArray(meta.tasks) ? meta.tasks.filter(t => typeof t === 'string' && t.startsWith('tool:')).map(t => t.slice(5)) : [])),
     enabled: false,
     source,
   };
 }
 function exportSkill(skill) {
-  return `---\n${stringify({ name: skill.name, description: skill.description, tasks: skill.tasks })}---\n\n${skill.body}\n`;
+  return `---\n${stringify({ name: skill.name, description: skill.description, tasks: skill.tasks, ...(skill.toolTags?.length ? { toolTags: skill.toolTags } : {}) })}---\n\n${skill.body}\n`;
 }
 function extendStore(Store) {
   Object.assign(Store.prototype, {
@@ -129,7 +131,8 @@ function extendStore(Store) {
       this.putSetting("model-profiles", state);
     },
     skills() {
-      return this.setting("writing-skills", []);
+      const plaza = this.setting('plaza-items', []);
+      return this.setting("writing-skills", []).map(skill => ({ ...skill, toolTags: creativeTags.normalize(skill.toolTags ?? plaza.filter(item => item.installed && item.installedSkillId === skill.id).flatMap(item => creativeTags.fromTasks(item.tasks))) }));
     },
     saveSkill(input) {
       const all = this.skills(),
@@ -138,7 +141,8 @@ function extendStore(Store) {
         body = validText(input.body).trim();
       requireValue(name && body, "请填写 Skill 名称和指令内容");
       const tasks = (input.tasks || KINDS).filter((k) => KINDS.includes(k));
-      requireValue(tasks.length, "至少选择一种写作任务");
+      const toolTags = creativeTags.normalize(input.toolTags ?? old?.toolTags);
+      requireValue(tasks.length || toolTags.length, "至少选择一种写作任务或工具箱标签");
       requireValue(all.length < 100 || old, "最多保存 100 个 Skill");
       const s = {
         id: old?.id || randomUUID(),
@@ -146,6 +150,7 @@ function extendStore(Store) {
         description: validText(input.description || "", 1000),
         body,
         tasks: [...new Set(tasks)],
+        toolTags,
         enabled: !!input.enabled,
         source: old?.source || validText(input.source || "手动创建", 200),
         version: old ? old.version + 1 : 1,
@@ -315,13 +320,15 @@ function extendStore(Store) {
           ];
           this.putBook(b);
         } else if (entry.type === "volume") {
-          const { chapterIds, ...volume } = entry.item;
+          const { chapterIds, chapterPlanPositions, ...volume } = entry.item;
           b.volumes = [...(b.volumes || []), volume];
           this.putBook(b);
           for (const cid of chapterIds || []) {
             const c = this.chapter(cid);
             if (c.bookId === b.id && !c.volumeId) {
               c.volumeId = volume.id;
+              const position=chapterPlanPositions?.[cid];
+              if (Number.isInteger(position) && position>=1 && position<=200) c.volumePlanIndex=position;
               this.putChapter(c);
             }
           }

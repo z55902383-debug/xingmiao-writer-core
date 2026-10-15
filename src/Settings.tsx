@@ -1,10 +1,11 @@
+import CreativeToolTags, { creativeTools } from "./CreativeToolTags";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { tr } from "./i18n";
 import { useEffect, useState, useRef } from "react";
 import {
   Translate,
   Plugs,
-  
+  ImageSquare,
   PuzzlePiece,
   Database,
   Info,
@@ -17,7 +18,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import { api } from "./api";
-import type { Config, Skill, Kind, TrashEntry } from "./types";
+import type { Config, Skill, Kind, TrashEntry, UpdateState } from "./types";
 import { Button, Field, Modal } from "./ui";
 import ModelSettings from "./ModelSettings";
 import "./skill-library.css";
@@ -49,6 +50,18 @@ const blank = (): Skill => ({
   enabled: false,
   tasks: ["write", "continue", "polish"],
 });
+type Release = {
+  packaged: boolean;
+  version: string;
+  channel: string;
+  updateUrl: string;
+  changelog: {
+    version: string;
+    date?: string;
+    changes?: string[];
+    notes?: string[];
+  }[];
+};
 type DataInfo = {
   path: string;
   defaultPath: string;
@@ -77,14 +90,14 @@ export default function Settings({
   onClose,
   onSaved,
   onDataChanged,
-  
+
 }: {
   config: Config;
   initialTab?: string;
   onClose: () => void;
   onSaved: (c: Config) => void;
   onDataChanged: () => Promise<void>;
-  
+
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState(initialTab),
@@ -92,12 +105,17 @@ export default function Settings({
     [draft, setDraft] = useState<Skill | null>(null),
     [search, setSearch] = useState("");
   const [skillStatus, setSkillStatus] = useState("all");
+  const [skillTool, setSkillTool] = useState("all");
+  const matchesTool = (s: Skill) => skillTool === "all" || (skillTool === "untagged" ? !s.toolTags?.length : s.toolTags?.includes(skillTool));
   const [skillTask, setSkillTask] = useState<Kind | "all">("all");
-  const [trash, setTrash] = useState<TrashEntry[]>([]);
+  const [trash, setTrash] = useState<TrashEntry[]>([]),
+    [release, setRelease] = useState<Release | null>(null),
+    [url, setUrl] = useState("");
+  const [retention, setRetention] = useState<{ days: number; effectiveFrom: string }>({ days: 0, effectiveFrom: '' });
+  const [retentionDays, setRetentionDays] = useState(0);
   const [dataInfo, setDataInfo] = useState<DataInfo | null>(null),
     [move, setMove] = useState<DirCandidate | null>(null),
     [applied, setApplied] = useState<Applied | null>(null);
-  
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [result, setResult] = useState("");
@@ -119,14 +137,19 @@ export default function Settings({
   }
   useEffect(() => {
     void run(async () => {
-      const [s, t, d] = await Promise.all([
+      const [s, t, r, d, retentionPolicy] = await Promise.all([
         api<Skill[]>("skills:list"),
         api<TrashEntry[]>("trash:list"),
+        api<Release>("app:info"),
         api<DataInfo>("data:info"),
+        api<{ days: number; effectiveFrom: string }>('trash:policy'),
       ]);
       setSkills(s);
       setTrash(t);
+      setRelease(r);
+      setUrl(r.updateUrl);
       setDataInfo(d);
+      setRetention(retentionPolicy); setRetentionDays(retentionPolicy.days);
     });
   }, []);
   // 切换存储位置与恢复默认位置走同一套「选目录 → 确认 → 重启」流程。
@@ -170,10 +193,10 @@ export default function Settings({
           {[
             { id: "language", label: "语言设置", icon: Translate },
             { id: "models", label: "模型连接", icon: Plugs },
-            
+
             { id: "skills", label: "写作 Skill", icon: PuzzlePiece },
             { id: "data", label: "数据与回收站", icon: Database },
-            
+
           ].map((t) => (
             <button
               key={t.id}
@@ -204,7 +227,7 @@ export default function Settings({
           <div hidden={tab !== "models"}>
             <ModelSettings config={config} onSaved={onSaved} />
           </div>
-          
+
           {tab === "skills" && (
             <div className="settings-panel">
               <div className="section-intro">
@@ -254,8 +277,9 @@ export default function Settings({
               <div className="skill-library-filters">
                 <Field label={tr("筛选 Skill 状态")}><select value={skillStatus} onChange={event => setSkillStatus(event.target.value)}><option value="all">{tr("全部状态")}</option><option value="enabled">{tr("已启用")}</option><option value="disabled">{tr("未启用")}</option></select></Field>
                 <Field label={tr("筛选适用任务")}><select value={skillTask} onChange={event => setSkillTask(event.target.value as Kind | "all")}><option value="all">{tr("全部任务")}</option>{(Object.keys(tasks) as Kind[]).map(kind => <option key={kind} value={kind}>{tr(tasks[kind])}</option>)}</select></Field>
+                <Field label={tr("筛选工具箱标签")}><select value={skillTool} onChange={e => setSkillTool(e.target.value)}><option value="all">{tr("全部工具标签")}</option><option value="untagged">{tr("未标注工具标签")}</option>{creativeTools.map(tool => <option key={tool.id} value={tool.id}>{tr(tool.label)}</option>)}</select></Field>
               </div>
-              {!skills.some(s => (skillStatus === "all" || (skillStatus === "enabled" ? s.enabled : !s.enabled)) && (skillTask === "all" || s.tasks.includes(skillTask)) && (s.name + " " + s.description).toLowerCase().includes(search.toLowerCase())) && <p className="muted">{tr("没有匹配的 Skill。")}<Button variant="ghost" onClick={() => { setSearch(""); setSkillStatus("all"); setSkillTask("all"); }}>{tr("清除 Skill 筛选")}</Button></p>}
+              {!skills.some(s => (skillStatus === "all" || (skillStatus === "enabled" ? s.enabled : !s.enabled)) && (skillTask === "all" || s.tasks.includes(skillTask)) && matchesTool(s) && (s.name + " " + s.description).toLowerCase().includes(search.toLowerCase())) && <p className="muted">{tr("没有匹配的 Skill。")}<Button variant="ghost" onClick={() => { setSearch(""); setSkillStatus("all"); setSkillTask("all"); setSkillTool("all"); }}>{tr("清除 Skill 筛选")}</Button></p>}
               <div className="skill-list">
                 {skills
                   .filter((s) =>
@@ -263,7 +287,8 @@ export default function Settings({
                       .toLowerCase()
                       .includes(search.toLowerCase()) &&
                     (skillStatus === "all" || (skillStatus === "enabled" ? s.enabled : !s.enabled)) &&
-                    (skillTask === "all" || s.tasks.includes(skillTask)))
+                    (skillTask === "all" || s.tasks.includes(skillTask)) && matchesTool(s),
+                  )
                   .map((s) => (
                     <article className="skill-row" key={s.id}>
                       <div className="skill-heading">
@@ -289,14 +314,16 @@ export default function Settings({
                                   await api<Skill[]>("skill:save", {
                                     ...s,
                                     enabled,
-                                  })));
+                                  }),
+                                ),
+                              );
                             }}
                           />
                           <span>{s.enabled ? tr("已启用") : tr("关闭")}</span>
                         </label>
                       </div>
                       <p>{s.description || tr("暂无说明")}</p>
-                      <div className="skill-task-tags">{s.tasks.map(task => <span key={task}>{tr(tasks[task])}</span>)}</div>
+                      <div className="skill-task-tags">{s.tasks.map(task => <span key={task}>{tr(tasks[task])}</span>)}{s.toolTags?.map(tag => <span key={`tool:${tag}`}>{tr(creativeTools.find(tool => tool.id === tag)?.label || tag)}</span>)}{!s.toolTags?.length && <span>{tr("未标注工具标签")}</span>}</div>
                       <p className="skill-library-preview">{s.body}</p>
                       <details className="skill-library-content"><summary>{tr("查看完整指令")}</summary><div className="writing-profile-text">{s.body}</div></details>
                       <div className="skill-bottom">
@@ -308,7 +335,8 @@ export default function Settings({
                             run(async () => {
                               const p = await api<string | null>(
                                 "skill:export",
-                                { id: s.id });
+                                { id: s.id },
+                              );
                               if (p) setResult(tr("Skill 已导出"));
                             })
                           }
@@ -391,6 +419,7 @@ export default function Settings({
                 <h4>{tr("备份与恢复")}</h4>
                 <p>{tr("包含作品、章节历史、写作 Skill 和回收站，不包含账号密钥。恢复会创建副本。")}</p>
                 <p>{tr("已写入的资料修改会备份；资料对话及方案撤销历史不包含在备份中。")}</p>
+                <p>{tr('写前卡、已采用拆文素材和导入原稿包含在备份中；资料重建与拆文的分析过程记录不包含。')}</p>
                 <div className="settings-actions">
                   <Button
                     disabled={busy}
@@ -418,6 +447,11 @@ export default function Settings({
                 </div>
               </div>
               <h4>{tr("回收站 ·")}{" "}{trash.length}</h4>
+              <div className="settings-card trash-retention"><h4>{tr('回收站自动清理')}</h4><p>{tr('只清理移入回收站的内容，归档作品长期保留。到期清理为永久删除，已导出的备份不受影响。')}</p>
+                <Field label={tr('回收站保留时间')}><select value={retentionDays} disabled={busy} onChange={e => setRetentionDays(Number(e.target.value))}><option value={0}>{tr('不自动清理')}</option><option value={7}>{tr('7天')}</option><option value={30}>{tr('30天（推荐）')}</option><option value={90}>{tr('90天')}</option></select></Field>
+                <p className="settings-note">{tr('首次开启或更改周期时，现有条目获得新的完整保留期；关闭软件期间不执行清理。')}</p>
+                <Button disabled={busy || retentionDays === retention.days} onClick={() => run(async () => { const value = await api<{ days: number; effectiveFrom: string }>('trash:configure', { days: retentionDays }); setRetention(value); setTrash(await api<TrashEntry[]>('trash:list')); setResult(tr('回收站清理设置已保存。')); })}>{tr('保存清理设置')}</Button>
+              </div>
               {!trash.length && <p className="muted">{tr("回收站是空的。")}</p>}
               {trash.map((t) => (
                 <div className="trash-row" key={t.id}>
@@ -430,6 +464,8 @@ export default function Settings({
                             book: "作品",
                             chapter: "章节",
                             character: "人物",
+                            worldRecord: "世界设定",
+                            foreshadow: "伏笔记录",
                             memory: "记忆",
                             reference: "参考文章",
                             timeline: "时间线变化",
@@ -440,6 +476,7 @@ export default function Settings({
                       }{" "}
                       · {t.bookTitle} ·{" "}
                       {new Date(t.deletedAt).toLocaleDateString()}
+                      <span className="trash-deadline">{t.remainingDays == null ? tr('不自动清理') : t.remainingDays > 0 ? tr('剩余 {0} 天后清理', { 0: t.remainingDays }) : tr('保留期已到，等待自动清理')}{t.cleanupAt ? ' · ' + tr('到期日：{0}', { 0: new Date(t.cleanupAt).toLocaleDateString() }) : ''}</span>
                     </small>
                   </div>
                   <Button
@@ -450,7 +487,8 @@ export default function Settings({
                         setTrash(await api<TrashEntry[]>("trash:list"));
                         await onDataChanged();
                         setResult(
-                          tr("已恢复。来源章节恢复后，相关记忆需重新核对。"));
+                          tr("已恢复。来源章节恢复后，相关记忆需重新核对。"),
+                        );
                       })
                     }
                   >{tr("恢复")}</Button>
@@ -458,7 +496,6 @@ export default function Settings({
               ))}
             </div>
           )}
-          
           {error && (
             <p className="error-box" role="alert">
               {tr(error)}
@@ -524,6 +561,7 @@ export default function Settings({
                 </label>
               ))}
             </fieldset>
+            <CreativeToolTags value={draft.toolTags || []} onChange={toolTags => setDraft({ ...draft, toolTags })} />
             {error && <p className="error-box">{tr(error)}</p>}
           </div>
           <div className="modal-footer">
@@ -554,7 +592,8 @@ export default function Settings({
               onClick={() =>
                 run(async () => {
                   setSkills(
-                    await api<Skill[]>("skill:delete", { id: remove.id }));
+                    await api<Skill[]>("skill:delete", { id: remove.id }),
+                  );
                   setRemove(null);
                 })
               }

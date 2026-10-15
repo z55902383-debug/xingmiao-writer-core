@@ -1,4 +1,5 @@
 import type { Book, Kind } from "./types";
+import {chapterBatch} from '../electron/chapter-batches.mjs';
 export const ROUTED_PLANNING: Kind[] = ["bookOutline", "volumePlan", "volumeOutline", "volumeDetail", "chapterPlan", "chapterDetails", "summary", "outline"];
 export const VOLUME_TASKS: Kind[] = ["volumeOutline", "volumeDetail", "chapterPlan", "chapterDetails"];
 export type PlanningStep = { label: string; kind?: Kind; chapterId?: string; volumeId?: string; target: string };
@@ -21,6 +22,8 @@ export function nextPlanningStep(book: Book, preferredVolume?: string, preferred
     const target = "volume-" + volume.id;
     if (!volume.outline.trim()) return { label: "生成卷大纲", kind: "volumeOutline", volumeId: volume.id, target };
     if (!volume.detail.trim()) return { label: "生成卷细纲", kind: "volumeDetail", volumeId: volume.id, target };
+    const batch=chapterBatch(book,volume.id);
+    if (batch && !batch.complete) return {label:'继续分批规划章节',kind:'chapterPlan',volumeId:volume.id,target};
     const chapters = book.chapters.filter(c => c.volumeId === volume.id);
     if (!chapters.length || chapters.some(c => !c.summary?.trim())) return { label: "生成本卷章节规划", kind: "chapterPlan", volumeId: volume.id, target };
     if (chapters.some(c => !c.outline.trim())) return { label: "补全本卷章节细纲", kind: "chapterDetails", volumeId: volume.id, target };

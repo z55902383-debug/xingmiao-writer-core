@@ -70,7 +70,7 @@ export default function SyncReview({
       {rows && (
         <Modal title={tr("核对本章变化")} wide onClose={() => !busy && setRows(null)}>
           <div className="modal-body">
-            <p>{tr("仅同步勾选项。确认会将本章定稿，并更新人物档案和本章生效的时间线。新人被其他变化引用时，请同时勾选该新人。")}</p>
+            <p>{tr('仅同步勾选项。确认会将本章定稿，分别更新人物、时间线和关键记忆。新人被其他变化引用时，请同时勾选该新人。')}</p>
             <p className="notice">{tr('默认不勾选。请重点核对准备、即将、已经等时间状态，以及推断和临时路人。')}</p>
             {rows.map((r) => (
               <article className="sync-row" key={r.id}>
@@ -93,12 +93,13 @@ export default function SyncReview({
                         character: "人物状态",
                         relation: "人物关系",
                         world: "世界变化",
+                        memory: "关键记忆",
                       } as Record<string, string>
                     )[r.kind]
                   }
                 </label>
                 <div className="form-row">
-                  <Field label={tr('记录类型')}><select value={r.kind} onChange={e => edit(r.id, 'kind', e.target.value)}>{Object.entries({newCharacter:'新增人物',character:'人物状态',relation:'人物关系',world:'世界变化'}).map(([key,label]) => <option key={key} value={key}>{tr(label)}</option>)}</select></Field>
+                  <Field label={tr('记录类型')}><select value={r.kind} onChange={e => edit(r.id, 'kind', e.target.value)}>{Object.entries({newCharacter:'新增人物',character:'人物状态',relation:'人物关系',world:'世界变化',memory:'关键记忆'}).map(([key,label]) => <option key={key} value={key}>{tr(label)}</option>)}</select></Field>
                   <Field label={tr("人物 / 对象")}>
                     <input
                       value={r.subject}

@@ -13,6 +13,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import type { Book } from "./types";
+import {chapterBatch} from '../electron/chapter-batches.mjs';
 
 const COLLAPSED_KEY = "xm-creation-guide-collapsed";
 
@@ -37,7 +38,7 @@ export default function CreationGuideIsland({
     { id: "outline", title: "整理全书总纲", detail: "先确定故事从哪里开始、走向哪里", done: !!book.outline.trim(), icon: ListBullets },
     { id: "chapters", title: "生成分卷规划", detail: "采用后创建对应分卷与名称", done: (book.volumes || []).length > 0, icon: BookOpen },
     { id: "volumePlans", title: "完善卷大纲与细纲", detail: "明确每卷目标、事件与转折", done: !!book.volumes?.length && book.volumes.every(v => !!v.outline.trim() && !!v.detail.trim()), icon: ListBullets },
-    { id: "chapterPlans", title: "拆出章节大纲与细纲", detail: "采用后同步章名、归卷与章节规划", done: !!book.volumes?.length && book.volumes.every(v => book.chapters.some(c => c.volumeId === v.id)) && !!book.chapters.length && book.chapters.every(c => !!c.summary?.trim() && !!c.outline.trim()), icon: ListBullets },
+    { id: "chapterPlans", title: "拆出章节大纲与细纲", detail: "采用后同步章名、归卷与章节规划", done: !!book.volumes?.length && book.volumes.every(v => book.chapters.some(c => c.volumeId === v.id) && (!chapterBatch(book,v.id) || chapterBatch(book,v.id)?.complete)) && !!book.chapters.length && book.chapters.every(c => !!c.summary?.trim() && !!c.outline.trim()), icon: ListBullets },
     { id: "draft", title: "逐章生成与采用正文", detail: "按章细纲写作，核对后写入对应章节", done: !!book.chapters.length && book.chapters.every(c => !!c.body.trim()), icon: BookOpen },
     { id: "complete", title: "确认作品完结", detail: "各章定稿后由作者确认；导出和备份分别操作", done: !!book.completedAt, icon: CheckCircle },
   ].filter(step => book.creationMode !== 'short' || !['chapters', 'volumePlans'].includes(step.id)).map(step => book.creationMode === 'short' && step.id === 'chapterPlans' ? { ...step, title: '拆出短篇章节', detail: '由故事简纲生成章概要与细纲，无需分卷', done: !!book.chapters.length && book.chapters.every(c => !!c.summary?.trim() && !!c.outline.trim()) } : step) as GuideStep[], [book]);
@@ -54,7 +55,9 @@ export default function CreationGuideIsland({
   return (
     <div className={`creation-island ${open ? "is-open" : ""}`}>
       <button
+        key={`${book.id}:${nextStep?.id || 'done'}`}
         className="creation-island-pill"
+        data-step={nextStep?.id || 'done'}
         aria-expanded={open}
         aria-controls="creation-guide-panel"
         onClick={() => toggle(!open)}
@@ -88,7 +91,7 @@ export default function CreationGuideIsland({
               const current = !step.done && index === nextIndex;
               return (
                 <li key={step.id} className={`${step.done ? "is-done" : ""} ${current ? "is-current" : ""}`}>
-                  <button onClick={() => navigate(step.id, step.done ? 'view' : 'continue')} aria-label={`${tr(step.done ? "查看" : "前往")} ${tr(step.title)}`}>
+                  <button key={`${step.id}:${current}`} aria-current={current ? 'step' : undefined} onClick={() => navigate(step.id, step.done ? 'view' : 'continue')} aria-label={`${tr(step.done ? "查看" : "前往")} ${tr(step.title)}`}>
                     <span className="creation-guide-status">{step.done ? <CheckCircle size={19} weight="fill" /> : <Icon size={17} />}</span>
                     <span className="creation-guide-copy">
                       <strong>{tr(step.title)}</strong>

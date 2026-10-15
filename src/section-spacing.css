@@ -1,4 +1,41 @@
 /* Separate task areas with space before relying on divider lines. */
+.planning-batch-notice { margin: 12px 0 16px; padding: 12px 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--accent-soft); color: var(--ink); }
+.volume-block > .planning-batch-notice { margin-inline: 16px; }
+.planning-batch-notice strong { display: block; font-size: 13px; line-height: 1.7; }
+.planning-batch-notice p { margin: 6px 0; font-size: 12px; line-height: 1.7; }
+.planning-batch-notice small { display: block; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.volume-batch-choice { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; font-size: 13px; }
+.volume-batch-choice input { width: 16px; height: 16px; min-height: 16px; accent-color: var(--accent); }
+.planning-next-step { margin: 16px 0 24px; padding: 20px; background: var(--accent-soft); border: 1px solid var(--border-strong); border-radius: 10px; }
+.planner-management { padding: 20px; margin-bottom: 24px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel); }
+.planner-management .timeline-top { margin-bottom: 16px; }
+.planner-management .planner-filters { margin-bottom: 0; }
+.volume-planner .volume-block { margin-bottom: 24px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); }
+.volume-planner .volume-block > header { background: var(--raised); border-radius: 11px 11px 0 0; }
+.volume-chapter-target { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 16px; font-size: 13px; }
+.volume-chapter-target > strong { color: var(--ink); }
+.volume-chapter-target > span { color: var(--muted); }
+.volume-chapter-target > small { flex-basis: 100%; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.volume-chapter-target .button { min-height: 30px; padding: 4px 8px; font-size: 12px; margin-left: auto; }
+.volume-planner .volume-block > .section-generation { border-bottom: 0; padding-top: 0; }
+.volume-plan-status { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; border-bottom: 1px solid var(--border-strong); }
+.volume-plan-status > span { padding: 5px 8px; border-radius: 5px; background: var(--panel); color: var(--muted); font-size: 12px; }
+.volume-plan-status > span[data-ready="true"] { background: var(--success-soft); color: var(--success); }
+.volume-planner .volume-chapters { background: var(--bg); border-radius: 0 0 11px 11px; }
+.module-content-scroll > .module-section-intro { padding: 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--panel); }
+.outline-journey > .timeline-top, .chapter-board-heading { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--border-strong); }
+.chapter-review-entry { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-strong); }
+.chapter-review-entry > strong { font-size: 14px; }
+.chapter-review-entry > p, .chapter-review-body > p { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 8px 0 12px; }
+.chapter-review-body { max-height: min(66dvh, 660px); overflow: auto; }
+.chapter-review-row { padding: 16px; margin-bottom: 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--panel); }
+.chapter-review-title { display: flex; align-items: center; gap: 10px; }
+.chapter-review-title input[type="checkbox"] { width: 16px; height: 16px; min-height: 16px; flex: 0 0 16px; accent-color: var(--accent); }
+.chapter-review-title input:not([type="checkbox"]) { flex: 1; min-width: 0; }
+.chapter-review-row > small { display: block; color: var(--muted); font-size: 12px; margin-top: 8px; overflow-wrap: anywhere; }
+.chapter-review-row summary { cursor: pointer; color: var(--accent); font-size: 13px; padding-block: 12px; }
+.chapter-review-row textarea { width: 100%; resize: vertical; line-height: 1.8; }
+@container planner (max-width: 620px) { .planner-management { padding: 16px; } .planner-management .planner-filters { grid-template-columns: 1fr; } .volume-chapter-target { gap: 8px; } }
 :root {
   --section-gap: 16px;
   --section-inset: 12px;

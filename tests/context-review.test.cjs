@@ -9,9 +9,40 @@ function fixture(){
 function data(b,kind='continue'){return JSON.parse(buildContext(b,b.chapters[5],kind).messages[1].content.split('以下 JSON 为资料数据：\n')[1]);}
 test('前N章可配置，0不会意外读取全部，草稿与未来不进入正文上下文',()=>{
  const b=fixture();b.contextChapters=3;b.chapters[4].status='draft';
- assert.deepEqual(data(b).recent.map(c=>c.title),['第2章','第3章']);
+ assert.deepEqual(data(b).recent.map(c=>c.title),['第1章','第2章','第3章']);
  b.contextChapters=0;assert.deepEqual(data(b).recent,[]);
  b.contextChapters=20;assert.equal(data(b).recent.length,4);
+});
+
+test('默认最近10章按已定稿章节补足，保持全文与顺序，不读当前章及未来',()=>{
+ const b=fixture();
+ b.chapters=Array.from({length:17},(_,i)=>({id:'c'+i,title:'第'+i+'章',order:i+1,status:[7,12].includes(i)?'draft':'final',revision:1,outline:'',body:'开头'+i+'甲'.repeat(3000)+'结尾'+i}));
+ const current=b.chapters[15];
+ const result=buildContext(b,current,'write');
+ const payload=JSON.parse(result.messages[1].content.split('以下 JSON 为资料数据：\n')[1]);
+ assert.equal(result.contextChapters,10);
+ const expected=b.chapters.slice(0,15).filter(c=>c.status==='final').slice(-10);
+ assert.deepEqual(payload.recent,expected.map(c=>({title:c.title,body:c.body})));
+ assert.deepEqual(result.sourceChapters.filter(c=>c.selected).map(c=>c.id),expected.map(c=>c.id));
+ assert.equal(result.chapterCount,10);
+ assert.equal(buildContext(b,current,'write','',[],{chapterIds:[]}).chapterCount,0);
+});
+
+test('手动勾选的旧章在主题变化后仍显示，清单与实际请求一致',()=>{
+ const b=fixture(); b.contextChapters=1;
+ const result=buildContext(b,b.chapters[5],'write','',[],{chapterIds:['c0','c4','c5','missing']});
+ assert.deepEqual(result.chapterTitles,['第0章','第4章']);
+ assert.deepEqual(result.sourceChapters.filter(c=>c.selected).map(c=>c.id),['c0','c4']);
+ assert.equal(result.sourceChapters.some(c=>c.id==='c5'||c.id==='missing'),false);
+ const empty=buildContext(b,b.chapters[5],'write','',[],{chapterIds:[]});
+ assert.equal(empty.sourceChapters.some(c=>c.selected),false);
+});
+
+test('缺省引用设置与显式10章生成相同签名，已有设置保持有效',()=>{
+ const b=fixture(),c=b.chapters[5];
+ assert.equal(contextSignature(b,c),contextSignature({...b,contextChapters:10},c));
+ assert.equal(buildContext({...b,contextChapters:2},c,'write').chapterCount,2);
+ assert.equal(buildContext(b,c,'write').chapterCount,5);
 });
 test('长章续写与整章润色都保留完整正文',()=>{
  const b=fixture();b.chapters[5].body='开头标记'+'甲'.repeat(12000)+'结尾标记';
@@ -29,7 +60,7 @@ test('按本章主题推荐早期定稿章，并允许排除默认前章',()=>{
  const result=buildContext(b,b.chapters[5],'write','',[],{chapterIds:['c1']});
  const payload=JSON.parse(result.messages[1].content.split('以下 JSON 为资料数据：\n')[1]);
  assert.deepEqual(payload.recent.map(c=>c.title),['第1章']);
- assert.ok(result.sourceChapters.some((source)=>source.id==='c1'&&!source.selected&&source.relevance>0));
+ assert.ok(result.sourceChapters.some((source)=>source.id==='c1'&&source.selected&&source.relevance>0));
  assert.ok(result.sourceChapters.every((source)=>source.order< b.chapters[5].order));
 });
 test('人物认知边界与待回收伏笔进入上下文并明确作为作者资料',()=>{
@@ -65,7 +96,8 @@ test('完整资料不受总预算影响，序列化人物记忆和时间线始�
  b.premise=long;b.outline=long;b.world=long;b.style=long;
  b.characters=[{id:'p',name:'甲',role:'主角',description:long}];
  b.worldRecords=[{id:'w',title:'世界',description:long}];
- b.memories=[{subject:'甲',relation:'保管',object:long,evidence:long,sourceChapterId:'c0',sourceRevision:1}];
+ b.chapters[0].body=long;
+ b.memories=[{id:'long-memory',subject:'甲',relation:'保管',object:long,evidence:long,sourceChapterId:'c0',sourceRevision:1}];
  const instruction='要求开头'+'乙'.repeat(9000)+'要求结尾';
  const result=buildContext(b,b.chapters[5],'write',instruction);
  const payload=JSON.parse(result.messages[1].content.split('以下 JSON 为资料数据：\n')[1]);

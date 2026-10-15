@@ -36,7 +36,8 @@ try{
   const page=await app.firstWindow(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   const call=(action,data={})=>page.evaluate(async({action,data})=>{const r=await window.xingmiao.invoke(action,data);if(!r.ok)throw Error(r.error);return r.data;},{action,data});
-  const book=await call('book:create',{title:'流程测试',premise:'侦探调查雾城失踪案。'});
+  // This fixture plans two chapters; keep its target consistent with that scope.
+  const book=await call('book:create',{title:'流程测试',premise:'侦探调查雾城失踪案。',target:4000});
   await call('config:save',{baseUrl:`http://127.0.0.1:${server.address().port}/v1`,model:'fixture',name:'模拟模型',maxTokens:12000,temperature:null});
   await page.reload();
   await page.getByRole('button',{name:'打开 流程测试',exact:true}).click();

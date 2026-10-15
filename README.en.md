@@ -2,19 +2,19 @@
 
 A local-first fiction workspace for manual writing and your own AI provider.
 
-**v0.6.10 · Windows x64 · MIT**
+**v0.6.11 · Windows x64 · MIT**
 
-[Windows installer](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.10/XingmiaoWriter-Core-0.6.10-x64-Setup.exe) · [Full edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.10) · [中文](README.md)
+[Windows installer](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.11/XingmiaoWriter-Core-0.6.11-x64-Setup.exe) · [Full edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.11) · [中文](README.md)
 
 Full-edition membership is free and manages community template permissions. Model services may charge separately. Open Core needs no Xingmiao account.
 
 ![Current library](docs/assets/library.png)
 
-![Writing workspace](docs/assets/workspace.png)
-
-![Story data assistant](docs/assets/knowledge-assistant.png)
-
 Screenshots use isolated demonstration content; the application also supports English.
+
+## New in v0.6.11
+
+Writing cards, continuity context and selected old-text excerpts; manuscript import and evidence-reviewed data rebuilding; reusable writing techniques; independent side-by-side drafts; generation-process details and configurable trash retention (off by default).
 
 ## Features
 
@@ -33,8 +33,8 @@ Checks: `npm test`, `npm run build`, `npm run test:onboarding:ui` and `npm run t
 
 ## Data and license
 
-Books stay local. AI sends selected context to the configured provider. Backups include final story data, chapter history, skills and trash, but exclude credentials, account sessions, story-data conversations and proposal undo history. Restore creates copies.
+Books stay local. AI sends selected context to the configured provider. Backups include final story data, chapter history, skills and trash, but exclude credentials, account sessions, story-data conversations, proposal undo history and analysis-run history. Restore creates copies.
 
 Full-edition accounts, community, creative tools, images and updates are excluded from this MIT repository. Editions use separate book directories. Mock tests do not certify real-provider quality or availability. Windows installers are unsigned.
 
-[Features](docs/features.md) · [Verification](docs/检查记录-v0.6.10.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [MIT](LICENSE)
+[Features](docs/features.md) · [Verification](docs/检查记录-v0.6.11.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [MIT](LICENSE)

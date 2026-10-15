@@ -14,6 +14,8 @@ import type { Book, Chapter, Volume, Kind } from "./types";
 import { api } from "./api";
 import { Button, Field, Modal } from "./ui";
 import { PlanExcerpt } from "./PlanningText";
+import {chapterBatch} from '../electron/chapter-batches.mjs';
+import PlanningBatchNotice from './PlanningBatchNotice';
 import "./planner-hierarchy.css";
 export default function VolumePlanner({
   panel,
@@ -68,7 +70,7 @@ export default function VolumePlanner({
       setBusy(false);
     }
   }
-  const groups = [
+  const groups: Volume[] = [
     ...(book.volumes || []),
     ...(book.chapters.some(c=>!c.volumeId) ? [{ id: "", title: book.creationMode === 'short' ? tr('短篇章节') : tr('未分卷章节'), outline: "", detail: "" }] : []),
   ];
@@ -81,6 +83,8 @@ export default function VolumePlanner({
     (chapter) => (chapter.volumeId || "") === volume.id &&
       (!query.trim() || volume.title.includes(query.trim()) || chapter.title.includes(query.trim())),
   );
+  const volumeChapters = (id:string) => book.chapters.filter(chapter=>(chapter.volumeId || "")===id);
+  const estimatedChapters = Math.max(1,Math.ceil(book.target / (book.chapterTargetWords || 2000) / Math.max(1,book.volumes?.length || 0)));
   const boardColumns = [
     { id: "todo", title: "待规划", chapters: book.chapters.filter((c) => !c.summary?.trim() && !c.outline.trim() && !c.body.trim()) },
     { id: "planning", title: "规划中", chapters: book.chapters.filter((c) => !c.body.trim() && (!!c.summary?.trim() || !!c.outline.trim()) && !(c.summary?.trim() && c.outline.trim())) },
@@ -184,6 +188,7 @@ export default function VolumePlanner({
         </div>
       </div>}
       {panel === "volumes" && <>
+        <div className="planner-management">
         <div className="timeline-top">
           <div>
             <h3>{tr(book.creationMode === 'short' ? '短篇章节规划' : '分卷与章节规划')}</h3>
@@ -195,6 +200,7 @@ export default function VolumePlanner({
             <Plus size={16} />{tr("新建分卷")}</Button>}</div>
         </div>
         <div className="planner-filters"><Field label={tr("查看分卷")}><select value={volumeFilter} onChange={e => setVolumeFilter(e.target.value)}><option value="all">{tr("全部分卷")}</option>{groups.map(v => <option key={v.id || "none"} value={v.id || "none"}>{v.title}</option>)}</select></Field><Field label={tr("查找章节")}><input value={query} onChange={e => setQuery(e.target.value)} placeholder={tr("输入卷名或章名")}/></Field></div>
+        </div>
       {groups.filter(v => (volumeFilter === "all" || (v.id || "none") === volumeFilter) && (!query.trim() || v.title.includes(query.trim()) || book.chapters.some(c => (c.volumeId || "") === v.id && c.title.includes(query.trim())))).map((v) => (
         <article
           className="volume-block"
@@ -245,6 +251,7 @@ export default function VolumePlanner({
           {!v.id && <p className="unassigned-note">{tr("这是尚未归卷的章节集合。选择章节所属分卷即可移入已有卷；移走或删除全部章节后，此分组自动消失。")}</p>}
           {v.id && (
             <>
+              <div className="volume-chapter-target"><strong>{v.targetChapters ? tr("计划 {0} 章",{0:v.targetChapters}) : tr("计划章数未设置")}</strong><span>{tr("已有 {0} 章",{0:volumeChapters(v.id).length})}</span><Button disabled={generating || busy} onClick={()=>setDraft({...v})}>{tr("设置章数")}</Button><small>{tr("按目标字数均分估算约 {0} 章，实际以事件拆分为准。",{0:estimatedChapters})}</small></div>
               <div className="section-generation">
                 <Button
                   disabled={generating}
@@ -254,9 +261,11 @@ export default function VolumePlanner({
                   disabled={generating || !v.outline.trim()}
                   onClick={() => onGenerate("volumeDetail", undefined, v.id)}
                 >{tr("生成卷细纲")}</Button>
-                <Button disabled={generating || !v.detail.trim()} onClick={() => onGenerate("chapterPlan", undefined, v.id)}>{tr("生成本卷章节规划")}</Button>
+                <Button disabled={generating || (!v.detail.trim() && !v.outline.trim()) || !!chapterBatch(book,v.id)?.complete} onClick={() => onGenerate("chapterPlan", undefined, v.id)}>{chapterBatch(book,v.id) && !chapterBatch(book,v.id)?.complete ? tr('生成第 {0}–{1} 章规划',{0:chapterBatch(book,v.id)!.start,1:chapterBatch(book,v.id)!.end}) : tr("生成本卷章节规划")}</Button>
                 <Button disabled={generating || !book.chapters.some(c => c.volumeId === v.id)} onClick={() => onGenerate("chapterDetails", undefined, v.id)}>{tr("补全本卷章节细纲")}</Button>
               </div>
+              <PlanningBatchNotice batch={chapterBatch(book,v.id)}/>
+              <div className="volume-plan-status" aria-label={tr("本卷规划状态")}><span data-ready={!!v.outline.trim()}>{tr("卷大纲")}{" · "}{tr(v.outline.trim()?"已填写":"未填写")}</span><span data-ready={!!v.detail.trim()}>{tr("卷细纲")}{" · "}{tr(v.detail.trim()?"已填写":"未填写")}</span><span>{tr("概要 {0}/{1} 章",{0:volumeChapters(v.id).filter(c=>c.summary?.trim()).length,1:Math.max(v.targetChapters || 0,volumeChapters(v.id).length)})}</span><span>{tr("细纲 {0}/{1} 章",{0:volumeChapters(v.id).filter(c=>c.outline.trim()).length,1:Math.max(v.targetChapters || 0,volumeChapters(v.id).length)})}</span></div>
               <div className="volume-plans">
                 <PlanExcerpt title={tr("卷大纲")} text={v.outline} empty={tr("生成或编辑分卷，记录本卷目标、主冲突与结局。")}/>
                 <PlanExcerpt title={tr("卷细纲")} text={v.detail} empty={tr("采用卷大纲后，展开阶段事件、转折与伏笔。")}/>
@@ -375,6 +384,8 @@ export default function VolumePlanner({
                 placeholder={tr("本卷目标、核心冲突、高潮与结束状态")}
               />
             </Field>
+            <Field label={tr("计划章数")} hint={tr("本卷总章数为1–200；超过20章自动分批，每批最多10章。留空时参考目标字数估算。") }><input type="number" min={1} max={200} aria-label={tr("计划章数")} value={draft.targetChapters || ""} onChange={e=>setDraft({...draft,targetChapters:Number(e.target.value)})}/></Field>
+            <label className="volume-batch-choice"><input type="checkbox" checked={(draft.targetChapters||0)>20 || !!draft.planInBatches} disabled={(draft.targetChapters||0)>20} onChange={e=>setDraft({...draft,planInBatches:e.target.checked})}/>{tr('分批规划，每次最多10章')}</label>
             <Field label={tr("卷细纲")}>
               <textarea
                 rows={7}

@@ -539,6 +539,7 @@ test("rechecking unadopted suggestions uses fresh knowledge rather than acceptin
   assert.deepEqual(store.backup().excludedHistory, [
     "knowledge-chat",
     "knowledge-proposal-undo",
+    "craft-analysis-runs",
   ]);
   assert.ok(!Object.hasOwn(store.backup(), "knowledgeChats"));
 });

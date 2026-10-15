@@ -3,15 +3,22 @@ import KnowledgeAssistant from "./KnowledgeAssistant";
 import { tr, genreLabel } from "./i18n";
 import SyncReview from "./SyncReview";
 import CandidateRecovery from "./CandidateRecovery";
+import ContinuityPanel from "./ContinuityPanel";
+import RelationMemory, { CandidateRelationReview } from './RelationMemory';
+import CompareWriter from './CompareWriter';
+import { AuthorToolsPanel, WritingCardEditor, ProseReview } from "./AuthorTools";
 import "./onboarding.css";
 import CreationGuideIsland from "./CreationGuideIsland";
 import TimelinePanel from "./TimelinePanel";
 import VolumePlanner from "./VolumePlanner";
 import { PlanningCandidate, PlanningText } from "./PlanningText";
+import {chapterBatch} from '../electron/chapter-batches.mjs';
+import PlanningBatchNotice from './PlanningBatchNotice';
 import WritingProfiles, { WritingPicker, profileSelection } from "./WritingProfiles";
 import ReferenceOverview from "./ReferenceOverview";
 import SkillPicker from "./SkillPicker";
 import type { Skill } from "./types";
+import type { PlanningSelection } from "./types";
 import GenerationActivity, { type GenerationStart } from "./GenerationActivity";
 import { ROUTED_PLANNING, VOLUME_TASKS, nextPlanningStep } from "./planningFlow";
 import CreativeCanvas from "./CreativeCanvas";
@@ -68,6 +75,7 @@ import {
   Selection,
   CopySimple,
   SquaresFour,
+  Columns,
   SidebarSimple,
   ChatCircle,
   NotePencil,
@@ -333,6 +341,9 @@ export default function Workspace({
   const [light, setLight] = useState(() => currentTheme() === "light");
   const [focus, setFocus] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [chapterTools, setChapterTools] = useState<'continuity' | 'card' | null>(null);
+  const comparisonGuard = useRef<() => Promise<void>>(async () => {});
   const [chapterDrawerOpen, setChapterDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showOutline, setShowOutline] = useState(false);
@@ -396,6 +407,7 @@ export default function Workspace({
   const [history, setHistory] = useState<Version[] | null>(null);
   const [character, setCharacter] = useState<Character | null>(null);
   const [memoryForm, setMemoryForm] = useState(false);
+  const [relationFocus, setRelationFocus] = useState<string | null>(null);
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
   const [displayMode, setDisplayMode] = useState<"regular" | "canvas">(() => {
     try {
@@ -545,6 +557,7 @@ export default function Workspace({
   const [planningFocus, setPlanningFocus] = useState<{id:string;stamp:string}>();
   const [instruction, setInstruction] = useState("");
   const [selectedJob, setSelectedJob] = useState("");
+  const [authorToolsOpen, setAuthorToolsOpen] = useState(false);
   const [generationStart, setGenerationStart] = useState<GenerationStart | null>(null);
   const [activityJobId, setActivityJobId] = useState("");
   const generationStarting = useRef(false);
@@ -552,6 +565,8 @@ export default function Workspace({
   const [contextChapterIds, setContextChapterIds] = useState<string[] | null>(
     null,
   );
+  const [excerptIds, setExcerptIds] = useState<string[]>([]);
+  const [retrievalQuery, setRetrievalQuery] = useState("");
   const [contextError, setContextError] = useState("");
   const [showContext, setShowContext] = useState(false);
   const [assistantMode, setAssistantMode] = useState<"writing" | "knowledge">("writing");
@@ -710,7 +725,7 @@ export default function Workspace({
   };
   useManuscriptTyping(editor, inputFormat, (body) => {
     if (chapter) editChapter(chapter.id, { body });
-  }, `${view}:${chapter?.id || ""}`);
+  }, `${view}:${chapter?.id || ""}:${compareMode ? 'comparison' : 'manuscript'}`);
   useLayoutEffect(() => {
     if (!chapter || view !== "editor") return;
     const textarea = editor.current;
@@ -735,7 +750,8 @@ export default function Workspace({
       scroller.scrollTop = 0;
     }
   }, [book.id, chapter?.id, view]);
-  useEffect(() => setContextChapterIds(null), [chapter?.id]);
+  useEffect(() => { setContextChapterIds(null); setExcerptIds([]); setRetrievalQuery(""); }, [book.id, chapter?.id, book.contextChapters]);
+  useEffect(() => setExcerptIds([]), [contextChapterIds]);
   useEffect(() => { try { if (chapter) localStorage.setItem(`xm-last-chapter:${book.id}`, chapter.id); } catch {} }, [book.id, chapter?.id]);
   const modelReady = !!config.model || config.provider === "codex";
   /* 显示给作者的「第几章」用当前可见章节的位置，不用底层 order。
@@ -788,6 +804,8 @@ export default function Workspace({
     return () => { disposed = true; };
   }, [selected?.id, selected?.status, selected?.adopted, selected?.output]);
   const nextStep = nextPlanningStep(book, targetVolumeId, chapter?.id);
+  const currentPlanningBatch=chapterBatch(book,targetVolumeId,action);
+  const continuePlanningBatch=selected?.adopted ? chapterBatch(book,selected.targetVolumeId || '',selected.kind) : null;
   const running = book.candidates.find(
     (j) => j.status === "running" || j.review?.status === "analyzing",
   );
@@ -806,16 +824,24 @@ export default function Workspace({
   const bookProgress =
     book.target > 0 ? Math.min(100, (words / book.target) * 100) : 0;
   useLayoutEffect(() => {
+    if (view !== 'editor' || compareMode) return;
+    const textarea = editor.current;
+    if (!textarea) return;
     const size = () => {
-      if (editor.current) {
-        editor.current.style.height = "auto";
-        editor.current.style.height = `${Math.max(400, editor.current.scrollHeight)}px`;
-      }
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.max(400, textarea.scrollHeight)}px`;
     };
     size();
-    window.addEventListener("resize", size);
-    return () => window.removeEventListener("resize", size);
-  }, [chapter?.body, chapter?.id, display, focus, view]);
+    // Returning from comparison mounts a new textarea even when its text is unchanged.
+    // Observe width as well: opening the assistant or resizing a sidebar changes wrapping.
+    let width = textarea.getBoundingClientRect().width;
+    const observer = new ResizeObserver(() => {
+      const next = textarea.getBoundingClientRect().width;
+      if (next !== width) { width = next; size(); }
+    });
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [chapter?.body, chapter?.id, display, focus, view, compareMode]);
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     try {
@@ -859,7 +885,7 @@ export default function Workspace({
     }
   }
   useEffect(() => {
-    closeGuard.current = flush;
+    closeGuard.current = async () => { await comparisonGuard.current(); await flush(); };
     return () => {
       closeGuard.current = async () => {};
     };
@@ -880,11 +906,12 @@ export default function Workspace({
       const mod = event.ctrlKey || event.metaKey;
       if (mod && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        flush()
+        comparisonGuard.current().then(flush)
           .then(() => notify(tr("已保存到本机")))
           .catch((e) => notify(e.message));
       }
       if (mod && event.key.toLowerCase() === "f") {
+        if (compareMode) { event.preventDefault(); document.querySelector<HTMLTextAreaElement>('.compare-column textarea:not([readonly])')?.focus(); return; }
         event.preventDefault();
         setShowFind(true);
         requestAnimationFrame(() =>
@@ -895,6 +922,7 @@ export default function Workspace({
       }
       // Esc 逐层退出：先关浮层，再退专注模式
       if (event.key === "Escape") {
+        if (chapterTools) return setChapterTools(null);
         if (showDisplay) return setShowDisplay(false);
         if (showFind) return setShowFind(false);
         setFocus(false);
@@ -927,6 +955,8 @@ export default function Workspace({
         instruction,
         targetVolumeId,
         chapterIds: contextChapterIds,
+        excerptIds,
+        retrievalQuery,
         writingProfileId: action === "style" ? distillProfileId : undefined,
         skillIds,
       })
@@ -971,12 +1001,18 @@ export default function Workspace({
     book.volumes,
     book.chapterTargetWords,
     book.contextChapters,
+    book.includeContinuity,
+    book.relatedMemoryOnly,
+    book.techniques,
+    chapter?.writingCard,
     chapter?.targetWords,
     chapter?.volumeId,
     action,
     targetVolumeId,
     instruction,
     contextChapterIds,
+    excerptIds,
+    retrievalQuery,
     config,
     manuscriptFormat,
     distillProfileId,
@@ -1048,6 +1084,8 @@ export default function Workspace({
           ? volumeId || targetVolumeId
           : "",
         contextChapterIds,
+        excerptIds,
+        retrievalQuery,
         writingProfileId,
         analyzeChanges,
         skillIds,
@@ -1089,15 +1127,21 @@ export default function Workspace({
     await generateFor(action, chapter?.id, targetVolumeId, action === "style" ? distillProfileId : undefined);
   }
   async function adopt() {
-    if (!selected) return;
+    await adoptReviewed();
+  }
+  async function adoptReviewed(planningSelection?: PlanningSelection[]) {
+    if (!selected) return false;
+    let accepted=false;
     await run(async () => {
       const b = await api<Book>(
         selected.kind === "memory" ? "memory:accept" : "ai:adopt",
         {
           id: selected.id,
           mode: selected.kind === "continue" ? "append" : "replace",
+          planningSelection,
         },
       ).catch(async error => { await ws.reload().catch(() => undefined); setRecoveryRefresh(value => value + 1); throw error; });
+      accepted=true;
       replace(b);
       if (ROUTED_PLANNING.includes(selected.kind)) {
         const adopted = b.candidates.find(j => j.id === selected.id) as Job & { planningPreview?: PlanningRow[] };
@@ -1153,11 +1197,12 @@ export default function Workspace({
       }
       if (selected.kind === "style") setView("style");
     });
+    return accepted;
   }
   const validCount = book.memories.filter((m) => !m.stale).length;
   return (
     <div
-      className={`workspace ${focus ? "is-focused" : ""} ${assistantOpen ? "assistant-open" : ""} ${chapterDrawerOpen ? "chapter-drawer-open" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
+      className={`workspace ${compareMode && view === 'editor' ? 'compare-mode' : ''} ${focus ? "is-focused" : ""} ${assistantOpen ? "assistant-open" : ""} ${chapterDrawerOpen ? "chapter-drawer-open" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
       style={
         {
           "--side-w": `${panes.side}px`,
@@ -1176,11 +1221,17 @@ export default function Workspace({
           } else if (step === 'chapterPlans') {
             const volume = book.volumes?.find(v => v.id === targetVolumeId) || book.volumes?.[0];
             const chapters = book.chapters.filter(c => book.creationMode === 'short' || c.volumeId === volume?.id);
-            prepareStep({target:'volumes',kind:intent === 'continue' && chapters.length > 0 && chapters.every(c => c.summary?.trim()) ? 'chapterDetails' : 'chapterPlan',volumeId:volume?.id,label:''});
+            prepareStep({target:'volumes',kind:intent === 'continue' && (!volume || !chapterBatch(book,volume.id) || chapterBatch(book,volume.id)?.complete) && chapters.length > 0 && chapters.every(c => c.summary?.trim()) ? 'chapterDetails' : 'chapterPlan',volumeId:volume?.id,label:''});
           }
           else prepareStep({target:'editor',kind:step === 'draft' ? 'write' : undefined,chapterId:book.chapters.find(c => step === 'draft' ? !c.body.trim() : c.status !== 'final')?.id || chapter?.id,label:''});
         }}
       />
+      {authorToolsOpen && <AuthorToolsPanel book={book} flush={flush} onChange={replace} onOpenChapter={id => { setChapterId(id); setView("editor"); setAuthorToolsOpen(false); }} onClose={() => setAuthorToolsOpen(false)}/>}
+      {relationFocus && chapter && <Modal title={tr('关联旧文与变化')} wide onClose={() => setRelationFocus(null)}><div className="modal-body continuity-panel"><RelationMemory book={book} chapter={chapter} focusId={relationFocus} disabled={busy || !!running} onSource={id => void run(async () => { await flush(); setRelationFocus(null); setChapterId(id); setView('editor'); })}/></div></Modal>}
+      {chapterTools && chapter && view === 'editor' && <aside className="chapter-tools-drawer" aria-label={tr(chapterTools === 'continuity' ? '续写资料' : '本章写前卡')} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setChapterTools(null); } }}>
+        <div className="chapter-tools-head"><strong>{tr(chapterTools === 'continuity' ? '续写资料' : '本章写前卡')}</strong><IconButton label={tr('关闭章节资料')} onClick={() => setChapterTools(null)}><X size={18}/></IconButton></div>
+        <div className="chapter-tools-body">{chapterTools === 'continuity' ? <ContinuityPanel key={`continuity-${book.id}-${chapter.id}`} defaultOpen book={book} chapter={chapter} chapterIds={contextChapterIds} excerptIds={excerptIds} query={retrievalQuery} disabled={busy || !!running} onQuery={setRetrievalQuery} onExcerpts={setExcerptIds} onChanged={replace} onInclude={includeContinuity => editBook({ includeContinuity })} onRelated={relatedMemoryOnly => editBook({ relatedMemoryOnly })} onSource={id => void run(async () => { await comparisonGuard.current(); await flush(); setChapterId(id); setChapterTools(null); setView('editor'); })} flush={flush}/> : <WritingCardEditor defaultOpen chapter={chapter} book={book} disabled={busy || !!running} onChange={writingCard => editChapter(chapter.id, { writingCard })}/>}</div>
+      </aside>}
       <aside className="workspace-sidebar">
         <div className="sidebar-top">
           <div className="workspace-brand">
@@ -1439,7 +1490,7 @@ export default function Workspace({
           </div>
         </header>
       {!!running && <div className="generation-edit-warning" role="status">{tr('生成期间修改人物、设定或规划，会使当前候选需要重新核对；候选内容会保留。')}</div>}
-        {view === 'editor' && <div className="workflow-strip"><span><strong>{tr(nextStep.label)}</strong><small>{tr('定稿、故事资料同步、导出和备份分别核对。')}</small><small>{tr(syncLabel)}</small></span>{nextStep.target !== 'complete' && <Button disabled={!!running} onClick={() => prepareStep(nextStep)}>{tr('前往下一步')}</Button>}{canFinish && !book.completedAt && <Button disabled={busy} onClick={finishBook}>{tr('确认作品完结')}</Button>}<small>{tr('导出：')}{book.lastExportedAt ? date(book.lastExportedAt) : tr('尚未导出')} · {tr('备份：')}{backupAt ? date(backupAt) : tr('尚未备份')}</small></div>}
+        {view === 'editor' && <div className="workflow-strip"><span><strong>{tr(nextStep.label)}</strong></span>{nextStep.target !== 'complete' && <Button disabled={!!running} onClick={() => prepareStep(nextStep)}>{tr('前往下一步')}</Button>}{canFinish && !book.completedAt && <Button disabled={busy} onClick={finishBook}>{tr('确认作品完结')}</Button>}<details className="workflow-details"><summary>{tr('进度详情')}</summary><div><small>{tr('定稿、故事资料同步、导出和备份分别核对。')}</small><small>{tr(syncLabel)}</small><small>{tr('导出：')}{book.lastExportedAt ? date(book.lastExportedAt) : tr('尚未导出')} · {tr('备份：')}{backupAt ? date(backupAt) : tr('尚未备份')}</small></div></details></div>}
         {view === "editor" && !chapter && (
           <Empty
             icon={<BookOpen size={32} />}
@@ -1451,6 +1502,7 @@ export default function Workspace({
           <>
             <div className="editor-toolbar">
               <div className="editor-tabs">
+
                 <span className="selected">
                   <FileText size={17} />{tr("正文编辑")}</span>
                 <button
@@ -1460,6 +1512,7 @@ export default function Workspace({
                   <ListBullets size={16} />{tr("本章细纲")}</button>
               </div>
               <div className="toolbar-actions">
+                <Button className="author-tools-trigger" variant="quiet" onClick={() => setAuthorToolsOpen(true)}>{tr("素材与复核")}</Button>
                 <IconButton
                   label={tr("打开备忘录")}
                   className={memoDrawerOpen ? "memo-toolbar-active" : ""}
@@ -1494,7 +1547,7 @@ export default function Workspace({
                       : tr("确认本章正文，后续 AI 才会把它作为可靠事实提取记忆")
                   }
                   disabled={
-                    busy || chapter.status === "final" || !chapter.body.trim()
+                    compareMode || busy || chapter.status === "final" || !chapter.body.trim()
                   }
                   onClick={() =>
                     run(async () => {
@@ -1725,7 +1778,7 @@ export default function Workspace({
                     {chapter.status === "final" ? tr("已定稿") : tr("创作中")}
                   </span>
                 </div>
-                <input
+                <div className="chapter-heading-row"><input
                   className="chapter-title-input"
                   aria-label={tr("章节标题")}
                   maxLength={160}
@@ -1735,6 +1788,8 @@ export default function Workspace({
                   }
                   placeholder={tr("写下章节标题")}
                 />
+                <div className="chapter-quick-tools"><Button aria-expanded={chapterTools === 'continuity'} onClick={() => setChapterTools(v => v === 'continuity' ? null : 'continuity')}>{tr('续写资料')}</Button><Button aria-expanded={chapterTools === 'card'} onClick={() => setChapterTools(v => v === 'card' ? null : 'card')}>{tr('本章写前卡')}</Button><IconButton label={compareMode ? tr('退出对照创作') : tr('双列对照创作')} aria-pressed={compareMode} disabled={busy || !!running} onClick={() => void run(async () => { await comparisonGuard.current(); await flush(); setCompareMode(v => !v); setChapterTools(null); setAssistantOpen(false); })}><Columns size={18}/></IconButton></div></div>
+                {compareMode ? <CompareWriter key={`compare-${chapter.id}`} chapterId={chapter.id} guard={comparisonGuard} beforeApply={flush} onApplied={replace} preferredSourceId={selected?.chapterId === chapter.id ? selected.id : undefined} style={{ fontSize: display.fontSize, lineHeight: display.lineHeight }}/> : <>
                 {showOutline && (
                   <div className="outline-inline">
                     <div>
@@ -1867,6 +1922,7 @@ export default function Workspace({
                     </>
                   )}
                 </div>
+                </>}
               </div>
             </div>
             <footer className="editor-status">
@@ -2539,6 +2595,7 @@ export default function Workspace({
                               {m.evidence && (
                                 <blockquote>{m.evidence}</blockquote>
                               )}
+                              <div className="continuity-actions"><Button disabled={busy || !!running || !chapter} onClick={() => setRelationFocus(m.id)}>{tr('关联旧文与变化')}</Button></div>
                               <div className="memory-source">
                                 {m.stale ? (
                                   <span className="warning">
@@ -3239,6 +3296,8 @@ export default function Workspace({
             </Field>
           )}
           {action === "style" && <Field label={tr("蒸馏目标")}><select value={distillProfileId} onChange={event => setDistillProfileId(event.target.value)} disabled={busy || !!running}><option value="">{tr("本书参考文章")}</option>{(book.writingProfiles || []).map(item => <option key={item.id} value={item.id}>{tr(item.kind === "style" ? "写作风格" : "写作要求")} · {item.title}</option>)}</select></Field>}
+          <PlanningBatchNotice batch={currentPlanningBatch}/>
+
           <p className="generation-destination">{tr("生成去向：")}{action === "style" && distillProfileId ? (book.writingProfiles || []).find(item => item.id === distillProfileId)?.title || tr("资料已删除，请重新选择") : VOLUME_TASKS.includes(action)
               ? `${book.volumes?.find((v) => v.id === targetVolumeId)?.title || tr("请先选择卷")} · ${tr(taskName(action))}`
               : tr(taskName(action))}{" "}{tr("· 确认后写入")}</p>
@@ -3294,7 +3353,7 @@ export default function Workspace({
                       </label>
                     );
                   })}
-                  <small>{tr("仅显示已定稿前章；取消勾选后，本次生成不会读取该章正文。")}</small>
+                  <small>{tr("仅显示已定稿前章；取消勾选只移除该章完整正文，状态卡和旧文片段分别控制。")}</small>
                 </div>
               ) : null}
               {!contextPending && contextError && <div role="alert" className="reference-error"><p>{contextError}</p><Button onClick={() => setContextRefresh(value => value + 1)}>{tr("重新核对参考资料")}</Button></div>}
@@ -3424,9 +3483,11 @@ export default function Workspace({
                 <CandidateDiff before={chapter.body} after={selected.output} />
               ) : (
                 ROUTED_PLANNING.includes(selected.kind) && routePreview?.id === selected.id && routePreview.rows
-                  ? <PlanningCandidate rows={routePreview.rows}/>
+                  ? <PlanningCandidate key={`planning-${selected.id}`} rows={routePreview.rows} batch={selected.planningBatch} disabled={busy || !!running} onReviewAdopt={!selected.adopted && ["chapterPlan","chapterDetails"].includes(selected.kind) ? adoptReviewed : undefined}/>
                   : <CandidateBody job={selected} />
               )}
+              <ProseReview key={`prose-${selected.id}`} job={selected}/>
+              {chapter && ['write', 'continue', 'polish'].includes(selected.kind) && selected.status !== 'running' && !!selected.output && <CandidateRelationReview book={book} chapter={chapter} output={selected.kind === 'continue' ? chapter.body + '\n' + selected.output : selected.output}/>}
               <SyncReview
                 key={selected.id}
                 job={selected}
@@ -3484,7 +3545,7 @@ export default function Workspace({
           )}
         </div>
         {selected?.output && selected.kind !== 'check' && <div className="assistant-candidate-toolbar"><span>{tr(taskName(selected.kind))} · {selected.targetLabel || ''}</span><Button variant="primary-soft" disabled={!!running || busy || selected.adopted || (ROUTED_PLANNING.includes(selected.kind) && (selected.status !== 'done' || routePreview?.id !== selected.id || !routePreview.rows)) || !['done','cancelled','interrupted'].includes(selected.status) || (['memory','characters','timelinePlan','worldBuild'].includes(selected.kind) && selected.status !== 'done')} onClick={adopt}>{tr(selected.adopted ? selected.manualMerged ? '已手动合并' : '已采用' : selected.kind === 'memory' ? '确认记忆' : selected.kind === 'continue' ? '追加到正文' : '采用结果')}</Button>              {selected.adopted && [...ROUTED_PLANNING, "write", "continue", "polish"].includes(selected.kind) && <div className="planning-continue">
-                <Button onClick={() => prepareStep(nextStep)}>{tr("继续下一步")} · {tr(nextStep.label)}<ArrowRight size={14}/></Button>
+                <Button disabled={busy || !!running} onClick={() => continuePlanningBatch && !continuePlanningBatch.complete ? generateFor(selected.kind,undefined,selected.targetVolumeId) : prepareStep(nextStep)}>{continuePlanningBatch && !continuePlanningBatch.complete ? tr("继续生成第 {0}–{1} 章",{0:continuePlanningBatch.start,1:continuePlanningBatch.end}) : <>{tr("继续下一步")} · {tr(nextStep.label)}</>}<ArrowRight size={14}/></Button>
               </div>}</div>}
         {/* 助手内容 ↔ 底部设置区：拖动改设置区高度（往上拖是变高） */}
         <Splitter
@@ -3513,13 +3574,14 @@ export default function Workspace({
               <Field
                 label={
                   <span className="field-label-with-help">
-                    关联前多少章
-                    <HelpTip text="完整读取所选已定稿前章；人物、世界、有效记忆和时间线也完整关联。选择全部可包含所有已定稿前章。" />{" "}
+                    {tr("引用最近已定稿章节")}
+                    <HelpTip text={tr("默认引用最近10章已定稿正文；不足10章时引用现有前文，跳过草稿。人物、世界、有效记忆和时间线仍完整关联，也可手动勾选相关旧章或选择全部前文。")} />{" "}
                   </span>
                 }
               >
                 <select
-                  value={book.contextChapters ?? 100}
+                  aria-label={tr("引用最近已定稿章节")}
+                  value={book.contextChapters ?? 10}
                   disabled={busy || !!running}
                   onChange={(e) =>
                     editBook({ contextChapters: Number(e.target.value) })
@@ -4438,6 +4500,7 @@ function StreamingCandidateText({ job }: { job: Job }) {
   }, [job.output, job.status]);
   return <div className="candidate-stream">
     <pre ref={text} className={`candidate-text ${job.status === "running" ? "streaming" : ""}`}
+      data-prose-id={job.id}
       onScroll={() => {
         const node = text.current;
         if (!node) return;

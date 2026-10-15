@@ -65,10 +65,9 @@ function settingsActions({ store, window, publicConfig, saveFile, running,  }) {
     
     
     
-    "trash:list": () =>
-      store
-        .trash()
-        .map((e) => ({ ...e, bookTitle: store.rawBook(e.bookId).title })),
+    'trash:policy': () => require('./trash-retention.cjs').policy(store),
+    'trash:configure': d => require('./trash-retention.cjs').configure(store, d.days),
+    'trash:list': () => require('./trash-retention.cjs').list(store),
     "trash:restore": (d) => store.restoreTrash(d.id),
     "book:delete": (d) => {
       assert(

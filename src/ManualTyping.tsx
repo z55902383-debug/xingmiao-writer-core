@@ -1,4 +1,5 @@
 import { tr } from "./i18n";
+import CompareWriter from './CompareWriter';
 import {
   useCallback,
   useEffect,
@@ -36,6 +37,7 @@ import {
   X,
   TextAa,
   Sparkle,
+  Columns,
 } from "@phosphor-icons/react";
 import type { Book, BookSummary, Chapter, Job } from "./types";
 import { api, count, number } from "./api";
@@ -352,6 +354,8 @@ export default function ManualTyping({
   const draft = library.drafts[library.activeKey];
   const [prefs, setPrefs] = useState(loadPrefs);
   const [focus, setFocus] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const comparisonGuard = useRef<() => Promise<void>>(async () => {});
   const [showPicker, setShowPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showDisplaySettings, setShowDisplaySettings] = useState(false);
@@ -496,6 +500,7 @@ export default function ManualTyping({
   }, [library, persist]);
   useEffect(() => {
     const guard = async () => {
+      await comparisonGuard.current();
       await ideaCloseGuard.current();
       await memos.save();
       await protectDrafts();
@@ -683,7 +688,7 @@ export default function ManualTyping({
     textareaRef,
     inputFormat,
     (text) => edit({ text }),
-    draft.key,
+    `${draft.key}:${compareMode ? 'comparison' : 'manuscript'}`,
   );
   const switchDraft = (next: Draft) => {
     try {
@@ -802,6 +807,7 @@ export default function ManualTyping({
     if (savingRef.current || leaving) return;
     setLeaving(true);
     try {
+      await comparisonGuard.current();
       await ideaCloseGuard.current();
       await memos.save();
       await protectDrafts();
@@ -821,7 +827,10 @@ export default function ManualTyping({
           void memos.save().catch((error) => notify(error.message));
           return;
         }
-        if (!document.querySelector("dialog[open]")) void saveChapter();
+        if (!document.querySelector("dialog[open]")) {
+          if (compareMode) void comparisonGuard.current().catch(e => notify(e.message));
+          else void saveChapter();
+        }
       }
       if (
         (e.ctrlKey || e.metaKey) &&
@@ -865,7 +874,7 @@ export default function ManualTyping({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [saveChapter, focus, findOpen, memos.save, notify]);
+  }, [saveChapter, focus, findOpen, memos.save, notify, compareMode]);
   const playClick = () => {
     if (!prefs.sound) return;
     try {
@@ -1180,7 +1189,7 @@ export default function ManualTyping({
   }, []);
 
   return (
-    <div className={`mt-root${focus ? " mt-focus" : ""}`}>
+    <div className={`mt-root${focus ? " mt-focus" : ""}${compareMode ? ' mt-comparing' : ''}`}>
       {!focus && (
         <header className="mt-header">
           <div className="mt-header-left">
@@ -1201,11 +1210,11 @@ export default function ManualTyping({
               variant="primary"
               busy={saving}
               onClick={() =>
-                draft.chapterId ? void saveChapter() : setShowAttach(true)
+                compareMode ? void comparisonGuard.current().then(() => notify(tr('对照草稿已保存'))).catch(e => notify(e.message)) : draft.chapterId ? void saveChapter() : setShowAttach(true)
               }
             >
               <FloppyDisk size={16} />
-              {draft.chapterId ? tr("保存章节") : tr("存入作品")}
+              {compareMode ? tr('保存对照草稿') : draft.chapterId ? tr("保存章节") : tr("存入作品")}
             </Button>
           </div>
         </header>
@@ -1234,9 +1243,10 @@ export default function ManualTyping({
                 <FolderOpen size={16} />
                 {tr("临时稿管理")}
               </Button>
+              <Button disabled={saving || (!draft.chapterId && !compareMode)} aria-pressed={compareMode} title={!draft.chapterId ? tr('选择作品章节后可使用共享对照草稿') : undefined} onClick={() => { void (async () => { await comparisonGuard.current(); await ideaCloseGuard.current(); await memos.save(); await protectDrafts(); setCompareMode(v => !v); })().catch(e => notify(e.message)); }}><Columns size={16}/>{compareMode ? tr('退出对照创作') : tr('双列对照创作')}</Button>
               {draft.chapterId && (
                 <Button
-                  disabled={saving}
+                  disabled={saving || compareMode}
                   onClick={() => setShowSources(true)}
                   aria-label={tr("稿件与历史")}
                 >
@@ -1249,7 +1259,7 @@ export default function ManualTyping({
               )}
               <IconButton
                 label={tr("导出 TXT")}
-                disabled={exporting}
+                disabled={exporting || compareMode}
                 onClick={() => void exportDraft()}
               >
                 <DownloadSimple size={18} />
@@ -1258,7 +1268,7 @@ export default function ManualTyping({
             </div>
             <span className="mt-tool-label">{tr("文稿")}</span>
           </div>
-          <div className="mt-tool-group" role="group" aria-label={tr("编辑")}>
+          <div className="mt-tool-group" role="group" aria-label={tr("编辑")} inert={compareMode}>
             <div className="mt-tool-buttons">
               <IconButton
                 label={tr("查找替换")}
@@ -1410,7 +1420,7 @@ export default function ManualTyping({
           </IconButton>
         </div>
       )}
-      {findOpen && (
+      {!compareMode && findOpen && (
         <div
           className="mt-find-panel"
           role="search"
@@ -1544,7 +1554,7 @@ export default function ManualTyping({
           (!focus && showMemos ? " has-memos" : "")
         }
       >
-        {!focus && showIdeas && (
+        {!compareMode && !focus && showIdeas && (
           <ManualIdeaAssistant
             bookId={memos.bookId || null}
             bookTitle={memos.bookTitle}
@@ -1585,12 +1595,16 @@ export default function ManualTyping({
               onChange={(e) => edit({ title: e.target.value })}
             />
             <p className="mt-document-caption">
-              {draft.chapterId
+              {compareMode ? tr('本章对照草稿自动保存；点击右栏下方按钮写入正文。') : draft.chapterId
                 ? tr("正在编辑作品章节 · Ctrl+S 保存到作品")
                 : tr("临时文稿自动保留，可随时存入作品或导出 TXT")}
             </p>
           </div>
-          <textarea
+          {compareMode && draft.chapterId ? <CompareWriter key={`manual-compare-${draft.chapterId}`} chapterId={draft.chapterId} guard={comparisonGuard} beforeApply={async () => { await protectDrafts(); }} style={{ fontSize: prefs.fontSize, lineHeight: prefs.lineHeight }} onApplied={b => {
+            const saved = b.chapters.find(c => c.id === draft.chapterId);
+            if (saved && !changed(libraryRef.current.drafts[libraryRef.current.activeKey])) commit(lib => ({ ...lib, drafts: { ...lib.drafts, [draft.key]: chapterDraft(saved) } }));
+            notify(tr('已写入本章正文，旧正文保留在历史版本。'));
+          }}/> : <textarea
             key={draft.key}
             ref={textareaRef}
             aria-label={tr("码字正文")}
@@ -1620,9 +1634,9 @@ export default function ManualTyping({
             onCompositionEnd={playClick}
             autoFocus
             spellCheck={false}
-          />
+          />}
         </main>
-        {!focus && showMemos && (
+        {!compareMode && !focus && showMemos && (
           <ManualMemoPanel
             books={books}
             model={memos}

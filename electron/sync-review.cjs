@@ -2,6 +2,7 @@ const { randomUUID, createHash } = require("node:crypto");
 const { resolveTimeline, contextSignature } = require("./timeline.cjs");
 const hash = (s) => createHash("sha256").update(s).digest("hex");
 function messages(book, chapter, body) {
+  const state = resolveTimeline(book, chapter.id, false);
   return [
     {
       role: "system",
@@ -11,23 +12,12 @@ function messages(book, chapter, body) {
     {
       role: "user",
       content:
-        '分析章节中的新人、人物状态、关系、世界变化。最多20条。格式 {"changes":[{"kind":"newCharacter或character或relation或world","subject":"人物姓名或世界对象","target":"关系对象姓名，其他为空","attribute":"生存状态/阵营/亲属关系等维度","value":"变化后的状态；新人填写简短基础描述","role":"新人定位，其他为空","evidence":"正文逐字连续原文"}]}。每条必须有原文证据。已有相同事实不要重复；新人使用原文姓名。\n' +
+        '分析章节中的新人、人物状态、关系、世界变化，以及物品归属、明确承诺、线索发现等关键记忆。最多20条。格式 {"changes":[{"kind":"newCharacter或character或relation或world或memory","subject":"人物姓名、物品或世界对象","target":"关系对象姓名，其他为空","attribute":"生存状态/阵营/亲属关系/保管人/承诺/发现等维度","value":"变化后的状态或明确事实；新人填写简短基础描述","role":"新人定位，其他为空","evidence":"正文逐字连续原文"}]}。memory用于物品归属、承诺和关键事件，归属的subject填写物品名、attribute填写保管人、value只填写持有人姓名。承诺只能记录已作出的承诺，不视为已经兑现。知情范围只记录明确获知的内容，不把作者秘密推给人物。每条必须有原文证据。同一事实不要跨类型重复；已有相同事实不要重复；新人使用原文姓名。\n' +
         JSON.stringify({
-          characters: book.characters,
-          memories: book.memories.filter(
-            (m) =>
-              !m.stale &&
-              (!m.sourceChapterId ||
-                book.chapters.some(
-                  (c) =>
-                    c.id === m.sourceChapterId &&
-                    c.order < chapter.order &&
-                    c.status === "final" &&
-                    c.revision === m.sourceRevision,
-                )),
-          ),
+          characters: book.characters.filter(c => !c.introducedOrder || c.introducedOrder <= chapter.order).map(c => ({ id: c.id, name: c.name, role: c.role, description: c.description })),
+          memories: require('./relation-index.cjs').records(book, chapter).filter(r => r.kind === 'memory'),
           world: book.world,
-          state: resolveTimeline(book, chapter.id, false),
+          state: { world: state.world, characters: state.characters, relations: state.relations },
           chapter: chapter.title,
           body,
         }),
@@ -41,7 +31,7 @@ function parse(raw, body) {
   if (!Array.isArray(value.changes) || value.changes.length > 20)
     throw Error("变化分析格式不正确，正文已保留。");
   return value.changes.map((c) => {
-    if (!["newCharacter", "character", "relation", "world"].includes(c.kind))
+    if (!["newCharacter", "character", "relation", "world", "memory"].includes(c.kind))
       throw Error("变化类型无效");
     for (const k of ["subject", "value", "evidence"])
       if (typeof c[k] !== "string" || !c[k].trim())
@@ -105,7 +95,8 @@ function apply(store, jobId, changes) {
       });
     }
     store.finalize(c.id, c.revision);
-    for (const row of rows.filter((x) => x.kind !== "newCharacter")) {
+    for (const row of rows.filter(x => x.kind === 'memory')) store.addMemory(book.id, { subject: row.subject, relation: row.attribute, object: row.value, evidence: row.evidence, sourceChapterId: c.id });
+    for (const row of rows.filter((x) => !['newCharacter', 'memory'].includes(x.kind))) {
       const b = store.book(book.id),
         find = (n) => {
           const matches = b.characters.filter((p) => p.name === n);

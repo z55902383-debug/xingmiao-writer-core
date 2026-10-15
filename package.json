@@ -1,6 +1,6 @@
 {
   "name": "xingmiao-writer-core",
-  "version": "0.6.10",
+  "version": "0.6.11",
   "private": true,
   "description": "星喵写作开源核心版 · 本地 AI 小说工作台",
   "main": "electron/main.cjs",
@@ -26,7 +26,12 @@
     "test:planning:hierarchy": "node tests/desktop-planner-hierarchy.mjs",
     "test:writing:ui": "node tests/desktop-writing-profiles.mjs",
     "test:generation:ui": "node tests/desktop-generation-activity.mjs",
-    "test:references:ui": "node tests/desktop-references.mjs"
+    "test:references:ui": "node tests/desktop-references.mjs",
+    "test:context:ui": "node tests/desktop-context-range.mjs",
+    "test:continuity:ui": "node tests/desktop-continuity.mjs",
+    "test:comparison:ui": "node tests/desktop-comparison.mjs && node tests/desktop-comparison-resize.mjs",
+    "test:author-tools:ui": "node tests/desktop-author-tools.mjs",
+    "test:knowledge:ui": "node tests/desktop-knowledge.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.5",

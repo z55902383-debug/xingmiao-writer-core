@@ -18,6 +18,26 @@ function job(db,b,c,kind,data,extra={}) {
   const j = { id:randomUUID(),bookId:b.id,chapterId:c.id,baseRevision:db.chapter(c.id).revision,kind,output:typeof data === "string" ? data : JSON.stringify(data),status:"done",adopted:false,createdAt:new Date().toISOString(),...extra };
   db.putJob(j); return j;
 }
+test('卷目标章数可配置并进入上下文，只需卷大纲即可拆章，编辑保留目标',t=>{
+ const {db,b,c}=setup(t);db.saveVolume(b.id,{title:'目标卷',outline:'调查、转折、解决',targetChapters:6});const volume=db.book(b.id).volumes[0];
+ const context=buildContext(db.book(b.id),c,'chapterPlan','',[],{volumeId:volume.id});assert.equal(JSON.parse(context.messages[1].content.split('以下 JSON 为资料数据：\n')[1]).targetVolume.targetChapters,6);
+ db.saveVolume(b.id,{...volume,detail:'阶段划分'});assert.equal(db.book(b.id).volumes[0].targetChapters,6);
+ assert.throws(()=>db.saveVolume(b.id,{...volume,targetChapters:201}));assert.throws(()=>db.saveVolume(b.id,{...volume,targetChapters:1.5}));
+});
+test('逐章编辑选用仅写入勾选结果并自动归卷，保留现有正文和其他章节',t=>{
+ const {db,b,c}=setup(t);db.saveVolume(b.id,{title:'目标卷',outline:'调查'});const v=db.book(b.id).volumes[0];db.organizeChapter(c.id,{volumeId:v.id});db.updateChapter(c.id,{body:'作者既有正文'},c.revision);const latest=db.chapter(c.id);
+ const j=job(db,b,latest,'chapterPlan',{volumeId:v.id,chapters:[{id:c.id,title:'第1章 原名',summary:'原概要'},{title:'第2章 新线索',summary:'线索'},{title:'第3章 未选',summary:'未采用'}]},{targetVolumeId:v.id,planningSignature:planningSignature(db.book(b.id))});
+ db.adopt(j.id,'replace',[{index:0,title:'第1章 编辑后的名称',summary:'作者修订概要',outline:'作者修订细纲'},{index:1,title:'第2章 新线索',summary:'编辑线索',outline:'新的场景顺序'}]);const after=db.book(b.id);
+ assert.equal(after.chapters.length,2);assert.equal(after.chapters[0].body,'作者既有正文');assert.equal(after.chapters[0].summary,'作者修订概要');assert.equal(after.chapters[1].volumeId,v.id);assert.ok(!after.chapters.some(row=>row.title==='第3章 未选'));assert.equal(db.job(j.id).planningPreview.length,2);
+});
+test('逐章选择拒绝伪造目标、重复选择、清空必填概要和修改后过期采用',t=>{
+ const {db,b,c}=setup(t);db.saveVolume(b.id,{title:'目标卷',outline:'调查'});const v=db.book(b.id).volumes[0], j=job(db,b,c,'chapterPlan',{chapters:[{title:'章节一',summary:'大纲'},{title:'章节二',summary:'大纲'}]},{targetVolumeId:v.id,planningSignature:planningSignature(db.book(b.id))});
+ const before=JSON.stringify(db.book(b.id));for(const edits of [[{index:0,id:'foreign',title:'伪造'}],[{index:0},{index:0}],[{index:0,summary:''}],[]])assert.throws(()=>db.adopt(j.id,'replace',edits));assert.equal(JSON.stringify(db.book(b.id)),before);
+ db.saveVolume(b.id,{...v,targetChapters:4});assert.throws(()=>db.adopt(j.id,'replace',[{index:0,title:'新名称'}]),/修改/);assert.equal(db.job(j.id).adopted,false);
+});
+test('只选新增章时不会写入未勾选的初始空章',t=>{
+ const {db,b,c}=setup(t);db.saveVolume(b.id,{title:'甲卷',outline:'规划'});const v=db.book(b.id).volumes[0];const j=job(db,b,c,'chapterPlan',{chapters:[{title:'第1章 来客',summary:'概要'},{title:'第2章 线索',summary:'概要'}]},{targetVolumeId:v.id});db.adopt(j.id,'replace',[{index:1,title:'第2章 作者选择',summary:'作者概要'}]);assert.equal(db.chapter(c.id).title,c.title);assert.equal(db.chapter(c.id).summary,'');assert.equal(db.chapter(c.id).volumeId,c.volumeId);assert.equal(db.book(b.id).chapters.filter(row=>row.volumeId===v.id).length,1);
+});
 test("分步结构化结果同步作品名、卷名、章名和对应内容，并复用空白初始章", t => {
   const {db,b,c}=setup(t);
   db.adopt(job(db,b,c,"bookOutline",{title:"雾城追踪",outline:"调查、发现阴谋、揭开真相"}).id,"replace");

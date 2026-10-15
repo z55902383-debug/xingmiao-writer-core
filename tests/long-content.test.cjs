@@ -11,7 +11,7 @@ test('超过旧保存上限的正文、资料、Skill及备份在重新打开数
  t.after(()=>{db.close();rmSync(dir,{recursive:true,force:true});});
  const long='完整开头'+'甲'.repeat(220000)+'完整结尾';
  const book=db.createBook({title:'长篇资料',premise:long});
- assert.equal(book.contextChapters,100);
+ assert.equal(book.contextChapters,10);
  db.updateBook(book.id,{outline:long,world:long,style:long,reference:long,characters:[{id:'p',name:'甲',role:'主角',description:long,characterKnown:long,readerKnown:long,authorNotes:long}],worldRecords:[{id:'w',title:'世界',category:'规则',description:long}],memos:[{id:'m',title:'灵感',content:long}]});
  db.updateChapter(book.chapters[0].id,{body:long,outline:long,summary:long},1);
  db.saveVolume(book.id,{title:'第一卷',outline:long,detail:long});
