@@ -18,7 +18,7 @@ import {chapterBatch} from '../electron/chapter-batches.mjs';
 const COLLAPSED_KEY = "xm-creation-guide-collapsed";
 
 type GuideStep = {
-  id: "premise" | "outline" | "chapters" | "volumePlans" | "chapterPlans" | "draft" | "complete";
+  id: "style" | "imitation" | "premise" | "outline" | "chapters" | "volumePlans" | "chapterPlans" | "draft" | "complete";
   title: string;
   detail: string;
   done: boolean;
@@ -34,6 +34,7 @@ export default function CreationGuideIsland({
 }) {
   const [open, setOpen] = useState(() => localStorage.getItem(COLLAPSED_KEY) === "0");
   const steps = useMemo<GuideStep[]>(() => [
+    ...(book.imitationProfiles?.length ? [{ id: 'imitation', title: '配置仿写对标', detail: '上传原文、分析故事对标并采用，选择参考与占比', done: (book.imitationSelection?.ids || []).some(id => (book.imitationSelection?.weights[id] || 0) > 0 && !!book.imitationProfiles?.find(row => row.id === id)?.body.trim()), icon: Sparkle }] : []),
     { id: "premise", title: "写下故事方向", detail: "用几句话说清主角、目标和难题", done: !!book.premise.trim(), icon: FileText },
     { id: "outline", title: "整理全书总纲", detail: "先确定故事从哪里开始、走向哪里", done: !!book.outline.trim(), icon: ListBullets },
     { id: "chapters", title: "生成分卷规划", detail: "采用后创建对应分卷与名称", done: (book.volumes || []).length > 0, icon: BookOpen },

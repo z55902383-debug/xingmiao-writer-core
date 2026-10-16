@@ -155,7 +155,7 @@ async function generate(input) {
       input.kind,
       text(input.instruction || ""),
       store.skills(),
-      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat, writingProfileId: input.writingProfileId, skillIds: input.skillIds, excerptIds: input.excerptIds, retrievalQuery: input.retrievalQuery },
+      { volumeId: input.targetVolumeId, chapterIds: input.contextChapterIds, manuscriptFormat, writingProfileId: input.writingProfileId, imitationProfileId: input.imitationProfileId, skillIds: input.skillIds, excerptIds: input.excerptIds, retrievalQuery: input.retrievalQuery },
     );
     const config = store.config();
     assert(config.model || config.provider === "codex", "请先配置模型");
@@ -182,9 +182,10 @@ async function generate(input) {
       kind: input.kind,
       ...(context.planningBatch ? {planningBatch:context.planningBatch} : {}),
       ...(context.writingProfileSnapshot ? { writingProfileSnapshot: context.writingProfileSnapshot } : {}),
+      ...(context.imitationProfileSnapshot ? { imitationProfileSnapshot: context.imitationProfileSnapshot } : {}),
       ...(isProseKind(input.kind) ? { manuscriptFormat } : {}),
       targetVolumeId: input.targetVolumeId || "",
-      targetLabel: context.writingProfileSnapshot ? context.writingProfileSnapshot.title : input.targetVolumeId
+      targetLabel: context.imitationProfileSnapshot ? context.imitationProfileSnapshot.title : context.writingProfileSnapshot ? context.writingProfileSnapshot.title : input.targetVolumeId
         ? (book.volumes || []).find((v) => v.id === input.targetVolumeId)?.title
         : ["write", "continue", "polish", "summary", "outline", "memory", "check"].includes(input.kind) ? chapter.title : book.title,
       instruction: input.instruction || "",
@@ -193,7 +194,7 @@ async function generate(input) {
       createdAt: now(),
       progress: { requestedAt: now() },
       adopted: false,
-      context: { ...context, messages: undefined, writingProfileSnapshot: undefined },
+      context: { ...context, messages: undefined, writingProfileSnapshot: undefined, imitationProfileSnapshot: undefined },
       error: "",
     };
     store.putJob(job);
@@ -245,6 +246,7 @@ async function generate(input) {
           job.error = "达到输出长度上限，内容可能未完成；可保留后续写。";
         }
         job.output = formatJobOutput(job);
+          if (job.status === 'done') require('./output-contract.cjs').validateGeneratedOutput(book, chapter, job);
         if (
           job.status === "done" &&
           job.analyzeChanges && ["write", "continue", "polish"].includes(job.kind)
@@ -432,6 +434,7 @@ async function restoreBackup() {
         ...(source.importedSource ? { importedSource: { name: text(source.importedSource.name, 240), content: text(source.importedSource.content, 8000000), importedAt: text(source.importedSource.importedAt, 100) } } : {}),
         target: Number(source.target) || 200000,
         creationMode: source.creationMode === "short" ? "short" : "long",
+        writingMode: source.writingMode === "imitate" ? "imitate" : "original",
         characters: [],
         contextChapters: Number.isInteger(source.contextChapters)
           ? Math.max(0, Math.min(100, source.contextChapters))
@@ -760,7 +763,7 @@ const actions = {
       d.kind,
       d.instruction,
       store.skills(),
-      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId, skillIds: d.skillIds, excerptIds: d.excerptIds, retrievalQuery: d.retrievalQuery });
+      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId, imitationProfileId: d.imitationProfileId, skillIds: d.skillIds, excerptIds: d.excerptIds, retrievalQuery: d.retrievalQuery });
     return rest;
   },
   "ai:generate": generate,
@@ -899,6 +902,35 @@ const actions = {
   },
   "writing:save": (d) => store.saveWritingProfile(d.bookId, d.profile),
   "writing:select": (d) => store.selectWritingProfiles(d.bookId, d.selection),
+  'imitation:save': d => store.saveImitationProfile(d.bookId, d.profile),
+  'imitation:select': d => store.selectImitationProfiles(d.bookId, d.selection),
+  'imitation:delete': d => store.deleteImitationProfile(d.bookId, d.id, d.revision),
+  'imitation:restore': d => store.restoreImitationProfile(d.bookId, d.id),
+  'imitation:import-batch': d => store.importImitationSources(d.bookId, d.sources),
+  'imitation:export': d => {
+    const row = (store.book(d.bookId).imitationProfiles || []).find(row => row.id === d.id);
+    assert(row, '对标不存在');
+    return saveFile(`仿写对标-${row.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')}.json`, JSON.stringify({ format: 'xingmiao-imitation-profile', version: 1, title: row.title, body: row.body }, null, 2), 'json');
+  },
+  "writing:import-batch": (d) => store.importWritingSources(d.bookId, d.sources),
+  "writing:import-sources": async () => {
+    const result = await dialog.showOpenDialog(win, { title: '上传参考小说', properties: ['openFile', 'multiSelections'], filters: [{ name: 'UTF-8 小说文本', extensions: ['txt', 'md'] }] });
+    if (result.canceled) return null;
+    assert(result.filePaths.length <= 20, '每批最多上传20篇参考文章');
+    const rows = [];
+    for (const file of result.filePaths) {
+      const name = basename(file);
+      try {
+        assert(/\.(txt|md)$/i.test(file), '请选择TXT或Markdown文件');
+        assert((await fs.stat(file)).size <= 8000000, '文件超过8MB，请拆分后导入');
+        const body = (await fs.readFile(file, 'utf8')).replace(/^\uFEFF/, '');
+        assert(!body.includes('\uFFFD'), '文件不是UTF-8编码，请转换后重试');
+        assert(body.trim() && body.length <= 2000000, '参考原文须为1至200万字符');
+        rows.push({ name, title: name.replace(/\.[^.]+$/, '').slice(0, 120), body });
+      } catch (error) { rows.push({ name, title: name, body: '', error: error.message }); }
+    }
+    return rows;
+  },
   "writing:delete": (d) => store.deleteWritingProfile(d.bookId, d.id, d.revision, d.body),
   "writing:restore": (d) => store.restoreWritingProfile(d.bookId, d.id),
   "writing:import": async (d) => {
@@ -938,6 +970,7 @@ const actions = {
   // 走和正常关闭一样的收尾流程：先中止生成任务、等落盘，再重启。
   "data:restart": async () => {
     await closeLogin();
+    for (const controller of running.values()) controller.abort("user");
     await manualBrainstorm.cancelAll();
     await knowledgeChat.cancelAll();
     for (const controller of running.values()) controller.abort("user");
@@ -949,6 +982,7 @@ const actions = {
   },
   "app:close": async () => {
     await closeLogin();
+    for (const controller of running.values()) controller.abort("user");
     await manualBrainstorm.cancelAll();
     await knowledgeChat.cancelAll();
     for (const controller of running.values()) controller.abort("user");

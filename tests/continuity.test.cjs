@@ -26,7 +26,7 @@ test('状态卡按当前章过滤，拒绝未来、草稿、过期和无原文�
   const card = stateCard(b, c), text = JSON.stringify(card);
   assert.match(text, /铜钥匙/); assert.match(text, /有效旧线索/);
   assert.doesNotMatch(text, /过期标记|伪证标记|未来标记|草稿标记|未来章节独有内容|未来伏笔标记/);
-  const ctx = buildContext(b, c, 'write'); assert.doesNotMatch(data(ctx).openForeshadows, /未来伏笔标记/);
+  const ctx = buildContext(b, c, 'write'); assert.doesNotMatch(JSON.stringify(data(ctx).openForeshadows), /未来伏笔标记/);
   assert.equal(card.asOfChapterId, 'c12');
   assert.equal(card.sections.find(s => s.key === 'position').items[0].source.evidence, b.chapters[12].body);
 });
@@ -47,7 +47,7 @@ test('回看较早章节时，不把未来章节中的伏笔回收提前视为�
   const before = stateCard(b, b.chapters[5]), after = stateCard(b, b.chapters[13]);
   assert.equal(before.sections.find(s => s.key === 'open').items.length, 1);
   assert.equal(after.sections.find(s => s.key === 'open').items.length, 0);
-  assert.equal(JSON.parse(data(buildContext(b, b.chapters[5], 'write')).openForeshadows).length, 1);
+  assert.equal(data(buildContext(b, b.chapters[5], 'write')).openForeshadows.length, 1);
 });
 
 test('旧文检索利用人物别名和事件词，片段必须是已定稿来源的精确切片', () => {
@@ -141,7 +141,7 @@ test('改写来源再定稿不会复活旧认知或伏笔，逐项重新确认�
   const changed = store.updateChapter(source.id, { body: '陈默没有收到铜钥匙，但知道它的存在。' }, source.revision); store.finalize(changed.id, changed.revision);
   let book = store.book(b.id), preview = prepare(book, current); assert.equal(preview.reviews.length, 3);
   assert.equal(preview.stateCard.sections.find(s => s.key === 'knowledge').items.length, 0); assert.equal(preview.stateCard.sections.find(s => s.key === 'open').items.length, 0);
-  const payload = data(buildContext(book, current, 'write')); assert.equal(JSON.parse(payload.characters)[0].characterKnown, undefined); assert.equal(JSON.parse(payload.openForeshadows).length, 0);
+  const payload = data(buildContext(book, current, 'write')); assert.equal(payload.characters[0].characterKnown, undefined); assert.equal(payload.openForeshadows.length, 0);
   const row = preview.reviews.find(r => r.kind === 'knowledge');
   book = confirmReview(store, { bookId: b.id, id: row.id, kind: row.kind, basis: row.basis });
   assert.equal(book.characters[0].knowledgeStale, false); assert.equal(book.characters[0].secretStale, true);

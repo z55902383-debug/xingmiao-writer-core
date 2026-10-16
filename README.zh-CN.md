@@ -4,20 +4,22 @@
 
 本地优先的小说工作台，可以手写，也可以接入自己的模型逐步构建故事。
 
-**v0.6.12 · Windows x64 · MIT**
+**v0.6.13 · Windows x64 · MIT**
 
-[下载开源安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.12/XingmiaoWriter-Core-0.6.12-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.12)
+[下载开源安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.13/XingmiaoWriter-Core-0.6.13-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.13)
 
 **会员免费，无需付费开通。** 完整版区分会员与普通用户，是为了管理创作广场提示词库及相关权限，不是收费套餐。第三方模型和生图费用由服务商决定。开源版不含账号和广场。
 
 ![当前书架](docs/assets/library.png)
 
-## v0.6.12 本次更新
+## v0.6.13 本次更新
 
-- **指令状态更可靠**：修复启用、停用、删除与重新添加后的选择状态；保留已编辑内容和适用范围。
-- **引用更准确**：统一专项标签与章节任务匹配，完整发送已选指令；明确的逐项选择按作品和生成任务保留。
-- **操作更清楚**：改进风格参考入口与独立滚动，保持列表标题、筛选和操作区可见。
-- **双语首页**：默认英文，可切换简体中文；每个仓库保留一张展示图，以文字说明为主。
+- **仿写与风格分开管理**：独立的故事对标库与文风库，可以分别多选并设置占比；写作要求单独配置。
+- **上传与采用更稳妥**：批量上传、逐篇分析、审核后采用；来源改变时拒绝旧分析覆盖，实际引用与候选快照可查看。
+- **多风格交互**：主区与助手占比同步，完善搜索筛选、详情展开、键盘操作、窄屏菜单和资料层级。
+- **上下文与输出核对**：资料与系统规则分层，完整发送已选且正权重的档案，仿写与文风分别归一；新结构化任务检查格式及目标，采用时再次核对。
+
+[仿写与多风格融合使用说明](docs/仿写与多风格融合使用说明.md)
 
 ## 主要功能
 
@@ -74,7 +76,7 @@ AI请求把本次选中的正文和资料发送到配置的模型服务，输出
 
 ## 文档与贡献
 
-[功能说明](docs/features.md) · [本次检查](docs/检查记录-v0.6.12.md) · [资料整理](docs/资料整理使用说明.md) · [创作步骤](docs/分步创作流程与采用说明.md) · [上传步骤](docs/GitHub上传步骤.md)
+[功能说明](docs/features.md) · [本次检查](docs/检查记录-v0.6.13.md) · [资料整理](docs/资料整理使用说明.md) · [创作步骤](docs/分步创作流程与采用说明.md) · [上传步骤](docs/GitHub上传步骤.md)
 
 [架构](docs/architecture.md) · [路线图](docs/roadmap.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [更新记录](CHANGELOG.md)
 

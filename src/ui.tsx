@@ -141,16 +141,49 @@ export function Menu({
   icon,
   trigger,
   align = "end",
+  escapeClipping = false,
   children,
 }: {
   label: string;
   icon?: ReactNode;
   trigger?: ReactNode;
   align?: "start" | "end";
+  escapeClipping?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
-  const close = () => ref.current?.removeAttribute("open");
+  const panelRef = useRef<HTMLDivElement>(null);
+  const close = () => {
+    if (panelRef.current?.matches(':popover-open')) panelRef.current.hidePopover();
+    ref.current?.removeAttribute("open");
+  };
+  function positionPanel() {
+    if (!escapeClipping || !panelRef.current || !ref.current) return;
+    const panel = panelRef.current;
+    if (!ref.current.open) { if (panel.matches(':popover-open')) panel.hidePopover(); return; }
+    // A native top-layer popover can leave a scrolling list without losing DOM ownership.
+    if (!panel.matches(':popover-open')) panel.showPopover();
+    const anchor = ref.current.querySelector('summary')!.getBoundingClientRect();
+    const size = panel.getBoundingClientRect();
+    const left = align === 'start' ? anchor.left : anchor.right - size.width;
+    const top = anchor.bottom + 6 + size.height <= innerHeight - 8 ? anchor.bottom + 6 : anchor.top - 6 - size.height;
+    panel.style.left = `${Math.max(8, Math.min(left, innerWidth - size.width - 8))}px`;
+    panel.style.top = `${Math.max(8, Math.min(top, innerHeight - size.height - 8))}px`;
+  }
+  function followAnchor() {
+    if (!ref.current?.open) return;
+    const anchor = ref.current.querySelector('summary')!.getBoundingClientRect();
+    let ancestor = ref.current.parentElement;
+    while (ancestor && ancestor !== document.body) {
+      const style = getComputedStyle(ancestor);
+      if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) {
+        const bounds = ancestor.getBoundingClientRect();
+        if (anchor.bottom <= bounds.top || anchor.top >= bounds.bottom) { close(); return; }
+      }
+      ancestor = ancestor.parentElement;
+    }
+    positionPanel();
+  }
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) close();
@@ -163,14 +196,16 @@ export function Menu({
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    if (escapeClipping) { document.addEventListener('scroll', followAnchor, true); window.addEventListener('resize', followAnchor); }
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      if (escapeClipping) { document.removeEventListener('scroll', followAnchor, true); window.removeEventListener('resize', followAnchor); }
     };
-  }, []);
+  }, [escapeClipping]);
   return (
-    <details className="menu" ref={ref}>
-      <summary className="button menu-trigger" aria-label={label}>
+    <details className="menu" ref={ref} onToggle={escapeClipping ? positionPanel : undefined}>
+      <summary className="button menu-trigger" aria-label={label} title={label}>
         {trigger ?? (
           <>
             {icon}
@@ -180,6 +215,8 @@ export function Menu({
         )}
       </summary>
       <div
+        ref={panelRef}
+        popover={escapeClipping ? 'manual' : undefined}
         className={`menu-panel ${align === "start" ? "align-start" : ""}`}
         onClick={(e) => {
           if ((e.target as HTMLElement).closest("button")) close();

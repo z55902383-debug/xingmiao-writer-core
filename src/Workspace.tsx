@@ -16,7 +16,9 @@ import { PlanningCandidate, PlanningText } from "./PlanningText";
 import {chapterBatch} from '../electron/chapter-batches.mjs';
 import PlanningBatchNotice from './PlanningBatchNotice';
 import WritingProfiles, { WritingPicker, profileSelection } from "./WritingProfiles";
+import ImitationProfiles, { ImitationPicker } from './ImitationProfiles';
 import ReferenceOverview from "./ReferenceOverview";
+import CandidateReferences, { candidateDestination, recordedSkills } from "./CandidateReferences";
 import SkillPicker from "./SkillPicker";
 import type { Skill } from "./types";
 import type { PlanningSelection } from "./types";
@@ -108,7 +110,7 @@ import ManuscriptSettings, { useManuscriptFormat } from "./ManuscriptSettings";
 import { handleManuscriptEnter, useManuscriptTyping } from "./manuscriptInput";
 import { formatManuscript } from "../electron/manuscript-format.mjs";
 type View =
-  "editor" | "outline" | "characters" | "world" | "memory" | "notes" | "style";
+  "editor" | "outline" | "characters" | "world" | "memory" | "notes" | "style" | "imitation";
 
 /* 阅读偏好：只影响本机显示，不进作品数据。
    默认值取产品规范的推荐区间（字号 18、行高 1.8、正文宽度 760）。 */
@@ -228,6 +230,7 @@ const sections: { key: View; label: string; icon: typeof BookOpen }[] = [
   { key: "memory", label: "关系与记忆", icon: Brain },
   { key: "notes", label: "备忘录", icon: NotePencil },
   { key: "style", label: "风格档案", icon: PaintBrush },
+  { key: 'imitation', label: '仿写对标', icon: FileText },
 ];
 /* 任务按「用户想做什么」分组，而不是按当前所在资料页分组——
    作者写到一半想检查设定冲突时，不该先切到某个资料页才找得到入口。 */
@@ -285,6 +288,7 @@ const VIEW_KINDS: Record<View, Kind[]> = {
   memory: ["memory", "timelinePlan", "check"],
   notes: [],
   style: ["style"],
+  imitation: ['style'],
 };
 export default function Workspace({
   initial,
@@ -325,9 +329,9 @@ export default function Workspace({
       ? preferredChapterId!
       : (preferredChapterId ? [...initial.chapters].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id : initial.chapters[0]?.id) || "",
   );
-  const [view, setView] = useState<View>("editor");
+  const [view, setView] = useState<View>('editor');
   const [sidebarSection, setSidebarSection] = useState<"chapters" | "features">(
-    "chapters",
+    'chapters',
   );
   const [outlineTab, setOutlineTab] = useState<
     "foundation" | "timeline" | "volumes" | "board"
@@ -555,6 +559,8 @@ export default function Workspace({
   const [showMoreTasks, setShowMoreTasks] = useState(false);
   const [targetVolumeId, setTargetVolumeId] = useState("");
   const [distillProfileId, setDistillProfileId] = useState("");
+  const [imitationTargetId, setImitationTargetId] = useState('');
+  const [imitationBlendPreview, setImitationBlendPreview] = useState<Record<string, number> | null>(null);
   const [planningFocus, setPlanningFocus] = useState<{id:string;stamp:string}>();
   const [instruction, setInstruction] = useState("");
   const [selectedJob, setSelectedJob] = useState("");
@@ -572,6 +578,7 @@ export default function Workspace({
   const [showContext, setShowContext] = useState(false);
   const [assistantMode, setAssistantMode] = useState<"writing" | "knowledge">("writing");
   const [writingPickerOpen, setWritingPickerOpen] = useState(false);
+  const [imitationPickerOpen, setImitationPickerOpen] = useState(false);
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
   const [writingSkills, setWritingSkills] = useState<Skill[]>([]);
   const [skillChoices, setSkillChoices] = useState<Record<string, InstructionOverrides>>({});
@@ -603,10 +610,15 @@ export default function Workspace({
     return () => { cancelled = true; };
   }, [config, skillRefresh]);
   const invalidSkillChoice = skillLoading || !!skillError;
-  const applicableSkillCount = action === "style" && distillProfileId ? 0 : writingSkills.filter(skill => skill.tasks.includes(action) && (skillIds === undefined ? skill.enabled : skillIds.includes(skill.id!))).length;
+  const applicableSkillCount = action === "style" ? 0 : writingSkills.filter(skill => skill.tasks.includes(action) && (skillIds === undefined ? skill.enabled : skillIds.includes(skill.id!))).length;
   const [contextPending, setContextPending] = useState(true);
   const [contextRefresh, setContextRefresh] = useState(0);
-  const [busy, setBusy] = useState(false);
+  const [operationBusy, setBusy] = useState(false);
+  const [writingSaving, setWritingSaving] = useState(false);
+  const [styleBlendPreview, setStyleBlendPreview] = useState<Record<string, number> | null>(null);
+  const writingSavePending = useRef(false);
+  const busy = operationBusy || writingSaving;
+  function markWritingSaving(value: boolean) { writingSavePending.current = value; setWritingSaving(value); }
   const [query, setQuery] = useState("");
   const [findText, setFindText] = useState("");
   const [showFind, setShowFind] = useState(false);
@@ -787,8 +799,9 @@ export default function Workspace({
   const writingChoice = profileSelection(book);
   function openReferenceControls() {
     setAssistantOpen(true);
-    setWritingPickerOpen(value => !value);
-    if (!writingPickerOpen) requestAnimationFrame(() => document.getElementById("assistant-writing-reference")?.scrollIntoView({ block: "nearest" }));
+    const next = !writingPickerOpen;
+    setWritingPickerOpen(next); setImitationPickerOpen(next);
+    if (next) requestAnimationFrame(() => document.getElementById("assistant-imitation-reference")?.scrollIntoView({ block: "start" }));
   }
   const jobs = book.candidates.filter(
     (j) =>
@@ -955,9 +968,20 @@ export default function Workspace({
     setIntent(group.id);
     setAction(primary);
   }, [view]);
+  // Each library owns its analysis target; never carry a story target into style distillation.
+  useEffect(() => {
+    if (view === 'imitation') {
+      setDistillProfileId('');
+      setImitationTargetId(current => book.imitationProfiles?.some(row => row.id === current && row.source.trim()) ? current : book.imitationProfiles?.find(row => row.source.trim())?.id || '');
+    } else if (view === 'style') {
+      setImitationTargetId('');
+      setDistillProfileId(current => book.writingProfiles?.some(row => row.id === current && row.source.trim()) ? current : book.reference.trim() ? '' : book.writingProfiles?.find(row => row.source.trim())?.id || '');
+    }
+  }, [view, book.imitationProfiles, book.writingProfiles, book.reference]);
   useEffect(() => {
     let cancelled = false;
     if (!chapter) { setContext(null); setContextError(""); setContextPending(false); return; }
+    if (view === 'imitation' && action === 'style' && !imitationTargetId) { setContext(null); setContextError(tr('请先添加有原文的仿写对标，再分析。')); setContextPending(false); return; }
     setContextPending(true);
     const timer = setTimeout(() => {
       if (!chapter) return;
@@ -971,6 +995,7 @@ export default function Workspace({
         excerptIds,
         retrievalQuery,
         writingProfileId: action === "style" ? distillProfileId : undefined,
+        imitationProfileId: action === 'style' ? imitationTargetId : undefined,
         skillIds,
       })
         .then((result) => {
@@ -1029,6 +1054,10 @@ export default function Workspace({
     config,
     manuscriptFormat,
     distillProfileId,
+    view,
+    imitationTargetId,
+    book.imitationProfiles,
+    book.imitationSelection,
     contextRefresh,
     skillIds,
     writingSkills,
@@ -1057,10 +1086,13 @@ export default function Workspace({
     targetChapterId?: string,
     volumeId?: string,
     writingProfileId?: string,
+    imitationProfileId?: string,
   ) {
     setAssistantMode("writing");
+    if (writingSavePending.current) { notify(tr('风格配置正在保存，请稍后生成。')); return; }
     if (running || generationStarting.current) return;
-    if (!writingProfileId && (skillLoading || skillError || invalidSkillChoice)) {
+    if (kind === 'style' && view === 'imitation' && !imitationProfileId) { notify(tr('请先添加有原文的仿写对标，再分析。')); return; }
+    if (kind !== "style" && (skillLoading || skillError || invalidSkillChoice)) {
       setAssistantOpen(true);
       notify(tr(skillLoading ? "正在读取 Skill…" : skillError ? "请重新读取 Skill 后再生成。" : "部分所选 Skill 已删除，请重新选择或恢复默认。"));
       return;
@@ -1070,6 +1102,7 @@ export default function Workspace({
     if (preparedTask.current?.kind !== kind) preparedTask.current = {view, kind};
     setIntent(INTENTS.find(group => group.kinds.includes(kind))!.id);
     setDistillProfileId(writingProfileId || "");
+    setImitationTargetId(imitationProfileId || '');
     if (writingProfileId) setIntent(INTENTS.find(group => group.kinds.includes("style"))!.id);
     setTargetVolumeId(volumeId || "");
     if (targetChapterId) setChapterId(targetChapterId);
@@ -1079,7 +1112,7 @@ export default function Workspace({
       return;
     }
     generationStarting.current = true;
-    setGenerationStart({ startedAt: Date.now(), label: `${tr(taskName(kind))} · ${writingProfileId ? book.writingProfiles?.find(item => item.id === writingProfileId)?.title || "" : book.volumes?.find(item => item.id === volumeId)?.title || chapter?.title || book.title}` });
+    setGenerationStart({ startedAt: Date.now(), label: `${tr(imitationProfileId ? '分析对标' : taskName(kind))} · ${imitationProfileId ? book.imitationProfiles?.find(item => item.id === imitationProfileId)?.title || '' : writingProfileId ? book.writingProfiles?.find(item => item.id === writingProfileId)?.title || "" : book.volumes?.find(item => item.id === volumeId)?.title || chapter?.title || book.title}` });
     try { await run(async () => {
       let cid = targetChapterId || chapter?.id;
       if (!cid) {
@@ -1100,6 +1133,7 @@ export default function Workspace({
         excerptIds,
         retrievalQuery,
         writingProfileId,
+        imitationProfileId,
         analyzeChanges,
         skillIds,
       });
@@ -1123,6 +1157,7 @@ export default function Workspace({
     if (step.chapterId) setChapterId(step.chapterId);
     setView(destination); setSidebarSection(destination === 'editor' ? 'chapters' : 'features');
     setOutlineTab(step.target === 'foundation' ? 'foundation' : 'volumes');
+    setImitationTargetId('');
     setAssistantOpen(!!step.kind); setSelectedJob('');
   }
   async function finishBook() {
@@ -1137,7 +1172,7 @@ export default function Workspace({
   const syncLabel = !chapterReview ? '未分析故事变化' : chapterReview.revision !== undefined && chapterReview.revision !== chapter?.revision ? '正文已变，变化需重核' : chapterReview.applied ? '故事资料已同步' : chapterReview.status === 'empty' ? '未发现新变化' : '故事变化待核对';
   const pendingDecision = selected?.kind && ROUTED_PLANNING.includes(selected.kind) && /待定|待确认|二选一|或者|任选|父亲留言\/母亲道歉/.test(selected.output);
   async function generate() {
-    await generateFor(action, chapter?.id, targetVolumeId, action === "style" ? distillProfileId : undefined);
+    await generateFor(action, chapter?.id, targetVolumeId, action === "style" ? distillProfileId : undefined, action === 'style' ? imitationTargetId : undefined);
   }
   async function adopt() {
     await adoptReviewed();
@@ -1184,7 +1219,7 @@ export default function Workspace({
           "timelinePlan",
         ].includes(selected.kind)
       ) {
-        notify(tr("{0}结果已写入对应位置", {0: tr(taskName(selected.kind))}));
+        notify(tr("{0}结果已写入对应位置", {0: tr(selected.imitationProfileSnapshot ? '分析对标' : taskName(selected.kind))}));
         setView(
           selected.kind === "worldBuild"
             ? "world"
@@ -1200,7 +1235,7 @@ export default function Workspace({
         selected.kind === "memory"
           ? "记忆已确认并保存"
           : selected.kind === "style"
-            ? selected.writingProfileSnapshot ? tr("已保存到写作资料：{0}", {0: selected.writingProfileSnapshot.title}) : "已保存为本书风格档案"
+            ? selected.imitationProfileSnapshot ? tr('已保存到仿写对标：{0}', { 0: selected.imitationProfileSnapshot.title }) : selected.writingProfileSnapshot ? tr("已保存到写作资料：{0}", {0: selected.writingProfileSnapshot.title}) : "已保存为本书风格档案"
             : "候选稿已采用，原文保留在历史版本中",
       );
       if (["write", "continue", "polish"].includes(selected.kind)) {
@@ -1208,7 +1243,7 @@ export default function Workspace({
         notify(tr("正文已写入对应章节。下一步：{0}", {0:tr(next.label)}));
         if (!selected.review?.changes?.length && selected.review?.status !== "error") setAssistantOpen(false);
       }
-      if (selected.kind === "style") setView("style");
+      if (selected.kind === "style") setView(selected.imitationProfileSnapshot ? 'imitation' : 'style');
     });
     return accepted;
   }
@@ -1226,7 +1261,8 @@ export default function Workspace({
       <CreationGuideIsland
         book={book}
         onNavigate={(step, intent) => {
-          if (step === 'premise' || step === 'outline') prepareStep({target:'foundation',kind:'bookOutline',label:''});
+          if (step === 'style' || step === 'imitation') { setView(step); setSidebarSection('features'); setAssistantOpen(false); }
+          else if (step === 'premise' || step === 'outline') prepareStep({target:'foundation',kind:'bookOutline',label:''});
           else if (step === 'chapters') prepareStep({target:'volumes',kind:'volumePlan',label:''});
           else if (step === 'volumePlans') {
             const volume = book.volumes?.find(v => v.id === targetVolumeId) || book.volumes?.[0];
@@ -3014,14 +3050,10 @@ export default function Workspace({
             </div>
           </div>
         )}
+        {view === 'imitation' && <div className="document-page style-page"><PageHeading icon={<FileText size={23}/>} title={tr('仿写小说对标')} text="故事对标与文风蒸馏分别管理。"/><ImitationProfiles book={book} disabled={busy || !!running} onChanged={replace} flush={flush} onSaving={markWritingSaving} preview={imitationBlendPreview} onPreview={setImitationBlendPreview} onAnalyze={id => generateFor('style', undefined, undefined, undefined, id)}/></div>}
         {view === "style" && (
-          <div className="document-page">
-            <PageHeading
-              icon={<PaintBrush size={23} />}
-              title={tr("管理写作风格与要求")}
-              text="添加可复用的写作资料，生成时自由选择。"
-            />
-            <WritingProfiles book={book} busy={busy || !!running} onChanged={replace} beforeChange={flush} onGenerate={id => generateFor("style", undefined, undefined, id)} notify={notify} />
+          <div className="document-page style-page">
+            <WritingProfiles book={book} busy={busy || !!running} onChanged={replace} beforeChange={flush} onGenerate={id => generateFor("style", undefined, undefined, id)} notify={notify} onSavingChange={markWritingSaving} previewWeights={styleBlendPreview} onPreview={setStyleBlendPreview} heading={<PageHeading icon={<PaintBrush size={23} />} title={tr("管理写作风格与要求")} text="添加可复用的写作资料，生成时自由选择。"/>}>
             <details className="writing-legacy">
             <summary className="writing-legacy-summary"><span><strong>{tr("本书原有档案")}</strong><small>{tr("单份本书风格与参考文章")}</small></span><span className="writing-legacy-status">{tr(book.style.trim() ? "风格已填写" : book.reference.trim() ? "已导入参考文章" : "尚未添加")}<CaretDown size={16} /></span></summary>
             <div className="writing-legacy-content">
@@ -3109,6 +3141,7 @@ export default function Workspace({
             </Field>
             </div>
             </details>
+            </WritingProfiles>
           </div>
         )}
       </div>
@@ -3201,7 +3234,7 @@ export default function Workspace({
         <KnowledgeAssistant book={book} beforeAction={flush} onChanged={replace} disabled={busy || !!running} active={assistantMode === "knowledge"}/>
         <div className="assistant-writing-mode" hidden={assistantMode !== "writing"}>
         <GenerationActivity job={activityJob} preparing={generationStart}
-          label={activityJob ? `${tr(taskName(activityJob.kind))} · ${activityJob.targetLabel || book.title}` : ""}
+          label={activityJob ? `${tr(activityJob.imitationProfileSnapshot ? '分析对标' : taskName(activityJob.kind))} · ${activityJob.targetLabel || book.title}` : ""}
           onView={() => activityJob && viewGenerationResult(activityJob.id)}
           onStop={() => activityJob && api("ai:cancel", { id: activityJob.id }).catch(e => notify(e.message))} />
         <div className="assistant-body">
@@ -3308,15 +3341,16 @@ export default function Workspace({
               </select>
             </Field>
           )}
-          {action === "style" && <Field label={tr("蒸馏目标")}><select value={distillProfileId} onChange={event => setDistillProfileId(event.target.value)} disabled={busy || !!running}><option value="">{tr("本书参考文章")}</option>{(book.writingProfiles || []).map(item => <option key={item.id} value={item.id}>{tr(item.kind === "style" ? "写作风格" : "写作要求")} · {item.title}</option>)}</select></Field>}
+          {action === "style" && <Field label={tr(view === 'imitation' || imitationTargetId ? '对标分析目标' : '蒸馏目标')}><select value={imitationTargetId ? `imitation:${imitationTargetId}` : distillProfileId} onChange={event => { const value = event.target.value; setImitationTargetId(value.startsWith('imitation:') ? value.slice(10) : ''); setDistillProfileId(value.startsWith('imitation:') ? '' : value); }} disabled={busy || !!running}><option value="">{tr(view === 'imitation' ? '请选择仿写对标' : "本书参考文章")}</option>{(view === 'imitation' ? [] : book.writingProfiles || []).map(item => <option key={item.id} value={item.id} disabled={!item.source.trim()}>{tr(item.kind === "style" ? "写作风格" : "写作要求")} · {item.title}</option>)}{(view === 'style' ? [] : book.imitationProfiles || []).map(item => <option key={`imitation:${item.id}`} value={`imitation:${item.id}`} disabled={!item.source.trim()}>{tr('仿写对标')} · {item.title}</option>)}</select></Field>}
           <PlanningBatchNotice batch={currentPlanningBatch}/>
 
-          <p className="generation-destination">{tr("生成去向：")}{action === "style" && distillProfileId ? (book.writingProfiles || []).find(item => item.id === distillProfileId)?.title || tr("资料已删除，请重新选择") : VOLUME_TASKS.includes(action)
-              ? `${book.volumes?.find((v) => v.id === targetVolumeId)?.title || tr("请先选择卷")} · ${tr(taskName(action))}`
-              : tr(taskName(action))}{" "}{tr("· 确认后写入")}</p>
+          <p className="generation-destination">{tr("生成去向：")}{action === "style" && (distillProfileId || imitationTargetId) ? (imitationTargetId ? book.imitationProfiles?.find(item => item.id === imitationTargetId)?.title : (book.writingProfiles || []).find(item => item.id === distillProfileId)?.title) || tr("资料已删除，请重新选择") : VOLUME_TASKS.includes(action)
+              ? `${book.volumes?.find((v) => v.id === targetVolumeId)?.title || tr("请先选择卷")} · ${tr(action === 'style' && imitationTargetId ? '分析对标' : taskName(action))}`
+              : tr(action === 'style' && imitationTargetId ? '分析对标' : taskName(action))}{" "}{tr("· 确认后写入")}</p>
           <div className="assistant-reference-controls">
-          <SkillPicker skills={writingSkills} kind={action} ids={skillIds} onChoose={setSkillIds} onManage={onSkillSettings} disabled={busy || !!running} loading={skillLoading} error={skillError} onRetry={() => setSkillRefresh(value => value + 1)} sourceOnly={action === "style" && !!distillProfileId} open={skillPickerOpen} onToggle={() => setSkillPickerOpen(value => !value)} />
-          <WritingPicker book={book} sourceOnly={action === "style" && !!distillProfileId} open={writingPickerOpen} onToggle={() => setWritingPickerOpen(value => !value)} disabled={busy || !!running} onManage={() => { setView("style"); setAssistantOpen(false); }} onSelect={selection => run(async () => replace(await api<Book>("writing:select", { bookId: book.id, selection })))} />
+          <SkillPicker skills={writingSkills} kind={action} ids={skillIds} onChoose={setSkillIds} onManage={onSkillSettings} disabled={busy || !!running} loading={skillLoading} error={skillError} onRetry={() => setSkillRefresh(value => value + 1)} sourceOnly={action === "style"} open={skillPickerOpen} onToggle={() => setSkillPickerOpen(value => !value)} />
+          <ImitationPicker open={imitationPickerOpen} onToggle={() => setImitationPickerOpen(value => !value)} book={book} disabled={busy || !!running} onChanged={replace} flush={flush} onSaving={markWritingSaving} preview={imitationBlendPreview} onPreview={setImitationBlendPreview} onManage={() => { setView('imitation'); setSidebarSection('features'); setAssistantOpen(false); }}/>
+          <WritingPicker book={book} sourceOnly={action === "style"} open={writingPickerOpen} onToggle={() => setWritingPickerOpen(value => !value)} disabled={busy || !!running} onManage={() => { setView("style"); setAssistantOpen(false); }} onSelect={selection => run(async () => replace(await api<Book>("writing:select", { bookId: book.id, selection })))} previewWeights={styleBlendPreview} onPreview={setStyleBlendPreview}/>
           <section className={`reference-disclosure context-disclosure${showContext ? ' is-open' : ''}`} aria-label={tr("本次参考资料")}>
           <button
             className="context-toggle disclosure-toggle"
@@ -3381,7 +3415,7 @@ export default function Workspace({
           </div>
           {selected && (
             <section className="candidate">
-              <details className="candidate-reference-snapshot"><summary><FolderOpen size={15}/><span>{tr("这份结果实际参考")}</span><small>{tr("风格 {0} · 要求 {1}", { 0: selected.context.writingReferences?.filter(item => item.kind === "style").length || 0, 1: selected.context.writingReferences?.filter(item => item.kind === "requirement").length || 0 })}</small><CaretDown size={14}/></summary><p className="reference-help">{tr("生成时保存的记录，修改当前选择不会改变这份候选。")}</p><ReferenceOverview context={selected.context} snapshot/></details>
+              <CandidateReferences context={selected.context}/>
               <div className="candidate-head">
                 <span>
                   <Sparkle size={15} />
@@ -3389,7 +3423,7 @@ export default function Workspace({
                     ? tr("检查结果")
                     : selected.kind === "memory"
                       ? tr("记忆提取结果")
-                      : tr("本次生成内容")}
+                      : tr("生成结果")}
                 </span>
                 <small
                   className={`candidate-status-pill ${candidateStatus(selected).tone}`}
@@ -3415,7 +3449,7 @@ export default function Workspace({
                     </span>
                     <div className="candidate-state-copy">
                       <strong>{tr(state.label)}</strong>
-                      <p>{tr(state.message)}</p>
+                      <p>{selected.adopted ? tr("已写入：{0}。", { 0: candidateDestination(selected) }) : tr(state.message)}</p>
                       {selected.status === "error" && selected.error && (
                         <details className="candidate-error-detail">
                           <summary>{tr("查看错误详情")}</summary>
@@ -3433,6 +3467,7 @@ export default function Workspace({
                             selected.chapterId,
                             selected.targetVolumeId,
                             selected.writingProfileSnapshot?.id,
+                            selected.imitationProfileSnapshot?.id,
                           )
                         }
                       >{tr("重新生成")}</Button>
@@ -3449,7 +3484,7 @@ export default function Workspace({
                 >
                   {jobs.map((j) => (
                     <option value={j.id} key={j.id}>
-                      {tr(taskName(j.kind))} · {date(j.createdAt)}
+                      {tr(j.imitationProfileSnapshot ? '分析对标' : taskName(j.kind))} · {date(j.createdAt)}
                     </option>
                   ))}
                 </select>
@@ -3461,10 +3496,9 @@ export default function Workspace({
                   ))}
                 </div>
               )}
-              {selected.profileName && (
+              {(selected.profileName || selected.model || selected.context) && (
                 <p className="candidate-source">
-                  {selected.profileName} · {selected.model} ·{" "}
-                  {selected.context?.skills?.length || 0}{" "}{tr("个 Skill")}</p>
+                  {[selected.profileName, selected.model].filter(Boolean).join(' · ') || tr('模型信息未记录')} · {recordedSkills(selected.context)}</p>
               )}
               {["write", "continue", "polish"].includes(selected.kind) &&
                 selected.output && (
@@ -3515,7 +3549,7 @@ export default function Workspace({
               {selected.output && (
                 <>
                   <p className="generation-destination">
-                    {tr(taskName(selected.kind))}
+                    {tr(selected.imitationProfileSnapshot ? '分析对标' : taskName(selected.kind))}
                     {selected.targetLabel
                       ? ` · ${selected.targetLabel}`
                       : ""} ·{" "}
@@ -3557,7 +3591,7 @@ export default function Workspace({
             </div>
           )}
         </div>
-        {selected?.output && selected.kind !== 'check' && <div className="assistant-candidate-toolbar"><span>{tr(taskName(selected.kind))} · {selected.targetLabel || ''}</span><Button variant="primary-soft" disabled={!!running || busy || selected.adopted || (ROUTED_PLANNING.includes(selected.kind) && (selected.status !== 'done' || routePreview?.id !== selected.id || !routePreview.rows)) || !['done','cancelled','interrupted'].includes(selected.status) || (['memory','characters','timelinePlan','worldBuild'].includes(selected.kind) && selected.status !== 'done')} onClick={adopt}>{tr(selected.adopted ? selected.manualMerged ? '已手动合并' : '已采用' : selected.kind === 'memory' ? '确认记忆' : selected.kind === 'continue' ? '追加到正文' : '采用结果')}</Button>              {selected.adopted && [...ROUTED_PLANNING, "write", "continue", "polish"].includes(selected.kind) && <div className="planning-continue">
+        {selected?.output && selected.kind !== 'check' && <div className="assistant-candidate-toolbar"><span>{tr(selected.imitationProfileSnapshot ? '分析对标' : taskName(selected.kind))} · {selected.targetLabel || ''}</span><Button variant="primary-soft" disabled={!!running || busy || selected.adopted || (ROUTED_PLANNING.includes(selected.kind) && (selected.status !== 'done' || routePreview?.id !== selected.id || !routePreview.rows)) || !['done','cancelled','interrupted'].includes(selected.status) || (['memory','characters','timelinePlan','worldBuild'].includes(selected.kind) && selected.status !== 'done')} onClick={adopt}>{tr(selected.adopted ? selected.manualMerged ? '已手动合并' : '已采用' : selected.kind === 'memory' ? '确认记忆' : selected.kind === 'continue' ? '追加到正文' : '采用结果')}</Button>              {selected.adopted && [...ROUTED_PLANNING, "write", "continue", "polish"].includes(selected.kind) && <div className="planning-continue">
                 <Button disabled={busy || !!running} onClick={() => continuePlanningBatch && !continuePlanningBatch.complete ? generateFor(selected.kind,undefined,selected.targetVolumeId) : prepareStep(nextStep)}>{continuePlanningBatch && !continuePlanningBatch.complete ? tr("继续生成第 {0}–{1} 章",{0:continuePlanningBatch.start,1:continuePlanningBatch.end}) : <>{tr("继续下一步")} · {tr(nextStep.label)}</>}<ArrowRight size={14}/></Button>
               </div>}</div>}
         {/* 助手内容 ↔ 底部设置区：拖动改设置区高度（往上拖是变高） */}
@@ -3578,8 +3612,8 @@ export default function Workspace({
           style={panes.compose ? { height: panes.compose } : undefined}
         >
           <div className="assistant-compose-fields">
-          <button className="compose-reference-trigger" onClick={openReferenceControls} aria-label={tr("选择风格并核对参考资料")} aria-expanded={writingPickerOpen} aria-controls="assistant-writing-reference">
-            <FolderOpen size={17}/><span><strong>{tr("风格与参考")}</strong><small>{tr("风格 {0} · 要求 {1}", { 0: writingChoice.styleIds.length, 1: writingChoice.requirementIds.length })}{" · "}{tr("Skill {0}", { 0: applicableSkillCount })}{" · "}{tr(!chapter ? "请先选择章节" : contextPending ? "正在核对引用" : contextError ? "引用待核对" : action === "style" && distillProfileId ? "蒸馏只读目标原文" : "可查看引用清单")}</small></span><CaretRight size={16}/>
+          <button className="compose-reference-trigger" onClick={openReferenceControls} aria-label={tr("选择风格并核对参考资料")} aria-expanded={writingPickerOpen} aria-controls="assistant-imitation-reference assistant-writing-reference">
+            <FolderOpen size={17}/><span><strong>{tr('下次生成参考')}</strong><small>{tr('仿写 {0}', { 0: (book.imitationSelection?.ids || []).filter(id => (book.imitationSelection?.weights[id] || 0) > 0).length })}{' · '}{tr("风格 {0} · 要求 {1}", { 0: writingChoice.styleIds.length, 1: writingChoice.requirementIds.length })}{" · "}{tr("Skill {0}", { 0: applicableSkillCount })}{" · "}{tr(!chapter ? "请先选择章节" : contextPending ? "正在核对引用" : contextError ? "引用待核对" : action === "style" ? "蒸馏只读目标原文" : "可查看引用清单")}</small></span><CaretRight size={16}/>
           </button>
           <details className="compose-advanced">
             <summary>{tr("参考范围与目标字数")}<span className="compose-setting-summary">{tr("目标 {0} 字", { 0: chapter?.targetWords || book.chapterTargetWords || 2000 })}</span></summary>
@@ -3713,13 +3747,13 @@ export default function Workspace({
             ) : (
               <Button
                 variant="primary"
-                disabled={busy || !modelReady || !chapter || (!(action === "style" && distillProfileId) && (skillLoading || !!skillError || invalidSkillChoice))}
+                disabled={busy || !modelReady || !chapter || (action === 'style' && ((view === 'imitation' && !imitationTargetId) || (!imitationTargetId && !distillProfileId && !book.reference.trim()))) || (action !== "style" && (skillLoading || !!skillError || invalidSkillChoice))}
                 onClick={generate}
                 aria-label={tr("开始生成")}
-                title={tr(taskName(action))}
+                title={tr(action === 'style' && imitationTargetId ? '分析对标' : taskName(action))}
                 busy={busy}
               >
-                <PaperPlaneTilt size={17} />{tr(taskName(action))}</Button>
+                <PaperPlaneTilt size={17} />{tr(action === 'style' && imitationTargetId ? '分析对标' : taskName(action))}</Button>
             )}
           </div>
           <small>{tr("生成内容请核对后采用 · 不会自动覆盖正文")}</small>

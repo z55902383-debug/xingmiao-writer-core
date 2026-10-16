@@ -1,0 +1,22 @@
+.style-blend { margin: 16px 0; padding: 16px 0; border-block: 1px solid var(--border); min-width: 0; }
+.style-blend-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.style-blend-track { position: relative; display: flex; height: 16px; margin: 24px 12px; border-radius: 4px; background: var(--border); }
+.style-blend-segment { height: 100%; flex-shrink: 0; }
+.style-blend-segment:first-child { border-radius: 4px 0 0 4px; }
+.style-blend-segment:last-of-type { border-radius: 0 4px 4px 0; }
+.style-blend-handle { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 24px; height: 36px; padding: 0; border: 2px solid var(--ink); border-radius: 5px; background: var(--panel); cursor: ew-resize; touch-action: none; z-index: 1; }
+.style-blend-handle::after { content: ''; display: block; width: 2px; height: 14px; margin: auto; background: var(--ink); }
+.style-blend-handle:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; z-index: 2; }
+.style-blend-handle:disabled { cursor: default; opacity: .6; }
+.style-blend-legend { display: grid; gap: 10px; }
+.style-blend-legend label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.style-blend-legend label > i { flex: 0 0 10px; width: 10px; height: 10px; border-radius: 2px; }
+.style-blend-legend label > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.style-blend-legend input { width: 70px; min-width: 0; flex: 0 0 70px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+.writing-mode-section, .writing-source-upload { padding: 18px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.writing-source-upload h3 { margin: 0 0 8px; }
+.writing-source-upload p { margin: 8px 0 16px; color: var(--muted); line-height: 1.7; }
+.writing-upload-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.writing-batch-row { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.writing-batch-row .writing-section-head { margin-bottom: 12px; }
+.writing-batch-row strong { overflow-wrap: anywhere; }

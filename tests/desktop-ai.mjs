@@ -26,7 +26,7 @@ const server = createServer(async (req, res) => {
         },
       ],
     });
-  else if (prompt.includes("分析参考文章的叙事视角"))
+  else if ((prompt.includes("分析参考文章的叙事视角") || prompt.includes("蒸馏可复用的写作风格")))
     text =
       "叙事视角：第三人称限知。\n对白短促，用动作呈现心理。\n章节末尾保留具体悬念。";
   else if (prompt.includes("核对本章与资料"))

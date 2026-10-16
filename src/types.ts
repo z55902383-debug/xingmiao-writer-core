@@ -81,7 +81,8 @@ export type ContextInfo = {
   relationSources?: { chapterId: string; revision: number }[];
   retrievedExcerpts?: RetrievedExcerpt[];
   referenceSections?: { key: string; group: "story" | "writing" | "task"; count?: number; titles?: string[] }[];
-  writingReferences?: { id: string; kind: "style" | "requirement"; title: string; body: string }[];
+  writingReferences?: { id: string; kind: "style" | "requirement"; title: string; body: string; weight?: number }[];
+  imitationReferences?: { id: string; kind: 'imitation'; title: string; body: string; weight: number; revision: number }[];
   sourceChapters?: {
     revision?: number;
     id: string;
@@ -119,6 +120,7 @@ export type Job = {
   manualMerged?: boolean;
   analyzeChanges?: boolean;
   writingProfileSnapshot?: WritingProfile;
+  imitationProfileSnapshot?: ImitationProfile;
   manuscriptFormat?: import("../electron/manuscript-format.mjs").ManuscriptFormat;
   review?: {
     status: string;
@@ -198,6 +200,11 @@ export type Book = {
   techniques?: Technique[];
   importedSource?: { name: string; content: string; importedAt: string };
   creationMode?: 'short' | 'long';
+  /** Legacy backup field. Selected imitation profiles determine generation references. */
+  writingMode?: 'original' | 'imitate';
+  imitationProfiles?: ImitationProfile[];
+  imitationTrash?: ImitationProfile[];
+  imitationSelection?: { ids: string[]; weights: Record<string, number> };
   completedAt?: string;
   lastExportedAt?: string;
   writingProfiles?: WritingProfile[];
@@ -229,7 +236,8 @@ export type Book = {
   candidates: Job[];
   memos?: MemoNote[];
 };
-export type WritingSelection = { styleIds: string[]; requirementIds: string[] };
+export type WritingSelection = { styleIds: string[]; requirementIds: string[]; styleWeights?: Record<string, number> };
+export type ImitationProfile = Omit<WritingProfile, 'kind'> & { kind: 'imitation' };
 export type WritingCard = { must: string; avoid: string; knowledge: string; stop: string };
 export type ContinuityCard = { asOfChapterId: string; asOfTitle: string; warning: string; sections: { key: string; title: string; items: { id: string; text: string; source: { chapterId: string; title: string; revision: number; evidence?: string; start?: number; end?: number } }[] }[] };
 export type RetrievedExcerpt = { id: string; chapterId: string; revision: number; title: string; order?: number; start: number; end: number; text: string; selected?: boolean; reasons?: string[]; semanticReason?: string };

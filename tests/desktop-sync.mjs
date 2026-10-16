@@ -29,6 +29,7 @@ const server = createServer(async (req, res) => {
                 value: "失踪",
                 evidence: "顾舟已经失踪。",
               },
+              { kind: 'memory', subject: '顾舟', attribute: '到达', value: '旧书店', evidence: '顾舟走进旧书店。' },
             ],
       })
     : body;
@@ -90,6 +91,7 @@ try {
   await page.getByRole("button", { name: "采用结果", exact: true }).click();
   await page.getByRole("button", { name: "查阅变化清单", exact: true }).click();
   await page.getByLabel("人物描述", { exact: true }).fill("谨慎的访客");
+  await expect(page.getByRole('dialog', {name:'核对本章变化',exact:true}).getByRole('checkbox', {name:'关键记忆',exact:true})).toBeVisible();
   for (const box of await page.getByRole("dialog", {name:"核对本章变化",exact:true}).getByRole("checkbox").all()) await box.check();
   await page
     .getByRole("button", { name: "确认同步并定稿", exact: true })
@@ -104,6 +106,7 @@ try {
   );
   assert.ok(saved.timeline.some((e) => e.value === "失踪"));
   assert.equal(saved.chapters[0].status, "final");
+  assert.ok(saved.memories.some(m => m.subject === '顾舟' && m.relation === '到达' && m.object === '旧书店' && m.sourceChapterId === saved.chapters[0].id && m.evidence === '顾舟走进旧书店。'));
   empty = true;
   await call("ai:generate", {
     bookId: b.id,

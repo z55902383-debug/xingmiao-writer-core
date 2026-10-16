@@ -11,7 +11,7 @@ function describeReferences(data, writingReferences = [], skills = [], instructi
   for (const [key, field] of [['characters','characters'], ['worldRecords','worldRecords'], ['foreshadows','openForeshadows'], ['memories','facts']]) {
     const entries = records(data[field]); add(key,'story',entries.length,entries.length,entries.map(row => row.name || row.title).filter(Boolean));
   }
-  const temporal = data.timelineState ? JSON.parse(data.timelineState) : {};
+  const temporal = typeof data.timelineState === 'string' ? JSON.parse(data.timelineState) : data.timelineState || {};
   const states = Object.values(temporal).flat(); add('timeline','story',states.length,states.length);
   const plans = records(data.currentChapterPlans); add('chapterPlans','story',plans.length,plans.length);
   add('volume','story',data.volumePlan,undefined,[data.volumePlan?.title]);

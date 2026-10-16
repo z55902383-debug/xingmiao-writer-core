@@ -68,12 +68,12 @@ test('人物认知边界与待回收伏笔进入上下文并明确作为作者�
  b.foreshadows=[{id:'f1',title:'钟楼停摆的钟',plantedChapterId:'c1',status:'open',note:'第三卷再揭示'}];
  const result=buildContext(b,b.chapters[5],'write','',[],{});
  const payload=JSON.parse(result.messages[1].content.split('以下 JSON 为资料数据：\n')[1]);
- assert.equal(JSON.parse(payload.characters)[0].authorNotes,'印记来自未来的她');
- assert.equal(JSON.parse(payload.openForeshadows)[0].title,'钟楼停摆的钟');
+ assert.equal(payload.characters[0].authorNotes,'印记来自未来的她');
+ assert.equal(payload.openForeshadows[0].title,'钟楼停摆的钟');
  assert.match(result.messages[0].content,/不能让角色提前知道/);
  const earlier=buildContext(b,b.chapters[2],'write','',[],{}),earlierData=JSON.parse(earlier.messages[1].content.split('以下 JSON 为资料数据：\n')[1]);
- assert.equal(JSON.parse(earlierData.characters)[0].characterKnown,undefined);
- assert.equal(JSON.parse(earlierData.characters)[0].authorNotes,undefined);
+ assert.equal(earlierData.characters[0].characterKnown,undefined);
+ assert.equal(earlierData.characters[0].authorNotes,undefined);
 });
 test('全部前章包含超过100章的完整正文，仍排除草稿、未来与过期记忆',()=>{
  const b=fixture(); b.contextChapters=100;
@@ -86,7 +86,7 @@ test('全部前章包含超过100章的完整正文，仍排除草稿、未来�
  assert.equal(payload.recent.at(-1).body,b.chapters[120].body);
  assert.equal(payload.chapter.body,current.body);
  assert.ok(!payload.recent.some(c=>['第4章','第121章','第122章'].includes(c.title)));
- assert.deepEqual(JSON.parse(payload.facts),[]);
+ assert.deepEqual(payload.facts,[]);
  assert.ok(context.characters>500000);
  const manual=buildContext(b,current,'write','',[],{chapterIds:['c0','c4','c122']});
  assert.deepEqual(manual.chapterTitles,['第0章']);
@@ -101,11 +101,11 @@ test('完整资料不受总预算影响，序列化人物记忆和时间线始�
  const instruction='要求开头'+'乙'.repeat(9000)+'要求结尾';
  const result=buildContext(b,b.chapters[5],'write',instruction);
  const payload=JSON.parse(result.messages[1].content.split('以下 JSON 为资料数据：\n')[1]);
- assert.equal(payload.book.outline,long);assert.equal(payload.book.world,long);assert.equal(payload.style,long);
- assert.equal(JSON.parse(payload.characters)[0].description,long);
- assert.equal(JSON.parse(payload.worldRecords)[0].description,long);
- assert.equal(JSON.parse(payload.facts)[0].evidence,long);
- assert.doesNotThrow(()=>JSON.parse(payload.timelineState));
+ assert.equal(payload.book.outline,long);assert.equal(payload.book.world,long);assert.equal(payload.style,undefined);assert.equal(result.writingReferences[0].body,long);assert.equal(payload.references.writingReferences[0].body,long);
+ assert.equal(payload.characters[0].description,long);
+ assert.equal(payload.worldRecords[0].description,long);
+ assert.equal(payload.facts[0].evidence,long);
+ assert.equal(typeof payload.timelineState,"object");assert.ok(!Array.isArray(payload.timelineState));
  assert.ok(result.messages[1].content.includes(instruction));
  assert.ok(!result.warnings.some(w=>/预算|截断/.test(w)));
 });

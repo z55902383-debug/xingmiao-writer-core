@@ -49,7 +49,7 @@ test("Skill 导入默认关闭、版本更新、任务隔离与完整长指令",
   db.saveSkill({ ...s, enabled: true });
   const ctx = buildContext(b, b.chapters[0], "write", "", db.skills());
   assert.equal(ctx.skills[0].version, 2);
-  assert.match(ctx.messages[0].content, /短句推进/);
+  assert.match(ctx.messages.map(m=>m.content).join("\n"), /短句推进/);
   assert.equal(
     buildContext(b, b.chapters[0], "outline", "", db.skills()).skills.length,
     0,
@@ -63,7 +63,7 @@ test("Skill 导入默认关闭、版本更新、任务隔离与完整长指令",
     enabled: true,
   });
   const full = buildContext(b, b.chapters[0], "write", "", db.skills());
-  assert.ok(full.messages[0].content.includes("字".repeat(80000)));
+  assert.ok(full.messages.map(m=>m.content).join("\n").includes("字".repeat(80000)));
   assert.equal(parseSkill(exportSkill(db.skills().find((skill) => skill.name === "长指令"))).body.length, 80000);
 });
 test("删除章节保留历史并使记忆过期，恢复仍需核对；删除书籍阻止旧候选采用", (t) => {

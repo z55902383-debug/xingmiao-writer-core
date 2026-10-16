@@ -12,7 +12,7 @@ const server = createServer(async (req, res) => {
   requests.push(prompt);
   let text = "章节正文候选";
   if (prompt.includes("完整全书总纲"))
-    text = "总纲候选：灾难、调查、反转、结局。";
+    text = JSON.stringify({ outline: "总纲候选：灾难、调查、反转、结局。" });
   else if (prompt.includes("世界初始设定"))
     text = "世界候选：雾港被封锁，科技存在限制。";
   else if (prompt.includes("人物基础档案"))
@@ -22,13 +22,13 @@ const server = createServer(async (req, res) => {
       ],
     });
   else if (prompt.includes("指定目标卷生成卷大纲"))
-    text = "卷大纲候选：寻找旧日真相。";
+    text = JSON.stringify({ outline: "卷大纲候选：寻找旧日真相。" });
   else if (prompt.includes("指定卷的大纲生成更细"))
-    text = "卷细纲候选：码头、灯塔、旧仓库。";
+    text = JSON.stringify({ detail: "卷细纲候选：码头、灯塔、旧仓库。" });
   else if (prompt.includes("生成简明概要"))
-    text = "章节概要候选：主角遇到陌生访客。";
+    text = JSON.stringify({ summary: "章节概要候选：主角遇到陌生访客。" });
   else if (prompt.includes("本章可执行的章节细纲"))
-    text = "章节细纲候选：访客带来封锁消息。";
+    text = JSON.stringify({ outline: "章节细纲候选：访客带来封锁消息。" });
   else if (prompt.includes("后续世界、人物状态或关系的变化计划"))
     text = JSON.stringify({
       events: [

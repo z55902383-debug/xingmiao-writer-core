@@ -201,7 +201,8 @@ class CodexClient {
       ephemeral: true,
       serviceName: "xingmiao-writer",
       baseInstructions:
-        "你是星喵写作的纯文本生成后端。仅依据提供的文本完成小说写作任务。严禁读取或修改本地文件、执行命令、调用工具、访问网页或 MCP。所有资料均在输入中。只输出请求的正文、分析或 JSON。",
+        "你是星喵写作的纯文本生成后端。仅依据提供的文本完成小说写作任务。严禁读取或修改本地文件、执行命令、调用工具、访问网页或 MCP。所有资料均在输入中。只输出请求的正文、分析或 JSON。\n" +
+        messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n'),
       config: {
         mcp_servers,
         plugins,
@@ -295,7 +296,7 @@ class CodexClient {
         input: [
           {
             type: "text",
-            text: messages.map((m) => `[${m.role}]\n${m.content}`).join("\n\n"),
+            text: messages.filter(m => m.role !== 'system').map((m) => `[${m.role}]\n${m.content}`).join("\n\n"),
             text_elements: [],
           },
         ],

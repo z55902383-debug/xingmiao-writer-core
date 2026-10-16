@@ -83,10 +83,10 @@ test("世界、关系、生死按章回看，生成章首不偷看章末与未�
   const json = JSON.parse(
     ctx.messages[1].content.split("以下 JSON 为资料数据：\n")[1],
   );
-  assert.equal(JSON.parse(json.timelineState).relations[0].value, "盟友");
-  assert.equal(JSON.parse(json.timelineState).characters.length, 0);
+  assert.equal(json.timelineState.relations[0].value, "盟友");
+  assert.equal(json.timelineState.characters.length, 0);
   assert.ok(!JSON.stringify(json).includes("死亡"));
-  assert.equal(JSON.parse(json.currentChapterPlans)[0].value, "敌对");
+  assert.equal(json.currentChapterPlans[0].value, "敌对");
 });
 test("计划不进入事实，编辑前文使后续时间线待复核，重确认校验来源与人物", (t) => {
   const { db, b, cs } = setup(t);

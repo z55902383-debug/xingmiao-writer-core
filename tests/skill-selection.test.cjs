@@ -12,14 +12,14 @@ test('本次明确选择覆盖全局默认，空选择关闭，适用任务隔�
   assert.deepEqual(buildContext(book, chapter, 'write', '', db.skills()).skills.map(s => s.id), [a.id]);
   const context = buildContext(book, chapter, 'write', '', db.skills(), { skillIds: [b.id, c.id] });
   assert.deepEqual(context.skills.map(s => s.id), [b.id]);
-  assert.match(context.messages[0].content, /CHOSEN-CONTENT/);
-  assert.ok(!context.messages[0].content.includes('DEFAULT-CONTENT') && !context.messages[0].content.includes('OTHER-TASK-CONTENT'));
+  assert.match(context.messages.map(m=>m.content).join("\n"), /CHOSEN-CONTENT/);
+  assert.ok(!context.messages.map(m=>m.content).join("\n").includes('DEFAULT-CONTENT') && !context.messages.map(m=>m.content).join("\n").includes('OTHER-TASK-CONTENT'));
   assert.deepEqual(buildContext(book, chapter, 'write', '', db.skills(), { skillIds: [] }).skills, []);
   assert.equal(db.skills().find(s => s.id === a.id).enabled, true);
   assert.equal(db.skills().find(s => s.id === b.id).enabled, false);
   db.saveSkill({ ...b, body: 'EDITED-CONTENT' });
   assert.equal(context.skills[0].version, 1);
-  assert.match(context.messages[0].content, /CHOSEN-CONTENT/);
+  assert.match(context.messages.map(m=>m.content).join("\n"), /CHOSEN-CONTENT/);
   assert.deepEqual(context.referenceSections.find(s => s.key === 'skills').titles, ['本次']);
 });
 test('拒绝重复和不存在编号，超过30项仍完整发送，不适用任务隔离', () => {

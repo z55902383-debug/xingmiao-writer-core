@@ -226,11 +226,13 @@ function installTimeline(Store) {
   });
 }
 function contextSignature(book, chapter) {
+  const imitationReferences = require('./imitation.cjs').references(book);
   return require("node:crypto")
     .createHash("sha256")
     .update(
       JSON.stringify([
         book.title,
+          ...(imitationReferences.length ? [imitationReferences] : []),
         book.premise,
         book.outline,
         book.world,

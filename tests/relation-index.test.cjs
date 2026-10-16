@@ -20,14 +20,14 @@ test('关系索引保留交接历史，区分最近归属与历史，作者固�
 test('关联筛选进入真实上下文，保留十章全文，可恢复完整历史引用', () => {
   const b = fixture(), c = b.chapters[14], ctx = buildContext(b, c, 'write'), p = payload(ctx);
   assert.equal(p.recent.length, 10); assert.equal(p.recent[0].body, b.chapters[4].body);
-  assert.match(p.facts, /铜钥匙/); assert.doesNotMatch(p.facts, /北境/); assert.equal(ctx.memoryCount, 3);
+  assert.match(JSON.stringify(p.facts), /铜钥匙/); assert.doesNotMatch(JSON.stringify(p.facts), /北境/); assert.equal(ctx.memoryCount, 3);
   assert.ok(ctx.relationSources.some(r => r.chapterId === 'c2'));
-  b.relatedMemoryOnly = false; assert.match(payload(buildContext(b, c, 'write')).facts, /北境/);
+  b.relatedMemoryOnly = false; assert.match(JSON.stringify(payload(buildContext(b, c, 'write')).facts), /北境/);
 });
 test('来源修订、伪证、草稿、未来记录均不得反向进入索引和生成', () => {
   const b = fixture(), c = b.chapters[14]; b.memories[0].sourceRevision = 0; b.memories[1].evidence = '伪造'; b.chapters[4].status = 'draft';
   b.memories.push({ ...b.memories[0], id: 'future', sourceChapterId: c.id, sourceRevision: 1, evidence: '未来', subject: '未来毒药' });
-  assert.deepEqual(records(b, c).map(r => r.id), ['fixed']); assert.doesNotMatch(payload(buildContext(b, c, 'write')).facts, /铜钥匙|北境|未来毒药/);
+  assert.deepEqual(records(b, c).map(r => r.id), ['fixed']); assert.doesNotMatch(JSON.stringify(payload(buildContext(b, c, 'write')).facts), /铜钥匙|北境|未来毒药/);
 });
 test('关系证据提高旧文检索排序，片段仍需作者勾选', () => {
   const b = fixture(), c = b.chapters[14], r = search(b, c, { query: '小李' });

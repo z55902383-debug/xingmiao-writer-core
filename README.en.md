@@ -4,9 +4,9 @@
 
 A local-first fiction workspace for manual writing, AI-assisted drafting and story organization.
 
-**v0.6.12 · Windows x64 · MIT**
+**v0.6.13 · Windows x64 · MIT**
 
-[Download Windows installer](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.12/XingmiaoWriter-Core-0.6.12-x64-Setup.exe) · [Release notes and files](https://github.com/z55902383-debug/xingmiao-writer-core/releases/tag/v0.6.12) · [Full edition](https://github.com/z55902383-debug/xingmiao-writer-releases)
+[Download Windows installer](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.13/XingmiaoWriter-Core-0.6.13-x64-Setup.exe) · [Release notes and files](https://github.com/z55902383-debug/xingmiao-writer-core/releases/tag/v0.6.13) · [Full edition](https://github.com/z55902383-debug/xingmiao-writer-releases)
 
 **Membership is free.** In the Full edition, member status is a way to manage access to the shared prompt library, rather than a paid subscription. Third-party model and image services may charge separately. Open Core has no account or community modules.
 
@@ -14,12 +14,14 @@ A local-first fiction workspace for manual writing, AI-assisted drafting and sto
 
 The image uses demonstration content. The application also supports an English interface; repository language links only change the documentation.
 
-## New in v0.6.12
+## New in v0.6.13
 
-- Reliable instruction state after enabling, disabling, deleting and adding items again, while preserving local edits and task scopes.
-- Consistent mapping between tool tags and chapter tasks, complete selected instruction bodies, and explicit selections saved per book and generation task.
-- Clearer style-reference controls and separate scrolling regions that keep list controls accessible.
-- English repository homepages by default, with a Simplified Chinese link and one showcase image per repository.
+- Separate story-reference and writing-style libraries, each with its own multi-selection and blend weights. Writing requirements stay independent.
+- Batch source import, individual analysis and reviewed adoption; changed sources block stale analysis. Inspect actual references and candidate snapshots.
+- Synchronized blend controls in the main workspace and assistant, clearer filters and details, keyboard adjustments and narrow-window menus.
+- Separate instruction and data layers; send complete selected positive-weight profiles. Structured generation validates its format and target, with another check before adoption.
+
+[Story references and style blending guide (中文)](docs/仿写与多风格融合使用说明.md)
 
 ## Features
 
@@ -78,7 +80,7 @@ Desktop checks use isolated test libraries and mock model services; they do not 
 
 ## Documentation and feedback
 
-[Detailed features (中文)](docs/features.md) · [Verification (中文)](docs/检查记录-v0.6.12.md) · [Story-data guide (中文)](docs/资料整理使用说明.md) · [Writing workflow (中文)](docs/分步创作流程与采用说明.md) · [Upload guide (中文)](docs/GitHub上传步骤.md)
+[Detailed features (中文)](docs/features.md) · [Verification (中文)](docs/检查记录-v0.6.13.md) · [Story-data guide (中文)](docs/资料整理使用说明.md) · [Writing workflow (中文)](docs/分步创作流程与采用说明.md) · [Upload guide (中文)](docs/GitHub上传步骤.md)
 
 The core source is licensed under [MIT](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md), [contributing](CONTRIBUTING.md), [security](SECURITY.md) and [changelog](CHANGELOG.md). The core license does not cover Full-edition add-ons.
 

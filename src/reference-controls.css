@@ -57,11 +57,17 @@
 .reference-snapshot-styles { margin-top: 14px; font-size: 12px; }
 .reference-snapshot-styles summary { cursor: pointer; color: var(--muted); padding: 5px 0; overflow-wrap: anywhere; }
 .candidate-reference-snapshot { border-bottom: 1px solid var(--border); padding: 10px 12px; }
-.candidate-reference-snapshot > summary { display: flex; align-items: center; gap: 7px; font-size: 12px; list-style: none; color: var(--muted); cursor: pointer; }
+.candidate-reference-snapshot > summary { display: flex; align-items: center; gap: 7px; min-height: 32px; font-size: 12px; list-style: none; color: var(--ink); cursor: pointer; }
 .candidate-reference-snapshot > summary::-webkit-details-marker { display: none; }
-.candidate-reference-snapshot > summary small { margin-left: auto; font-size: 12px; }
+.candidate-reference-snapshot > summary > span { flex: 1; min-width: 0; }
+.candidate-reference-snapshot > summary svg { flex-shrink: 0; }
+.candidate-reference-snapshot > summary small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.6; color: var(--muted); overflow-wrap: anywhere; }
 .candidate-reference-snapshot[open] > summary svg:last-child { transform: rotate(180deg); }
 .candidate-reference-snapshot > .reference-help { margin-top: 12px; }
+.reference-total > p { margin: 0; line-height: 1.7; }
+.reference-input-help { margin-top: 4px; }
+.reference-input-help > summary { cursor: pointer; min-height: 32px; padding: 6px 0; line-height: 1.7; }
+.reference-input-help > p { margin: 0; line-height: 1.7; overflow-wrap: anywhere; }
 .compose-reference-trigger { width: 100%; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-strong); border-radius: 7px; padding: 9px 10px; margin-bottom: 8px; background: var(--accent-soft); color: var(--ink); cursor: pointer; text-align: left; }
 .assistant-compose { min-height: min-content; }
 .compose-advanced > summary { font-size: 12px; }
@@ -76,3 +82,17 @@
 .context-chapter-picker > strong, .context-chapter-picker label, .context-chapter-picker small { font-size: 12px; }
 .context-chapter-picker input[type="checkbox"] { width: 14px; height: 14px; min-height: 14px; padding: 0; margin: 0; }
 @media (max-height: 720px) { .compose-reference-trigger { padding: 6px 8px; } .compose-reference-trigger small { font-size: 12px; } }
+
+/* Keep blend labels, inputs and helper text on the disclosure content grid. */
+.writing-picker.reference-disclosure > .style-blend { margin: 12px; padding: 12px 0; }
+.writing-picker.reference-disclosure > .style-blend .writing-help { margin-bottom: 0; }
+
+/* Keep collapsed names compact; full names remain readable in the expanded list. */
+.reference-overview summary { min-height: 32px; padding-block: 6px; line-height: 1.65; }
+.reference-titles > summary { display: flex; align-items: center; gap: 6px; list-style: none; }
+.reference-titles > summary::-webkit-details-marker { display: none; }
+.reference-titles > summary > svg { flex: 0 0 13px; }
+.reference-titles[open] > summary > svg { transform: rotate(90deg); }
+.reference-titles .reference-title-preview { min-width: 0; flex: 1 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.reference-titles > summary > small { flex-shrink: 0; font-size: 12px; color: var(--muted); }
+.reference-titles > ul:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }

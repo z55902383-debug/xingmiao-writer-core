@@ -191,6 +191,7 @@ class Store {
       timeline: [],
       chapterTargetWords: input.creationMode === 'short' ? 1000 : 2000,
       creationMode: input.creationMode === 'short' ? 'short' : 'long',
+      writingMode: input.writingMode === 'imitate' ? 'imitate' : 'original',
       contextChapters: 10,
       world: "",
       memories: [],
@@ -223,7 +224,14 @@ class Store {
       if (key in patch)
         book[key] = text(patch[key], key === "title" ? 120 : Infinity);
     assert(book.title.trim(), "书名不能为空");
-    if ("style" in patch && !book.style.trim() && book.writingSelection) book.writingSelection.styleIds = book.writingSelection.styleIds.filter(id => id !== require("./writing-profiles.cjs").LEGACY);
+    if ("style" in patch && !book.style.trim() && book.writingSelection) {
+      book.writingSelection.styleIds = book.writingSelection.styleIds.filter(id => id !== require("./writing-profiles.cjs").LEGACY);
+      if (book.writingSelection.styleWeights) book.writingSelection.styleWeights = require('./style-weights.mjs').normalizeWeights(book.writingSelection.styleIds, book.writingSelection.styleWeights);
+    }
+    if ('writingMode' in patch) {
+      assert(['original', 'imitate'].includes(patch.writingMode), '请选择创作或仿写');
+      book.writingMode = patch.writingMode;
+    }
     if ("contextChapters" in patch) {
       const n = Number(patch.contextChapters);
       assert(Number.isInteger(n) && n >= 0 && n <= 100, "关联章节数应为 0–100");
@@ -596,8 +604,13 @@ class Store {
         "该候选稿还不能采用",
       );
       assert(!job.adopted, "这个候选稿已经采用过");
+        if (job.kind === 'style') assert(job.status === 'done', '分析尚未完整结束，请重新生成完整档案；部分内容可复制后手动整理。');
       const c = this.chapter(job.chapterId);
       assert(c.bookId === job.bookId, "章节不属于当前作品");
+      if (job.imitationProfileSnapshot) {
+        assert(!this.rawBook(job.bookId).deletedAt, '请先恢复作品');
+        this.adoptImitationProfile(job); job.adopted = true; this.putJob(job); return this.book(job.bookId);
+      }
       if (job.writingProfileSnapshot) {
         assert(!this.rawBook(job.bookId).deletedAt, "请先恢复作品");
         this.adoptWritingProfile(job);
@@ -736,6 +749,7 @@ require("./extensions.cjs").extendStore(Store);
 require("./timeline.cjs").installTimeline(Store);
 require("./canvas.cjs").installCanvas(Store);
 require("./writing-profiles.cjs").extendStore(Store);
+require('./imitation.cjs').extendStore(Store);
 Store.prototype.cleanWritingCard = require('./author-tools.cjs').writingCard;
 Store.prototype.cleanTechniques = require('./author-tools.cjs').techniques;
 module.exports = { Store, assert, text, id, now };

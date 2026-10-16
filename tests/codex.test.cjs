@@ -91,7 +91,7 @@ test("Codex 协议：动态模型、流式输出、独立受限会话且关闭�
   let output = "";
   await client.write(
     { model: "available-model" },
-    [{ role: "user", content: "写作资料" }],
+    [{ role: 'system', content: 'TASK-POLICY-JSON' }, { role: "user", content: "USER-REFERENCE-ONLY 写作资料" }],
     (s) => (output += s),
     new AbortController().signal,
   );
@@ -103,6 +103,11 @@ test("Codex 协议：动态模型、流式输出、独立受限会话且关闭�
   assert.equal(thread.config.plugins["example@test"].enabled, false);
   assert.equal(thread.config.features.shell_tool, false);
   assert.equal(thread.config.features.apps, false);
+  assert.match(thread.baseInstructions, /TASK-POLICY-JSON/);
+  assert.doesNotMatch(thread.baseInstructions, /USER-REFERENCE-ONLY/);
+  const input = calls.find(c => c.method === 'turn/start').params.input[0].text;
+  assert.match(input, /USER-REFERENCE-ONLY/);
+  assert.doesNotMatch(input, /TASK-POLICY-JSON|\[system\]/);
 });
 test("Codex 不确认受限权限时拒绝发送写作资料", async (t) => {
   const { client, calls } = mock(t, "bad-permission");

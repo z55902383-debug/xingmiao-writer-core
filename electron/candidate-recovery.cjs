@@ -2,6 +2,8 @@ const { createHash } = require('node:crypto');
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function basis(book, chapter) {
   const fields = { '故事想法': book.premise, '全文大纲': book.outline, '人物档案': book.characters, '世界设定': [book.world, book.worldRecords], '时间线与记忆': [book.timeline, book.memories, book.foreshadows], '分卷规划': book.volumes, '章节规划': book.chapters.map(c => [c.id, c.title, c.volumeId, c.summary, c.outline]), '目标章节正文': [chapter.body, chapter.revision], '风格与要求': require('./writing-profiles.cjs').contextValue(book) };
+  const imitationReferences = require('./imitation.cjs').references(book);
+  if (imitationReferences.length) fields['仿写故事对标'] = imitationReferences;
   fields['写前卡与拆文技法'] = [chapter.writingCard || {}, (book.techniques || []).filter(row => row.enabled)];
   return Object.fromEntries(Object.entries(fields).map(([label, value]) => [label, { hash: digest(value), preview: typeof value === 'string' ? value.slice(0, 600) : JSON.stringify(value).slice(0, 600) }]));
 }
@@ -9,6 +11,7 @@ function prepare(store, id) {
   const job = store.job(id), book = store.book(job.bookId), chapter = store.chapter(job.chapterId);
   const signature = require('./timeline.cjs').contextSignature(book, chapter), planningSignature = require('./planning-routes.cjs').planningSignature(book);
   const current = basis(book, chapter);
+  if (job.adoptionBasis?.['仿写故事对标'] && !current['仿写故事对标']) current['仿写故事对标'] = { hash: digest([]), preview: '[]' };
   const changes = job.adoptionBasis ? Object.keys(current).filter(label => job.adoptionBasis[label]?.hash !== current[label].hash).map(label => ({ label, before: job.adoptionBasis[label]?.preview || '', after: current[label].preview })) : [];
   const conflict = !!((job.contextSignature && job.contextSignature !== signature) || (job.planningSignature && job.planningSignature !== planningSignature) || chapter.revision !== job.baseRevision);
   const field = { bookOutline: 'outline', worldBuild: 'world', volumeOutline: 'outline', volumeDetail: 'detail', outline: 'outline', summary: 'summary', write: 'body', continue: 'body', polish: 'body' }[job.kind];

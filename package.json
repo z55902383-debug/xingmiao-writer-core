@@ -1,6 +1,6 @@
 {
   "name": "xingmiao-writer-core",
-  "version": "0.6.12",
+  "version": "0.6.13",
   "private": true,
   "description": "星喵写作开源核心版 · 本地 AI 小说工作台",
   "main": "electron/main.cjs",
@@ -32,7 +32,16 @@
     "test:comparison:ui": "node tests/desktop-comparison.mjs && node tests/desktop-comparison-resize.mjs",
     "test:author-tools:ui": "node tests/desktop-author-tools.mjs",
     "test:knowledge:ui": "node tests/desktop-knowledge.mjs",
-    "test:scroll:ui": "node tests/desktop-page-scroll.mjs"
+    "test:scroll:ui": "node tests/desktop-page-scroll.mjs",
+    "test:requirements:ui": "node tests/desktop-writing-requirements.mjs",
+    "test:style-blend:ui": "node tests/desktop-style-blend.mjs && node tests/desktop-style-blend-edges.mjs",
+    "test:style-layout:ui": "node tests/desktop-style-layout.mjs",
+    "test:reference-disclosures:ui": "node tests/desktop-reference-disclosures.mjs",
+    "test:candidate-references:ui": "node tests/desktop-candidate-references.mjs",
+    "test:reference-full-flow:ui": "node tests/desktop-reference-full-flow.mjs",
+    "test:imitation-layout:ui": "node tests/desktop-imitation-layout.mjs",
+    "test:imitation:ui": "node tests/desktop-imitation.mjs",
+    "test:style-sync:ui": "node tests/desktop-style-sync.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.5",
