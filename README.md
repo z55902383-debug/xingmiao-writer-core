@@ -1,83 +1,85 @@
-# 星喵写作 · 开源核心版
+**English** | [简体中文](README.zh-CN.md)
 
-本地优先的小说工作台，可以手写，也可以接入自己的模型逐步构建故事。
+# Xingmiao Writer · Open Core
 
-**v0.6.11 · Windows x64 · MIT**
+A local-first fiction workspace for manual writing, AI-assisted drafting and story organization.
 
-[下载开源安装包](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.11/XingmiaoWriter-Core-0.6.11-x64-Setup.exe) · [完整版](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.11) · [English](README.en.md)
+**v0.6.12 · Windows x64 · MIT**
 
-**会员免费，无需付费开通。** 完整版区分会员与普通用户，是为了管理创作广场提示词库及相关权限，不是收费套餐。第三方模型和生图费用由服务商决定。开源版不含账号和广场。
+[Download Windows installer](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.12/XingmiaoWriter-Core-0.6.12-x64-Setup.exe) · [Release notes and files](https://github.com/z55902383-debug/xingmiao-writer-core/releases/tag/v0.6.12) · [Full edition](https://github.com/z55902383-debug/xingmiao-writer-releases)
 
-![当前书架](docs/assets/library.png)
+**Membership is free.** In the Full edition, member status is a way to manage access to the shared prompt library, rather than a paid subscription. Third-party model and image services may charge separately. Open Core has no account or community modules.
 
-## v0.6.11 本次更新
+![Xingmiao Writer library with demonstration books](docs/assets/library.png)
 
-- **写前准备**：新增本章写前卡，记录必发生、禁止发生、人物知情边界与停笔点。
-- **续写与旧文**：默认保留最近10章完整已定稿前文，提供续写状态卡、按原文位置检索、手动语义补搜及关系记忆联动；片段由作者选择，来源改写后重新核对。
-- **旧稿与资料**：导入TXT/Markdown或粘贴原稿，预览拆章及残稿；资料重建按章分析、逐项核对原文证据，拆文素材采用后默认不启用。
-- **双列对照**：左侧保存AI参考稿快照，右侧独立人工草稿，支持调整列宽与滚动方式；核对后再写入章节。
-- **生成与复核**：可查看本次生成阶段、耗时与实际引用快照，核对正文问题清单及改稿影响，保留批量章节规划的目标和采用检查。
-- **回收站与显示**：可配置保留期，默认不自动清理；调整步骤高亮、小窗口和资料区显示。
+The image uses demonstration content. The application also supports an English interface; repository language links only change the documentation.
 
-[续写与检索](docs/续写状态与旧文检索.md) · [双列对照](docs/双列对照创作.md) · [生成过程](docs/本次生成过程.md)
+## New in v0.6.12
 
-## 主要功能
+- Reliable instruction state after enabling, disabling, deleting and adding items again, while preserving local edits and task scopes.
+- Consistent mapping between tool tags and chapter tasks, complete selected instruction bodies, and explicit selections saved per book and generation task.
+- Clearer style-reference controls and separate scrolling regions that keep list controls accessible.
+- English repository homepages by default, with a Simplified Chinese link and one showcase image per repository.
 
-- 短篇由想法、简纲直接拆章；长篇按总纲、分卷、卷纲/细纲、章规划、正文逐步生成与采用，名称与内容同步到对应位置。
-- 人工码字板：独立草稿、专注计时、目标统计、查找替换、稿件历史与存入作品。
-- 写作助手：写作、续写、润色与检查，实际生成状态、停止入口、候选预览和防覆盖检查。正文变化分析可选，采用后仍可重新分析。
-- 资料整理助手：查询与调整人物、世界、关系、时间线、伏笔和规划资料；逐项核对采纳、重新核对、撤销与删除恢复。该助手不读取或修改章节正文、章纲、风格档案和备忘录。
-- 风格、要求与Skill：多条资料编辑、导入蒸馏、选择与删除；每次生成单独选择并核对实际引用。14项可编辑内置写法，默认不强制启用。
-- 本地书架、归档、分卷章节、人物世界、图谱、时间线、资料画布、备忘录、历史和回收站；中英界面及深浅主题。
-- 章节定稿后由作者确认完结，改稿取消完结；TXT/Markdown导出、JSON备份与副本恢复。
+## Features
 
-## 两种版本
+- **Plan and draft step by step.** Short stories go from an idea to an outline and chapters. Longer works use a whole-book outline, volumes, volume outlines/details, chapter plans and chapter text. Review each result before adopting it into its named destination.
+- **Write by hand.** A separate writing pad offers drafts, a focus timer, goals, search and replace, manuscript formatting and history. Side-by-side writing keeps an AI reference snapshot and a separate manual draft.
+- **Control AI context.** Select writing styles, requirements, Skills and reference materials for each request. Inspect generation stages and the context actually sent; stop generation and review candidates before replacing saved content.
+- **Maintain continuity.** Writing cards, continuity state, selected old-text excerpts, relationships, timelines and source checks support revisions. New books default to the latest 10 finalized chapters; saved settings remain in effect.
+- **Organize story data.** Manage characters, world settings, relationships, foreshadowing, memos and canvases. The story-data assistant proposes individually reviewed changes; it does not edit chapter text, chapter outlines, style profiles or memos.
+- **Import, export and recover.** Import TXT/Markdown manuscripts, rebuild story data with source-evidence review, export TXT/Markdown, create JSON backups and restore copies. Trash retention is configurable and automatic cleanup is off by default.
+- **Personalize the workspace.** English and Simplified Chinese interfaces, light/dark themes, editable writing materials and reusable built-in techniques.
 
-| 功能 | 开源核心版 | 完整版 |
+## Editions
+
+| Feature | Open Core | Full edition |
 | --- | --- | --- |
-| 书架、人工码字、AI写作与短篇/长篇流程 | ✓ | ✓ |
-| 资料整理、人物世界、图谱时间线与画布 | ✓ | ✓ |
-| 风格要求、Skill、模型配置及导出备份 | ✓ | ✓ |
-| 创意工具箱、封面生成、账号与广场 | — | ✓ |
-| 内置安装更新 | — | ✓ |
+| Library, manual writing, AI drafting and story workflows | Yes | Yes |
+| Story data, style/requirement libraries, Skills and backups | Yes | Yes |
+| Creative toolbox, cover generation, accounts and community | — | Yes |
+| Built-in installer updates | — | Yes |
 
-开源版无需星喵账号。两版使用独立书库，跨版本迁移请用JSON备份恢复。完整版附加模块源码不在本仓库。
+Open Core needs no Xingmiao account. Editions use separate libraries; transfer work with JSON backup and restore. Full-edition add-on source is outside this repository.
 
-## 快速开始
+## Get started
 
-用户直接下载安装包，无需Node.js。开发者使用Node.js 24与npm：
+End users can install the Windows package without Node.js. For development, use Node.js 24 and npm:
 
 ```sh
 npm ci
 npm start
 ```
 
-开发模式：`npm run dev`。在模型设置配置兼容接口或连接本机Codex，使用费用由服务商决定。
+Development mode: `npm run dev`. Configure your own compatible model service or connect a locally installed Codex in Settings.
 
-## 检查与构建
+## Checks and builds
 
 ```sh
 npm test
 npm run build
-npm run test:onboarding:ui
+npm run test:skills:ui
+npm run test:scroll:ui
 npm run test:ui
 npm run package:win
 ```
 
-桌面回归使用独立测试书库与模拟模型。默认打包输出位于release目录。
+The default build output is the `release` directory.
 
-## 数据与使用边界
+## Data and usage
 
-作品保存在本机，书库位置可在设置中更换。安装目录与书库独立，更新或迁移前请备份。
+Books are stored locally. The library location can be changed in Settings and is separate from the installation directory. Back up before updating or moving your library.
 
-JSON备份包括最终作品资料、章节及历史、Skill和回收站；**不包含模型密钥、账号会话、资料整理对话、方案撤销历史及资料重建/拆文分析过程**。恢复创建副本，旧对话不能用于撤销，但回收资料仍可恢复。
+AI requests send the selected context to your configured model provider. Review generated text and proposed changes before adopting them. Model and image providers may charge separately.
 
-AI请求把本次选中的正文和资料发送到配置的模型服务，输出需作者审核。本地模拟检查不代表真实模型质量或网络可用性。Windows x64安装包未配置代码签名证书。
+JSON backups include final story data, chapters and history, Skills and trash. They exclude API keys, account sessions, story-data conversations, proposal undo history and analysis-run history. Restore creates copies.
 
-## 文档与贡献
+Desktop checks use isolated test libraries and mock model services; they do not certify real-provider output quality or availability. Windows x64 installers are unsigned.
 
-[功能说明](docs/features.md) · [本次检查](docs/检查记录-v0.6.11.md) · [资料整理](docs/资料整理使用说明.md) · [创作步骤](docs/分步创作流程与采用说明.md) · [上传步骤](docs/GitHub上传步骤.md)
+## Documentation and feedback
 
-[架构](docs/architecture.md) · [路线图](docs/roadmap.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [更新记录](CHANGELOG.md)
+[Detailed features (中文)](docs/features.md) · [Verification (中文)](docs/检查记录-v0.6.12.md) · [Story-data guide (中文)](docs/资料整理使用说明.md) · [Writing workflow (中文)](docs/分步创作流程与采用说明.md) · [Upload guide (中文)](docs/GitHub上传步骤.md)
 
-核心源码采用[MIT](LICENSE)，第三方依赖见[许可说明](THIRD_PARTY_NOTICES.md)。核心许可不覆盖完整版附加模块。反馈请提供版本与复现步骤，删除密钥和私人小说内容。
+The core source is licensed under [MIT](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md), [contributing](CONTRIBUTING.md), [security](SECURITY.md) and [changelog](CHANGELOG.md). The core license does not cover Full-edition add-ons.
+
+For feedback, include your version and reproduction steps in Issues. Remove credentials, sessions and private manuscript text.

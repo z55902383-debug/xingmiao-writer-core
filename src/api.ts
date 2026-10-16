@@ -5,6 +5,7 @@ export async function api<T>(action: string, data: unknown = {}): Promise<T> {
     throw new Error("请通过项目中的“启动星喵写作.cmd”打开桌面软件");
   const result = await window.xingmiao.invoke(action, data);
   if (!result.ok) throw new Error(result.error || "操作失败");
+  if (["skill:save", "skill:delete", "skill:import", "plaza:install", "plaza:toggle", "plaza:delete", "plaza:remote:list", "creative:instruction-save", "backup:restore"].includes(action)) window.dispatchEvent(new Event("xm:instructions-changed"));
   return result.data as T;
 }
 export const count = (text: string) => text.replace(/\s/g, "").length;

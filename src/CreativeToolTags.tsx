@@ -1,8 +1,12 @@
 import tools from "../electron/creative-tool-tags.json";
+import chapterTools from "../electron/creative-task-map.json";
 import { tr } from "./i18n";
 import "./creative-tool-tags.css";
 export { tools as creativeTools };
-export const toolTasks = (tasks: string[]) => [...new Set(tasks.map(t => t.startsWith("tool:") ? t.slice(5) : t).filter(t => tools.some(tool => tool.id === t)))];
+export const toolTasks = (tasks: string[]) => {
+  const explicit = tasks.filter(t => t.startsWith("tool:")).map(t => t.slice(5)).filter(t => tools.some(tool => tool.id === t));
+  return [...new Set(explicit.length ? explicit : [...tasks, ...tasks.flatMap(t => (chapterTools as Record<string, string[]>)[t] || [])].filter(t => tools.some(tool => tool.id === t)))];
+};
 export default function CreativeToolTags({ value, onChange }: { value: string[]; onChange: (tags: string[]) => void }) {
   return <fieldset className="creative-tool-tags">
     <legend>{tr("工具箱专项标签")}</legend>

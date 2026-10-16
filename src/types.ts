@@ -293,6 +293,9 @@ export type Skill = {
   body: string;
   tasks: Kind[];
   toolTags?: string[];
+  toolTagsMode?: 'auto' | 'explicit';
+  instructionKind?: "skill" | "prompt";
+  plazaItemId?: string;
   enabled: boolean;
   version?: number;
   source?: string;

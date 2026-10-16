@@ -1,40 +1,85 @@
+**English** | [简体中文](README.zh-CN.md)
+
 # Xingmiao Writer · Open Core
 
-A local-first fiction workspace for manual writing and your own AI provider.
+A local-first fiction workspace for manual writing, AI-assisted drafting and story organization.
 
-**v0.6.11 · Windows x64 · MIT**
+**v0.6.12 · Windows x64 · MIT**
 
-[Windows installer](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.11/XingmiaoWriter-Core-0.6.11-x64-Setup.exe) · [Full edition](https://github.com/z55902383-debug/xingmiao-writer-releases/releases/tag/v0.6.11) · [中文](README.md)
+[Download Windows installer](https://github.com/z55902383-debug/xingmiao-writer-core/releases/download/v0.6.12/XingmiaoWriter-Core-0.6.12-x64-Setup.exe) · [Release notes and files](https://github.com/z55902383-debug/xingmiao-writer-core/releases/tag/v0.6.12) · [Full edition](https://github.com/z55902383-debug/xingmiao-writer-releases)
 
-Full-edition membership is free and manages community template permissions. Model services may charge separately. Open Core needs no Xingmiao account.
+**Membership is free.** In the Full edition, member status is a way to manage access to the shared prompt library, rather than a paid subscription. Third-party model and image services may charge separately. Open Core has no account or community modules.
 
-![Current library](docs/assets/library.png)
+![Xingmiao Writer library with demonstration books](docs/assets/library.png)
 
-Screenshots use isolated demonstration content; the application also supports English.
+The image uses demonstration content. The application also supports an English interface; repository language links only change the documentation.
 
-## New in v0.6.11
+## New in v0.6.12
 
-Writing cards, continuity context and selected old-text excerpts; manuscript import and evidence-reviewed data rebuilding; reusable writing techniques; independent side-by-side drafts; generation-process details and configurable trash retention (off by default).
+- Reliable instruction state after enabling, disabling, deleting and adding items again, while preserving local edits and task scopes.
+- Consistent mapping between tool tags and chapter tasks, complete selected instruction bodies, and explicit selections saved per book and generation task.
+- Clearer style-reference controls and separate scrolling regions that keep list controls accessible.
+- English repository homepages by default, with a Simplified Chinese link and one showcase image per repository.
 
 ## Features
 
-- Short-story and volume workflows, reviewed adoption into named targets, and chapter drafting.
-- Manual writing pad, independent drafts, focus timer, manuscript formatting and history.
-- Story data conversations: individual review, recheck, undo and deleted-record recovery.
-- Editable styles, requirements and skills with per-request reference selection.
-- Characters, world settings, relationships, timelines, canvases, memos, autosave and trash.
-- Author-confirmed completion, TXT/Markdown export, JSON backups and copy restore.
+- **Plan and draft step by step.** Short stories go from an idea to an outline and chapters. Longer works use a whole-book outline, volumes, volume outlines/details, chapter plans and chapter text. Review each result before adopting it into its named destination.
+- **Write by hand.** A separate writing pad offers drafts, a focus timer, goals, search and replace, manuscript formatting and history. Side-by-side writing keeps an AI reference snapshot and a separate manual draft.
+- **Control AI context.** Select writing styles, requirements, Skills and reference materials for each request. Inspect generation stages and the context actually sent; stop generation and review candidates before replacing saved content.
+- **Maintain continuity.** Writing cards, continuity state, selected old-text excerpts, relationships, timelines and source checks support revisions. New books default to the latest 10 finalized chapters; saved settings remain in effect.
+- **Organize story data.** Manage characters, world settings, relationships, foreshadowing, memos and canvases. The story-data assistant proposes individually reviewed changes; it does not edit chapter text, chapter outlines, style profiles or memos.
+- **Import, export and recover.** Import TXT/Markdown manuscripts, rebuild story data with source-evidence review, export TXT/Markdown, create JSON backups and restore copies. Trash retention is configurable and automatic cleanup is off by default.
+- **Personalize the workspace.** English and Simplified Chinese interfaces, light/dark themes, editable writing materials and reusable built-in techniques.
 
-## Development
+## Editions
 
-Use Node.js 24: `npm ci`, then `npm start`. Development: `npm run dev`.
+| Feature | Open Core | Full edition |
+| --- | --- | --- |
+| Library, manual writing, AI drafting and story workflows | Yes | Yes |
+| Story data, style/requirement libraries, Skills and backups | Yes | Yes |
+| Creative toolbox, cover generation, accounts and community | — | Yes |
+| Built-in installer updates | — | Yes |
 
-Checks: `npm test`, `npm run build`, `npm run test:onboarding:ui` and `npm run test:ui`. Windows builds: `npm run package:win`.
+Open Core needs no Xingmiao account. Editions use separate libraries; transfer work with JSON backup and restore. Full-edition add-on source is outside this repository.
 
-## Data and license
+## Get started
 
-Books stay local. AI sends selected context to the configured provider. Backups include final story data, chapter history, skills and trash, but exclude credentials, account sessions, story-data conversations, proposal undo history and analysis-run history. Restore creates copies.
+End users can install the Windows package without Node.js. For development, use Node.js 24 and npm:
 
-Full-edition accounts, community, creative tools, images and updates are excluded from this MIT repository. Editions use separate book directories. Mock tests do not certify real-provider quality or availability. Windows installers are unsigned.
+```sh
+npm ci
+npm start
+```
 
-[Features](docs/features.md) · [Verification](docs/检查记录-v0.6.11.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [MIT](LICENSE)
+Development mode: `npm run dev`. Configure your own compatible model service or connect a locally installed Codex in Settings.
+
+## Checks and builds
+
+```sh
+npm test
+npm run build
+npm run test:skills:ui
+npm run test:scroll:ui
+npm run test:ui
+npm run package:win
+```
+
+The default build output is the `release` directory.
+
+## Data and usage
+
+Books are stored locally. The library location can be changed in Settings and is separate from the installation directory. Back up before updating or moving your library.
+
+AI requests send the selected context to your configured model provider. Review generated text and proposed changes before adopting them. Model and image providers may charge separately.
+
+JSON backups include final story data, chapters and history, Skills and trash. They exclude API keys, account sessions, story-data conversations, proposal undo history and analysis-run history. Restore creates copies.
+
+Desktop checks use isolated test libraries and mock model services; they do not certify real-provider output quality or availability. Windows x64 installers are unsigned.
+
+## Documentation and feedback
+
+[Detailed features (中文)](docs/features.md) · [Verification (中文)](docs/检查记录-v0.6.12.md) · [Story-data guide (中文)](docs/资料整理使用说明.md) · [Writing workflow (中文)](docs/分步创作流程与采用说明.md) · [Upload guide (中文)](docs/GitHub上传步骤.md)
+
+The core source is licensed under [MIT](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md), [contributing](CONTRIBUTING.md), [security](SECURITY.md) and [changelog](CHANGELOG.md). The core license does not cover Full-edition add-ons.
+
+For feedback, include your version and reproduction steps in Issues. Remove credentials, sessions and private manuscript text.

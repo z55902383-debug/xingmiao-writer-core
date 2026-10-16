@@ -32,6 +32,7 @@ function settingsActions({ store, window, publicConfig, saveFile, running,  }) {
       return publicConfig();
     },
     "skills:list": () => store.skills(),
+    "skill:parse": d => parseSkill(text(d.content || "")),
     "skill:save": (d) => {
       store.saveSkill(d);
       return store.skills();

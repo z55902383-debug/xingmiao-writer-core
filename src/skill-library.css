@@ -13,3 +13,5 @@
 .skill-row .skill-name { min-width: 0; overflow-wrap: anywhere; }
 .skill-picker .writing-choice small { display: block; margin-block: 8px; }
 .skill-picker input[type="checkbox"] { min-height: 14px; width: 14px; height: 14px; flex: 0 0 14px; }
+.skill-tag-auto { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: var(--ink); font-size: 12px; }
+.skill-tag-auto input[type=checkbox] { width: 15px; height: 15px; min-height: 15px; margin: 0; padding: 0; accent-color: var(--accent); }

@@ -23,13 +23,28 @@ try{
  await page.getByRole('tab',{name:/章节/}).click();await page.getByRole('button',{name:/第2章/}).first().click();
  const entry=page.getByRole('button',{name:'选择风格并核对参考资料',exact:true}),picker=page.getByRole('region',{name:'风格参考',exact:true});
  const contextToggle=page.locator('.context-toggle'),writingToggle=picker.locator('.writing-picker-toggle');
+ const skillToggle=page.locator('.skill-picker .writing-picker-toggle');
+ const openWriting=async()=>{if(await entry.getAttribute('aria-expanded')!=='true')await entry.click();};
+ const openContext=async()=>{if(await contextToggle.getAttribute('aria-expanded')!=='true')await contextToggle.click();};
  await expect(contextToggle).toHaveAttribute('aria-expanded','false');await expect(writingToggle).toHaveAttribute('aria-expanded','false');
  await contextToggle.click();await expect(contextToggle).toHaveAttribute('aria-expanded','true');await expect(writingToggle).toHaveAttribute('aria-expanded','false');
  await writingToggle.click();await expect(writingToggle).toHaveAttribute('aria-expanded','true');await expect(contextToggle).toHaveAttribute('aria-expanded','true');
  await contextToggle.click();await expect(contextToggle).toHaveAttribute('aria-expanded','false');await expect(writingToggle).toHaveAttribute('aria-expanded','true');
  await writingToggle.click();await expect(writingToggle).toHaveAttribute('aria-expanded','false');await expect(contextToggle).toHaveAttribute('aria-expanded','false');
  await writingToggle.click();await expect(writingToggle).toHaveAttribute('aria-expanded','true');await expect(contextToggle).toHaveAttribute('aria-expanded','false');await writingToggle.click();
- await expect(entry).toBeVisible();await expect(entry).toContainText('风格 2 · 要求 1');await entry.click();
+ await expect(entry).toBeVisible();await expect(entry).toContainText('风格 2 · 要求 1');
+ const beforeSelection=(await call('book:get',{id:book.id})).writingSelection;
+ await entry.click();await expect(entry).toHaveAttribute('aria-expanded','true');await expect(writingToggle).toHaveAttribute('aria-expanded','true');
+ await expect(skillToggle).toHaveAttribute('aria-expanded','false');await expect(contextToggle).toHaveAttribute('aria-expanded','false');
+ await entry.click();await expect(entry).toHaveAttribute('aria-expanded','false');await expect(writingToggle).toHaveAttribute('aria-expanded','false');
+ await skillToggle.click();await contextToggle.click();
+ await entry.click();await expect(writingToggle).toHaveAttribute('aria-expanded','true');
+ await expect(skillToggle).toHaveAttribute('aria-expanded','true');await expect(contextToggle).toHaveAttribute('aria-expanded','true');
+ await entry.click();await expect(writingToggle).toHaveAttribute('aria-expanded','false');
+ await expect(skillToggle).toHaveAttribute('aria-expanded','true');await expect(contextToggle).toHaveAttribute('aria-expanded','true');
+ await skillToggle.click();await contextToggle.click();await openWriting();
+ assert.deepEqual((await call('book:get',{id:book.id})).writingSelection,beforeSelection);
+
  await page.screenshot({path:resolve(data,'initial-discovery.png')});
  await expect(picker.getByRole('searchbox',{name:'搜索风格或要求名称',exact:true})).toBeVisible();
  assert.ok(await picker.locator('.writing-choice-list').first().evaluate(el=>el.scrollHeight>el.clientHeight&&el.clientHeight<=262));
@@ -43,18 +58,18 @@ try{
  await expect.poll(async()=>(await call('book:get',{id:book.id})).writingSelection).toEqual({styleIds:[styles[29]],requirementIds:[requirements[0]]});
  await app.evaluate(({ipcMain},failId)=>{const original=ipcMain._invokeHandlers.get('xm:invoke');ipcMain.removeHandler('xm:invoke');ipcMain.handle('xm:invoke',async(...args)=>{if(args[1]==='writing:select'&&args[2]?.selection?.styleIds.includes(failId))return{ok:false,error:'测试保存失败，原选择保留'};return original(...args);});},styles[3]);
  await search.fill('style-3.txt');await picker.getByRole('checkbox',{name:'风格3 · 限知视角与对白节奏的长名称参考',exact:true}).click();await expect(picker.getByRole('checkbox',{name:'风格3 · 限知视角与对白节奏的长名称参考',exact:true})).not.toBeChecked();await expect(entry).toContainText('风格 1 · 要求 1');assert.deepEqual((await call('book:get',{id:book.id})).writingSelection,{styleIds:[styles[29]],requirementIds:[requirements[0]]});await search.fill('');
- await expect(page.locator('#assistant-context-detail')).toContainText('已定稿前文');await expect(page.locator('#assistant-context-detail')).toContainText('世界设定');
+ await openContext();await expect(page.locator('#assistant-context-detail')).toContainText('已定稿前文');await expect(page.locator('#assistant-context-detail')).toContainText('世界设定');
  for(const theme of ['dark','light']){await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);for(const width of [1460,1024]){await page.setViewportSize({width,height:900});const openAssistant=page.getByRole('button',{name:'打开写作助手',exact:true});if(width<1200&&await openAssistant.isVisible().catch(()=>false))await openAssistant.click();await expect.poll(async()=>{const r=await entry.boundingBox();return r.x+r.width<=width+1;}).toBe(true);await expect(entry).toBeVisible();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:resolve(data,`references-${theme}-${width}.png`)});}}
  await page.setViewportSize({width:1460,height:680});await expect(entry).toBeVisible();await expect(page.getByRole('button',{name:'开始生成',exact:true})).toBeVisible();await page.screenshot({path:resolve(data,'references-low-height.png')});await page.setViewportSize({width:1460,height:900});
  await page.getByRole('button',{name:'开始生成',exact:true}).click();await expect(page.locator('.candidate-text')).toContainText('林晚收起');await expect(page.locator('.generation-activity')).toHaveAttribute('data-active','false');
  const prose=requests.find(r=>r.messages.some(m=>m.content.includes('根据本章大纲创作本章正文')));const sent=prose.messages.map(m=>m.content).join('\n');assert.match(sent,/STYLE-29/);assert.match(sent,/REQ-0/);assert.ok(!sent.includes('PRIVATE-SOURCE-29')&&!sent.includes('STYLE-0：'));
  const snapshot=page.locator('.candidate-reference-snapshot');await snapshot.locator('summary').first().click();await expect(snapshot).toContainText('风格29');await expect(snapshot).toContainText('第1章');
- await entry.click();await picker.getByRole('button',{name:'清空风格',exact:true}).click();await expect(entry).toContainText('风格 0 · 要求 1');await expect(snapshot).toContainText('风格29');
+ await openWriting();await picker.getByRole('button',{name:'清空风格',exact:true}).click();await expect(entry).toContainText('风格 0 · 要求 1');await expect(snapshot).toContainText('风格29');
  // The manager closes the drawer at narrow widths and provides search/status filters.
  await page.setViewportSize({width:1024,height:900});await picker.getByRole('button',{name:'管理风格与要求',exact:true}).click();await expect(page.getByRole('heading',{name:'管理写作风格与要求',exact:true})).toBeVisible();
  const library=page.locator('.writing-library');await library.getByRole('searchbox',{name:'搜索此类资料',exact:true}).fill('等待蒸馏');await expect(library.locator('.writing-profile-row')).toHaveCount(1);
  await library.getByRole('combobox',{name:'资料状态',exact:true}).selectOption('selected');await expect(library).toContainText('没有匹配的资料');await library.getByRole('button',{name:'清除筛选',exact:true}).click();await expect(library.locator('.writing-profile-row')).toHaveCount(35);
- await library.getByRole('searchbox',{name:'搜索此类资料',exact:true}).fill('等待蒸馏');await library.getByRole('button',{name:'AI 蒸馏',exact:true}).click();await expect(page.locator('.candidate-text')).toContainText('蒸馏后的');await entry.click();await expect(page.locator('#assistant-context-detail')).toContainText('分析参考原文');await expect(page.locator('#assistant-context-detail')).not.toContainText('世界设定');
+ await library.getByRole('searchbox',{name:'搜索此类资料',exact:true}).fill('等待蒸馏');await library.getByRole('button',{name:'AI 蒸馏',exact:true}).click();await expect(page.locator('.candidate-text')).toContainText('蒸馏后的');await openContext();await expect(page.locator('#assistant-context-detail')).toContainText('分析参考原文');await expect(page.locator('#assistant-context-detail')).not.toContainText('世界设定');
  assert.equal((await call('book:get',{id:book.id})).chapters[1].body,'');assert.deepEqual(errors,[]);
  await writeFile(resolve(data,'result.json'),JSON.stringify({status:'passed',profiles:60,checks:['always visible entry','many entries with bounded lists','selected-first groups','search by title/source','selected-only filter','clear each category','empty entries disabled','save failure rollback','actual request references','immutable candidate snapshot','library search/status','narrow drawer manage','low height and themes','distillation-only references']},null,2));console.log('Reference controls desktop passed: '+data);
 }finally{await app.close();server.closeAllConnections();server.close();}

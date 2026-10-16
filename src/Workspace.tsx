@@ -1,3 +1,4 @@
+import { readOverrides, writeOverrides, selectedInstructions, type InstructionOverrides } from "./instruction-choice";
 import LanguageSwitcher from "./LanguageSwitcher";
 import KnowledgeAssistant from "./KnowledgeAssistant";
 import { tr, genreLabel } from "./i18n";
@@ -573,11 +574,25 @@ export default function Workspace({
   const [writingPickerOpen, setWritingPickerOpen] = useState(false);
   const [skillPickerOpen, setSkillPickerOpen] = useState(false);
   const [writingSkills, setWritingSkills] = useState<Skill[]>([]);
-  const [skillIds, setSkillIds] = useState<string[] | undefined>(undefined);
+  const [skillChoices, setSkillChoices] = useState<Record<string, InstructionOverrides>>({});
+  const skillChoiceKey = `xm-writing-instructions-v2:${book.id}:${action}`;
+  const currentSkillChoices = useMemo(() => skillChoices[skillChoiceKey] ?? readOverrides(skillChoiceKey), [skillChoices, skillChoiceKey]);
+  const skillIds = useMemo(() => selectedInstructions(writingSkills.filter(skill => skill.tasks.includes(action)), currentSkillChoices), [writingSkills, action, currentSkillChoices]);
+  function setSkillIds(ids?: string[]) {
+    const choices: InstructionOverrides = ids === undefined ? {} : { ...currentSkillChoices };
+    if (ids !== undefined) for (const skill of writingSkills.filter(skill => skill.tasks.includes(action))) {
+      if (ids.includes(skill.id!) !== skillIds.includes(skill.id!)) choices[skill.id!] = ids.includes(skill.id!);
+    }
+    writeOverrides(skillChoiceKey, choices); setSkillChoices(previous => ({ ...previous, [skillChoiceKey]: choices }));
+  }
   const [skillLoading, setSkillLoading] = useState(true);
   const [skillError, setSkillError] = useState("");
   const [skillRefresh, setSkillRefresh] = useState(0);
-  useEffect(() => { setSkillIds(undefined); }, [book.id]);
+  useEffect(() => {
+    const refresh = () => setSkillRefresh(value => value + 1);
+    window.addEventListener("xm:instructions-changed", refresh); window.addEventListener("focus", refresh);
+    return () => { window.removeEventListener("xm:instructions-changed", refresh); window.removeEventListener("focus", refresh); };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     setSkillLoading(true);
@@ -587,7 +602,7 @@ export default function Workspace({
       .finally(() => { if (!cancelled) setSkillLoading(false); });
     return () => { cancelled = true; };
   }, [config, skillRefresh]);
-  const invalidSkillChoice = !!skillIds && (skillIds.length > 30 || skillIds.some(id => !writingSkills.some(skill => skill.id === id)));
+  const invalidSkillChoice = skillLoading || !!skillError;
   const applicableSkillCount = action === "style" && distillProfileId ? 0 : writingSkills.filter(skill => skill.tasks.includes(action) && (skillIds === undefined ? skill.enabled : skillIds.includes(skill.id!))).length;
   const [contextPending, setContextPending] = useState(true);
   const [contextRefresh, setContextRefresh] = useState(0);
@@ -772,10 +787,8 @@ export default function Workspace({
   const writingChoice = profileSelection(book);
   function openReferenceControls() {
     setAssistantOpen(true);
-    setWritingPickerOpen(true);
-    setSkillPickerOpen(true);
-    setShowContext(true);
-    requestAnimationFrame(() => document.querySelector(".assistant-reference-controls")?.scrollIntoView({ block: "start" }));
+    setWritingPickerOpen(value => !value);
+    if (!writingPickerOpen) requestAnimationFrame(() => document.getElementById("assistant-writing-reference")?.scrollIntoView({ block: "nearest" }));
   }
   const jobs = book.candidates.filter(
     (j) =>
@@ -3565,7 +3578,7 @@ export default function Workspace({
           style={panes.compose ? { height: panes.compose } : undefined}
         >
           <div className="assistant-compose-fields">
-          <button className="compose-reference-trigger" onClick={openReferenceControls} aria-label={tr("选择风格并核对参考资料")}>
+          <button className="compose-reference-trigger" onClick={openReferenceControls} aria-label={tr("选择风格并核对参考资料")} aria-expanded={writingPickerOpen} aria-controls="assistant-writing-reference">
             <FolderOpen size={17}/><span><strong>{tr("风格与参考")}</strong><small>{tr("风格 {0} · 要求 {1}", { 0: writingChoice.styleIds.length, 1: writingChoice.requirementIds.length })}{" · "}{tr("Skill {0}", { 0: applicableSkillCount })}{" · "}{tr(!chapter ? "请先选择章节" : contextPending ? "正在核对引用" : contextError ? "引用待核对" : action === "style" && distillProfileId ? "蒸馏只读目标原文" : "可查看引用清单")}</small></span><CaretRight size={16}/>
           </button>
           <details className="compose-advanced">

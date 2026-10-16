@@ -22,11 +22,11 @@ test('本次明确选择覆盖全局默认，空选择关闭，适用任务隔�
   assert.match(context.messages[0].content, /CHOSEN-CONTENT/);
   assert.deepEqual(context.referenceSections.find(s => s.key === 'skills').titles, ['本次']);
 });
-test('拒绝重复、不存在和超量编号；选择不适用任务不会发送指令', () => {
+test('拒绝重复和不存在编号，超过30项仍完整发送，不适用任务隔离', () => {
   const skills = Array.from({ length: 31 }, (_, i) => ({ id: String(i), tasks: ['write'], enabled: false }));
   assert.throws(() => resolveSkills(skills, 'write', ['0', '0']), /选择无效/);
   assert.throws(() => resolveSkills(skills, 'write', ['missing']), /已删除/);
-  assert.throws(() => resolveSkills(skills, 'write', skills.map(s => s.id)), /最多30/);
+  assert.equal(resolveSkills(skills, 'write', skills.map(s => s.id)).length, 31);
   assert.throws(() => resolveSkills(skills, 'write', [null]), /选择无效/);
   assert.throws(() => resolveSkills(skills, 'write', '0'), /选择无效/);
   assert.deepEqual(resolveSkills(skills, 'memory', ['0']), []);

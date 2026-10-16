@@ -1,0 +1,58 @@
+/* Page controls stay in layout; only the collection below them scrolls. */
+.toolbox-shell { display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden; }
+.toolbox-shell > .toolbox-top { flex: 0 0 60px; }
+.toolbox-shell > .toolbox-content { display: flex; flex-direction: column; flex: 1 1 auto; width: 100%; min-height: 0; overflow: hidden; padding-bottom: 16px; }
+.toolbox-content > .toolbox-heading, .toolbox-content > .toolbox-toolbar { flex: 0 0 auto; }
+.toolbox-tools-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 2px 4px 12px 2px; }
+.toolbox-tools-scroll > .toolbox-group:first-child { margin-top: 8px; }
+.shelf-main:has(> .plaza-page) { display: flex; min-height: 0; overflow: hidden; }
+.plaza-page { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
+.plaza-page > .shelf-top { flex: 0 0 auto; }
+.plaza-page > .plaza-content { display: flex; flex-direction: column; width: 100%; flex: 1 1 auto; min-height: 0; margin: 0 auto; overflow: hidden; padding-bottom: 12px; }
+.plaza-content > .plaza-heading, .plaza-content > .plaza-library-tabs, .plaza-content > .plaza-bottom-note { flex: 0 0 auto; }
+.plaza-content > .plaza-browser { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.plaza-browser > .plaza-category-groups, .plaza-browser > .plaza-toolbar, .plaza-browser > .plaza-results-heading { flex: 0 0 auto; }
+.plaza-results-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 3px 4px 12px 2px; }
+.plaza-results-scroll > .plaza-grid { margin: 0; }
+.plaza-results-scroll .plaza-empty { min-height: min(240px, 100%); }
+.plaza-content > .plaza-bottom-note { margin: 10px 0 0; }
+.toolbox-tools-scroll:focus-visible, .plaza-results-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Preserve useful list space in laptop-height windows. */
+@media(max-height: 800px) {
+  .toolbox-shell > .toolbox-content { padding-top: 16px; }
+  .toolbox-content > .toolbox-heading { padding-bottom: 12px; }
+  .toolbox-content > .toolbox-toolbar { margin-bottom: 12px; }
+  .toolbox-heading h1 { font-size: 30px; }
+  .plaza-page > .plaza-content { padding-top: 12px; }
+  .plaza-content > .plaza-heading { margin-block: 0 12px; }
+  .plaza-heading h1 { font-size: 28px; }
+  .plaza-heading .overline { display: none; }
+  .plaza-browser > .plaza-category-groups { margin-block: 10px; }
+  .plaza-browser > .plaza-toolbar { margin-block: 8px 12px; }
+  .plaza-browser > .plaza-results-heading { margin-bottom: 10px; }
+}
+@media(max-height: 650px) {
+  .plaza-heading > div > p, .plaza-heading .membership-note-copy p, .toolbox-heading p, .toolbox-heading .overline { display: none; }
+  .toolbox-heading h1 { margin-block: 0; font-size: 26px; }
+  .plaza-heading .membership-note { padding-block: 8px; }
+  .plaza-content > .plaza-bottom-note { display: none; }
+  .plaza-content > .plaza-heading { margin-bottom: 8px; }
+  .plaza-heading .plaza-heading-actions { flex-basis: auto; gap: 8px; }
+  .plaza-content > .plaza-library-tabs { margin-bottom: 8px; }
+  .plaza-library-tabs button { padding-block: 8px; }
+  .plaza-browser > .plaza-category-groups { gap: 6px; margin-block: 6px; }
+  .plaza-category-select { align-items: center; grid-template-columns: auto minmax(0, 1fr); }
+  .plaza-browser > .plaza-toolbar { margin-block: 6px 8px; }
+}
+/* The mobile shelf hides its navigation; keep the remaining page bounded too. */
+@media(max-width: 560px) {
+  .shelf-shell:has(.plaza-page) { overflow: hidden; min-height: 0; }
+  .shelf-shell:has(.plaza-page) > .shelf-nav { display: none; }
+  .shelf-main:has(> .plaza-page) { height: 100dvh; }
+  .plaza-page .shelf-top { min-height: 44px; padding-block: 8px; }
+  .plaza-page .plaza-heading { margin-bottom: 12px; }
+  .plaza-page .plaza-heading .overline, .plaza-page .plaza-heading > div > p, .plaza-page .membership-note-copy p { display: none; }
+  .plaza-page .plaza-heading h1 { font-size: 26px; }
+  .plaza-page .plaza-toolbar { gap: 8px; }
+  .toolbox-shell > .toolbox-top { padding-inline: 16px; }
+}

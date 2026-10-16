@@ -1,4 +1,4 @@
-import CreativeToolTags, { creativeTools } from "./CreativeToolTags";
+import CreativeToolTags, { creativeTools, toolTasks } from "./CreativeToolTags";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { tr } from "./i18n";
 import { useEffect, useState, useRef } from "react";
@@ -298,7 +298,7 @@ export default function Settings({
                         >
                           {s.name}
                           <small>
-                            v{s.version} · {s.source}
+                            {s.instructionKind === 'prompt' ? tr('提示词') : 'Skill'} · v{s.version} · {s.source}
                           </small>
                         </button>
                         <label className="skill-switch">
@@ -323,7 +323,7 @@ export default function Settings({
                         </label>
                       </div>
                       <p>{s.description || tr("暂无说明")}</p>
-                      <div className="skill-task-tags">{s.tasks.map(task => <span key={task}>{tr(tasks[task])}</span>)}{s.toolTags?.map(tag => <span key={`tool:${tag}`}>{tr(creativeTools.find(tool => tool.id === tag)?.label || tag)}</span>)}{!s.toolTags?.length && <span>{tr("未标注工具标签")}</span>}</div>
+                      <div className="skill-task-tags">{s.toolTagsMode === "auto" && <span>{tr("按章节用途匹配")}</span>}{s.tasks.map(task => <span key={task}>{tr(tasks[task])}</span>)}{s.toolTags?.map(tag => <span key={`tool:${tag}`}>{tr(creativeTools.find(tool => tool.id === tag)?.label || tag)}</span>)}{!s.toolTags?.length && <span>{tr("未标注工具标签")}</span>}</div>
                       <p className="skill-library-preview">{s.body}</p>
                       <details className="skill-library-content"><summary>{tr("查看完整指令")}</summary><div className="writing-profile-text">{s.body}</div></details>
                       <div className="skill-bottom">
@@ -561,7 +561,8 @@ export default function Settings({
                 </label>
               ))}
             </fieldset>
-            <CreativeToolTags value={draft.toolTags || []} onChange={toolTags => setDraft({ ...draft, toolTags })} />
+            <label className="skill-tag-auto"><input type="checkbox" checked={draft.toolTagsMode === "auto"} onChange={e => setDraft({ ...draft, toolTagsMode: e.target.checked ? "auto" : "explicit" })} />{tr("按章节用途自动匹配工具箱")}</label>
+            <CreativeToolTags value={draft.toolTagsMode === "auto" ? toolTasks(draft.tasks) : draft.toolTags || []} onChange={toolTags => setDraft({ ...draft, toolTags, toolTagsMode: "explicit" })} />
             {error && <p className="error-box">{tr(error)}</p>}
           </div>
           <div className="modal-footer">

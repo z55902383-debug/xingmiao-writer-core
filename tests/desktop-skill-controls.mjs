@@ -45,6 +45,7 @@ try {
   await page.getByRole('button', { name: '按大纲写正文', exact: true }).click();
   await page.getByRole('button', { name: '选择风格并核对参考资料' }).click();
   const picker = page.getByRole('region', { name: '本次写作 Skill' });
+  await picker.locator('.writing-picker-toggle').click();
   await expect(picker.getByRole('checkbox', { name: '本次使用 测试默认', exact: true })).toBeChecked();
   await expect(picker.getByRole('checkbox', { name: '本次使用 测试规划', exact: true })).toHaveCount(0);
   await picker.getByRole('button', { name: '本次不使用 Skill', exact: true }).click();

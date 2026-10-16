@@ -644,7 +644,8 @@ async function restoreBackup() {
               s.body === skill.body &&
               s.description === skill.description &&
               JSON.stringify(s.tasks) === JSON.stringify(skill.tasks) &&
-              JSON.stringify(s.toolTags || []) === JSON.stringify(skill.toolTags || []),
+              JSON.stringify(s.toolTags || []) === JSON.stringify(skill.toolTags || []) &&
+              (s.toolTagsMode || "auto") === (skill.toolTagsMode || (skill.toolTags?.length ? "explicit" : "auto")),
           )
       )
         store.saveSkill({
@@ -759,7 +760,7 @@ const actions = {
       d.kind,
       d.instruction,
       store.skills(),
-      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId, skillIds: d.skillIds });
+      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId, skillIds: d.skillIds, excerptIds: d.excerptIds, retrievalQuery: d.retrievalQuery });
     return rest;
   },
   "ai:generate": generate,

@@ -14,3 +14,5 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
+
+import "./page-scroll-regions.css";

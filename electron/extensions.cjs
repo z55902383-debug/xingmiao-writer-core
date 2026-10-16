@@ -31,19 +31,21 @@ function parseSkill(markdown, source = "导入文件") {
     meta = parse(match[1], { maxAliasCount: 0 }) || {};
     body = markdown.replace(/^\uFEFF/, "").slice(match[0].length);
   }
+  const toolTags = creativeTags.normalize(meta.toolTags ?? (Array.isArray(meta.tasks) ? meta.tasks.filter(t => !KINDS.includes(t)) : []));
   return {
     name:
       typeof meta.name === "string" ? meta.name : source.replace(/\.md$/i, ""),
     description: typeof meta.description === "string" ? meta.description : "",
     body: body.trim(),
     tasks: Array.isArray(meta.tasks) ? meta.tasks : KINDS,
-    toolTags: creativeTags.normalize(meta.toolTags || (Array.isArray(meta.tasks) ? meta.tasks.filter(t => typeof t === 'string' && t.startsWith('tool:')).map(t => t.slice(5)) : [])),
+    toolTags,
+    toolTagsMode: meta.toolTagsMode === 'auto' ? 'auto' : Array.isArray(meta.toolTags) || toolTags.length || meta.toolTagsMode === 'explicit' ? 'explicit' : 'auto',
     enabled: false,
     source,
   };
 }
 function exportSkill(skill) {
-  return `---\n${stringify({ name: skill.name, description: skill.description, tasks: skill.tasks, ...(skill.toolTags?.length ? { toolTags: skill.toolTags } : {}) })}---\n\n${skill.body}\n`;
+  return `---\n${stringify({ name: skill.name, description: skill.description, tasks: skill.tasks, ...(skill.toolTagsMode === 'auto' ? { toolTagsMode: 'auto' } : skill.toolTags ? { toolTags: skill.toolTags, toolTagsMode: 'explicit' } : {}) })}---\n\n${skill.body}\n`;
 }
 function extendStore(Store) {
   Object.assign(Store.prototype, {
@@ -131,19 +133,36 @@ function extendStore(Store) {
       this.putSetting("model-profiles", state);
     },
     skills() {
+      if (!this.syncingInstructionRegistry) {
+        this.syncingInstructionRegistry = true;
+        try { require('./instruction-registry.cjs').reconcile(this); } finally { this.syncingInstructionRegistry = false; }
+      }
       const plaza = this.setting('plaza-items', []);
-      return this.setting("writing-skills", []).map(skill => ({ ...skill, toolTags: creativeTags.normalize(skill.toolTags ?? plaza.filter(item => item.installed && item.installedSkillId === skill.id).flatMap(item => creativeTags.fromTasks(item.tasks))) }));
+      return this.setting("writing-skills", []).filter(skill => !plaza.some(item => item.installedSkillId === skill.id && !item.installed)).map(skill => ({
+        ...skill,
+        tasks: require('./instruction-registry.cjs').tasksFor(skill, creativeTags.skillTags(skill, plaza.filter(item => item.installed && item.installedSkillId === skill.id).flatMap(item => item.tasks || []))).filter(task => KINDS.includes(task)),
+        instructionKind: plaza.find(item => item.installedSkillId === skill.id)?.kind || 'skill',
+        plazaItemId: plaza.find(item => item.installedSkillId === skill.id)?.id,
+        toolTags: creativeTags.skillTags(skill, plaza.filter(item => item.installed && item.installedSkillId === skill.id).flatMap(item => item.tasks || [])),
+        toolTagsMode: skill.toolTagsMode || (creativeTags.normalize(skill.toolTags).length ? 'explicit' : 'auto'),
+      }));
     },
     saveSkill(input) {
-      const all = this.skills(),
+      const effective = this.skills();
+      const all = this.setting('writing-skills', []),
         old = all.find((s) => s.id === input.id);
-      const name = validText(input.name, 100).trim(),
+      const current = effective.find(s => s.id === input.id);
+      const name = validText(input.name, 120).trim(),
         body = validText(input.body).trim();
       requireValue(name && body, "请填写 Skill 名称和指令内容");
-      const tasks = (input.tasks || KINDS).filter((k) => KINDS.includes(k));
-      const toolTags = creativeTags.normalize(input.toolTags ?? old?.toolTags);
+      const suppliedTasks = old && JSON.stringify(input.tasks) === JSON.stringify(current?.tasks) ? old.tasks : input.tasks;
+      const tasks = (suppliedTasks || KINDS).filter((k) => KINDS.includes(k));
+      const changedTags = input.toolTags !== undefined && JSON.stringify(creativeTags.normalize(input.toolTags)) !== JSON.stringify(current?.toolTags || []);
+      const toolTagsMode = input.toolTagsMode || (changedTags ? 'explicit' : old?.toolTagsMode || (input.toolTags !== undefined ? 'explicit' : 'auto'));
+      requireValue(['auto', 'explicit'].includes(toolTagsMode), '工具箱标签模式不正确');
+      const toolTags = toolTagsMode === 'auto' ? [] : creativeTags.normalize(input.toolTags ?? old?.toolTags);
       requireValue(tasks.length || toolTags.length, "至少选择一种写作任务或工具箱标签");
-      requireValue(all.length < 100 || old, "最多保存 100 个 Skill");
+      requireValue(all.length < 1000 || old, "最多保存 1000 项指令");
       const s = {
         id: old?.id || randomUUID(),
         name,
@@ -151,6 +170,7 @@ function extendStore(Store) {
         body,
         tasks: [...new Set(tasks)],
         toolTags,
+        toolTagsMode,
         enabled: !!input.enabled,
         source: old?.source || validText(input.source || "手动创建", 200),
         version: old ? old.version + 1 : 1,
@@ -160,14 +180,17 @@ function extendStore(Store) {
         "writing-skills",
         old ? all.map((x) => (x.id === s.id ? s : x)) : [...all, s],
       );
-      return s;
+      return this.skills().find(skill => skill.id === s.id);
     },
     deleteSkill(id) {
-      const all = this.skills();
+      const all = this.setting('writing-skills', []);
       requireValue(
         all.some((s) => s.id === id),
         "Skill 不存在",
       );
+      const plaza = this.setting('plaza-items', []);
+      for (const item of plaza) if (item.installedSkillId === id) { item.installed = false; item.installedSkillId = ''; }
+      this.putSetting('plaza-items', plaza);
       this.putSetting(
         "writing-skills",
         all.filter((s) => s.id !== id),
@@ -179,7 +202,7 @@ function extendStore(Store) {
       return this.transaction(() => {
         const fresh = this.setting("writing-skills", null) === null;
         for (const skill of builtins.items) {
-          const all = this.skills();
+          const all = this.setting('writing-skills', []);
           const existing = all.find(item => item.name === skill.name);
           const previous = builtins.previous.find(item => item.name === skill.name);
           if (existing) {

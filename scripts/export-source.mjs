@@ -5,7 +5,7 @@ const root=resolve('.');
 const version=JSON.parse(await readFile('package.json','utf8')).version;
 const output=resolve('发布源码',`xingmiao-writer-core-${version}`);
 await mkdir(output,{recursive:true});
-const items=['.github','.editorconfig','.gitattributes','.gitignore','.nvmrc','src','electron','public','build/icon.ico','scripts','tests','docs','package.json','package-lock.json','electron-builder.config.cjs','index.html','tsconfig.json','vite.config.mjs','release.json','README.md','README.en.md','LICENSE','CHANGELOG.md','CONTRIBUTING.md','SECURITY.md','THIRD_PARTY_NOTICES.md'];
+const items=['.github','.editorconfig','.gitattributes','.gitignore','.nvmrc','src','electron','public','build/icon.ico','scripts','tests','docs','package.json','package-lock.json','electron-builder.config.cjs','index.html','tsconfig.json','vite.config.mjs','release.json','README.md','README.en.md','README.zh-CN.md','LICENSE','CHANGELOG.md','CONTRIBUTING.md','SECURITY.md','THIRD_PARTY_NOTICES.md'];
 for(const item of items)await cp(join(root,item),join(output,item),{recursive:true,filter:src=>!/^_/.test(src.split(/[\\/]/).at(-1)) && (!relative(root,src).split(sep).join('/').startsWith('docs/assets/') || basename(src)==='library.png')});
 const inventory=[];
 async function visit(dir){

@@ -1,0 +1,6 @@
+{
+  "write": ["opening"], "continue": ["opening"], "polish": ["opening"],
+  "outline": ["outline"], "bookOutline": ["outline"], "volumePlan": ["outline"], "volumeOutline": ["outline"],
+  "chapterPlan": ["detail"], "chapterDetails": ["detail"], "volumeDetail": ["detail"], "summary": ["detail"],
+  "characters": ["character"], "worldBuild": ["world"]
+}

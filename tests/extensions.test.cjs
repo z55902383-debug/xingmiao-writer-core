@@ -6,6 +6,7 @@ const { tmpdir } = require("node:os");
 const { Store } = require("../electron/store.cjs");
 const { parseSkill, exportSkill } = require("../electron/extensions.cjs");
 const { buildContext } = require("../electron/context.cjs");
+
 function setup(t) {
   const dir = mkdtempSync(join(tmpdir(), "xm-v02-"));
   const db = new Store(join(dir, "test.sqlite"));

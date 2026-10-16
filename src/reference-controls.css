@@ -67,6 +67,7 @@
 .compose-advanced > summary { font-size: 12px; }
 .compose-reference-trigger > svg { color: var(--accent); flex-shrink: 0; }
 .compose-reference-trigger > svg:last-child { margin-left: auto; }
+.compose-reference-trigger[aria-expanded="true"] > svg:last-child { transform: rotate(90deg); }
 .compose-reference-trigger > span { display: grid; gap: 4px; }
 .compose-reference-trigger strong { font-size: 13px; }
 .compose-reference-trigger small { font-size: 12px; color: var(--muted); line-height: 1.5; }

@@ -2537,5 +2537,14 @@ export const english: Record<string, string> = {
   "提示词保存到创作广场；Skill 保存到设置中的 Skill 库，不自动启用章节写作。Skill 作为文字指令使用，不运行脚本或外部工具。": "Prompts are saved to the Prompt Plaza; Skills go to the Skill library in settings, without automatically enabling them for chapter writing. Skills supply text instructions and do not run scripts or external tools.",
   "保存并选用": "Save and select",
   "仅本次补充指令": "One-time instructions",
-  "补充语气、画风、禁用元素等；不会保存进指令库。": "Add tone, visual style, or elements to avoid. This will not be saved to the library."
+  "补充语气、画风、禁用元素等；不会保存进指令库。": "Add tone, visual style, or elements to avoid. This will not be saved to the library.",
+  "内容已上传，但服务器未保存这些标签：{0}。请更新广场后台后补全，勿重复上传。": "Content uploaded, but the server did not save these tags: {0}. Update the plaza backend and repair the tags; do not upload duplicates.",
+  "工具箱按任务自动匹配": "Toolbox matched automatically from tasks",
+  "选择本次 Skill 与提示词": "Choose Skills and prompts for this task",
+  "适用且已启用的条目默认全部开启，各功能分别记住开关，新添加条目自动接入。": "Applicable enabled instructions are on by default. Each feature remembers its switches and includes new instructions automatically.",
+  "已选优先显示": "Selected first",
+  "按章节用途自动匹配工具箱": "Automatically match toolbox tools from chapter tasks",
+  "按章节用途匹配": "Matched from chapter tasks",
+  "广场内容列表": "Community content list",
+  "创作工具列表": "Creative tools list"
 };
