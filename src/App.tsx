@@ -10,7 +10,7 @@ import ManualTyping from "./ManualTyping";
 
 import { Button, IconButton, Modal } from "./ui";
 import { demo } from "./demo";
-export default function App() {
+export default function App({ onReady }: { onReady?: () => void }) {
   useLanguage();
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [book, setBook] = useState<Book | null>(null);
@@ -27,6 +27,7 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [deleting, setDeleting] = useState<BookSummary | null>(null);
   const [workspaceKey, setWorkspaceKey] = useState(0);
+  const [importView,setImportView]=useState<"editor"|"outline"|"characters"|"world"|"cheat"|"atlas"|"memory">("editor");
   const [preferredChapterId, setPreferredChapterId] = useState("");
   const [archive, setArchive] = useState<BookSummary | null>(null);
   const closeGuard = useRef<() => Promise<void>>(async () => {});
@@ -62,6 +63,7 @@ export default function App() {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+      onReady?.();
     }
   }
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function App() {
   }) {
     const b = await api<Book>("book:create", value);
     setNewBook(false);
+    setImportView("editor");
     setBook(b);
   }
   async function loadDemo() {
@@ -171,6 +174,7 @@ export default function App() {
     <>
       {showManualTyping ? (
         <ManualTyping
+          onOpenBook={(value,target,chapterId)=>{setBook(value);setImportView(target);setPreferredChapterId(chapterId);setWorkspaceKey(v=>v+1);setShowManualTyping(false);}}
           books={books}
           onSettings={openSettings}
           onBack={async () => {
@@ -185,6 +189,7 @@ export default function App() {
           onSkillSettings={() => openSettings(undefined, "skills")}
           key={`${book.id}-${workspaceKey}`}
           initial={book}
+          initialView={importView}
           preferredChapterId={preferredChapterId}
           config={config}
           onConfigSaved={setConfig}
@@ -204,6 +209,7 @@ export default function App() {
           onNew={() => setNewBook(true)}
           onOpen={(id, chapterId) =>
             safe(async () => {
+              setImportView("editor");
               setPreferredChapterId(chapterId || "");
               setBook(await api<Book>("book:get", { id }));
             })

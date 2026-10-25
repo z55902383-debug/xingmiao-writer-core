@@ -23,7 +23,7 @@ try {
   await page.getByRole("combobox", { name: "Genre", exact: true }).selectOption("悬疑");
   await expect(page.getByRole("combobox", { name: "Genre", exact: true })).toHaveValue("悬疑");
   await page.getByRole("button", { name: "Create story", exact: true }).click();
-  const body = page.getByRole("textbox", { name: "Chapter text", exact: true });
+  const body = page.getByRole("textbox", { name: "Chapter prose", exact: true });
   await expect(body).toBeVisible();
   const original = "保存不是界面按钮。世界设定属于故事。\nThe last train carried a secret.";
   await body.fill(original);
@@ -47,7 +47,7 @@ try {
     await expect(page.getByRole("button", { name: "Arrange", exact: true })).toBeVisible();
   }
   await page.screenshot({ path: resolve(output, "i18n-canvas-en.png"), animations: "disabled" });
-  await page.locator(".workspace-nav").getByRole("button", { name: "Chapter text", exact: true }).click();
+  await page.locator(".workspace-nav").getByRole("button", { name: "Chapter prose", exact: true }).click();
   await expect(body).toHaveValue(original);
   await page.getByRole("button", { name: "Models & settings", exact: true }).click();
   const settings = page.getByRole("dialog", { name: "Models & local settings" });
@@ -77,7 +77,7 @@ try {
   await expect(page.getByRole("heading", { name: "My library", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Interface language", exact: true })).toHaveValue("en");
   await page.getByRole("button", { name: "Open 保存 · A story in two languages", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Chapter text", exact: true })).toHaveValue(original);
+  await expect(page.getByRole("textbox", { name: "Chapter prose", exact: true })).toHaveValue(original);
   const book = await page.evaluate(async () => {
     const list = await window.xingmiao.invoke("books:list", {});
     return (await window.xingmiao.invoke("book:get", { id: list.data[0].id })).data;

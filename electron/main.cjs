@@ -376,6 +376,7 @@ async function restoreBackup() {
       assert(Array.isArray(source.chapters) && source.chapters.length <= 5000, "备份章节格式无效");
       assert(!source.worldRecords || (Array.isArray(source.worldRecords) && source.worldRecords.length <= 500), "世界资料备份格式无效");
       assert(!source.foreshadows || (Array.isArray(source.foreshadows) && source.foreshadows.length <= 2000), "伏笔备份格式无效");
+      require('./atlas.cjs').assertBackup(source);
       const chapterMap = new Map(source.chapters.map((c) => [c.id, id()]));
       const worldMap = new Map((source.worldRecords || []).map((r) => [r.id, id()]));
       const memoryMap = new Map((source.memories || []).map((m) => [m.id, id()]));
@@ -418,7 +419,12 @@ async function restoreBackup() {
         Array.isArray(source.chapters) && source.chapters.length <= 5000,
         "备份章节格式无效",
       );
+      assert(Array.isArray(source.memos || []) && (source.memos || []).length <= 1000, '备忘录备份格式无效');
+      const atlasRestored = require('./atlas.cjs').restoreAtlas(source, { chapterMap, characterMap });
+      const { idMaps: atlasIdMaps = {}, ...atlasFields } = atlasRestored;
       const restored = {
+        cheat: require('./cheat.cjs').normalize(source.cheat || {}),
+        memos: (source.memos || []).map(memo=>({id:id(), title:text(memo.title || '未命名备忘录',160), content:text(memo.content || ''), createdAt:text(memo.createdAt || now(),64), updatedAt:text(memo.updatedAt || now(),64), ...require('./memo-metadata.mjs').normalizeMemoMetadata(memo)})),
         id: bookId,
         title: text(source.title, 120) + "（恢复）",
         genre: text(source.genre, 40),
@@ -431,6 +437,7 @@ async function restoreBackup() {
         techniques: store.cleanTechniques(source.techniques || []),
         includeContinuity: source.includeContinuity !== false,
         relatedMemoryOnly: source.relatedMemoryOnly === true,
+        ...atlasFields,
         ...(source.importedSource ? { importedSource: { name: text(source.importedSource.name, 240), content: text(source.importedSource.content, 8000000), importedAt: text(source.importedSource.importedAt, 100) } } : {}),
         target: Number(source.target) || 200000,
         creationMode: source.creationMode === "short" ? "short" : "long",
@@ -566,6 +573,21 @@ async function restoreBackup() {
             profileName: old.profileName,
             error: text(old.error || ""),
           });
+      // 回收站里的蓝图记录也要重映射：先给被删地图/节点预留新 ID，
+      // 使之后从回收站恢复时，父子引用保持一致。
+      const atlasTrashMapIds = new Map();
+      const atlasTrashNodeIds = new Map();
+      for (const entry of data.trash || []) {
+        if (entry.bookId !== source.id || !entry.item) continue;
+        if (entry.type === "atlasMap" && typeof entry.item.id === "string")
+          atlasTrashMapIds.set(entry.item.id, id());
+        if (entry.type === "atlasNode" && typeof entry.item.id === "string")
+          atlasTrashNodeIds.set(entry.item.id, id());
+      }
+      const atlasMapId = (oldId) =>
+        oldId ? atlasIdMaps.mapIdMap?.get(oldId) || atlasTrashMapIds.get(oldId) || "" : "";
+      const atlasNodeId = (oldId) =>
+        oldId ? atlasIdMaps.nodeIdMap?.get(oldId) || atlasTrashNodeIds.get(oldId) || "" : "";
       for (const sourceEntry of data.trash || []) {
         if (sourceEntry.bookId !== source.id) continue;
         const item = sourceEntry.item || {};
@@ -630,6 +652,67 @@ async function restoreBackup() {
             stale: true,
             createdAt: now(),
           });
+        else if (sourceEntry.type === "atlasMap")
+          store.recycle("atlasMap", bookId, {
+            id: atlasMapId(item.id) || atlasTrashMapIds.get(item.id) || id(),
+            name: text(item.name || "未命名地图", 60),
+            kind: item.kind,
+            parentMapId: atlasMapId(item.parentMapId),
+            entryNodeId: atlasNodeId(item.entryNodeId),
+            description: text(item.description || "", 800),
+            theme: item.theme,
+            status: item.status,
+            chapterId: chapterMap.get(item.chapterId) || "",
+            order: Number(item.order) || 0,
+            stale: !!item.stale || (!!item.chapterId && !chapterMap.has(item.chapterId)),
+          });
+        else if (sourceEntry.type === "atlasNode")
+          store.recycle("atlasNode", bookId, {
+            id: atlasNodeId(item.id) || atlasTrashNodeIds.get(item.id) || id(),
+            mapId: atlasMapId(item.mapId),
+            parentId: atlasNodeId(item.parentId),
+            kind: item.kind,
+            name: text(item.name || "未命名地点", 60),
+            description: text(item.description || "", 800),
+            x: Number(item.x) || 0,
+            y: Number(item.y) || 0,
+            status: item.status,
+            chapterId: chapterMap.get(item.chapterId) || "",
+            stale: !!item.stale || (!!item.chapterId && !chapterMap.has(item.chapterId)),
+          });
+        else if (sourceEntry.type === "atlasEdge")
+          store.recycle("atlasEdge", bookId, {
+            id: id(),
+            mapId: atlasMapId(item.mapId),
+            source: atlasNodeId(item.source),
+            target: atlasNodeId(item.target),
+            kind: item.kind,
+            label: text(item.label || "", 80),
+            status: item.status,
+            chapterId: chapterMap.get(item.chapterId) || "",
+            stale: !!item.stale || (!!item.chapterId && !chapterMap.has(item.chapterId)),
+          });
+        else if (sourceEntry.type === "atlasItem")
+          store.recycle("atlasItem", bookId, {
+            id: id(),
+            name: text(item.name || "未命名物品", 60),
+            description: text(item.description || "", 800),
+            nodeId: atlasNodeId(item.nodeId),
+            ownerCharacterId: characterMap.get(item.ownerCharacterId) || "",
+            status: item.status,
+            chapterId: chapterMap.get(item.chapterId) || "",
+            stale: !!item.stale || (!!item.chapterId && !chapterMap.has(item.chapterId)),
+          });
+        else if (sourceEntry.type === "atlasPosition")
+          store.recycle("atlasPosition", bookId, {
+            id: id(),
+            characterId: characterMap.get(item.characterId) || "",
+            nodeId: atlasNodeId(item.nodeId),
+            chapterId: chapterMap.get(item.chapterId) || "",
+            status: item.status,
+            note: text(item.note || "", 160),
+            stale: !!item.stale || (!!item.chapterId && !chapterMap.has(item.chapterId)),
+          });
       }
       store.restoreCanvasViews(source, bookId, data.canvasViews, {
         chapterMap, characterMap, volumeMap, worldMap, memoryMap, eventMap, foreshadowMap,
@@ -663,11 +746,13 @@ async function restoreBackup() {
 const actions = {
   "canvas:get": (d) => store.getCanvas(d.bookId, d.view),
   "canvas:save": (d) => store.saveCanvas(d.bookId, d.view, d.layout),
+  "atlas:save": (d) => store.saveAtlas(text(d.bookId, 100), d.patch ?? d),
   "timeline:preview": (d) =>
     require("./timeline.cjs").resolveTimeline(
       store.book(d.bookId),
       d.chapterId,
-      d.includeCurrent !== false),
+      d.includeCurrent !== false,
+    ),
   "timeline:save": (d) => store.saveEvent(d.bookId, d.event),
   "timeline:delete": (d) => store.deleteEvent(d.bookId, d.id),
   "volume:save": (d) => store.saveVolume(d.bookId, d.volume),
@@ -747,6 +832,8 @@ const actions = {
   'comparison:apply': d => require('./comparison.cjs').apply(store, d),
   'comparison:rescue': d => require('./comparison.cjs').rescue(store, d),
   "chapter:finalize": (d) => store.finalize(d.id, d.revision),
+  "chapter:sync-prepare": d=>require('./chapter-sync.cjs').prepare(store,d,new Set(running.keys())),
+  "chapter:sync-current": d=>require('./chapter-sync.cjs').current(store,d.id,new Set(running.keys())),
   "versions:list": (d) => store.versions(d.id),
   "version:restore": (d) => store.restoreVersion(d.id, d.versionId, d.revision),
   "memory:add": (d) => store.addMemory(d.bookId, d.memory),
@@ -763,10 +850,12 @@ const actions = {
       d.kind,
       d.instruction,
       store.skills(),
-      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId, imitationProfileId: d.imitationProfileId, skillIds: d.skillIds, excerptIds: d.excerptIds, retrievalQuery: d.retrievalQuery });
+      { volumeId: d.targetVolumeId, chapterIds: d.chapterIds, manuscriptFormat: normalizeManuscriptFormat(store.setting("manuscript-formatting", {})), writingProfileId: d.writingProfileId, imitationProfileId: d.imitationProfileId, skillIds: d.skillIds, excerptIds: d.excerptIds, retrievalQuery: d.retrievalQuery },
+    );
     return rest;
   },
   "ai:generate": generate,
+  "manual:brainstorm": (d) => manualBrainstorm.start(d),
   "knowledge:get": (d) => knowledgeChat.get(text(d.bookId, 100)),
   "knowledge:send": (d) => knowledgeChat.start(d),
   "knowledge:cancel": (d) => knowledgeChat.cancel(text(d.bookId, 100)),
@@ -774,22 +863,14 @@ const actions = {
   "knowledge:recheck": (d) => knowledgeChat.recheck(d),
   "knowledge:undo": (d) => knowledgeChat.undo(d),
   "knowledge:clear": (d) => knowledgeChat.clear(text(d.bookId, 100)),
-  
-  
-  "manual:brainstorm": (d) => manualBrainstorm.start(d),
   "manual:brainstorm-cancel": (d) => manualBrainstorm.cancel(text(d.requestId, 100)),
   "ai:cancel": (d) => {
     running.get(d.id)?.abort("user");
     return true;
   },
-  "planning:preview": (d) => {
-    const job = store.job(d.id);
-    if (!job.adopted && job.planningSignature) assert(job.planningSignature === require("./planning-routes.cjs").planningSignature(store.book(job.bookId)), "生成后分卷或章节规划已修改，请重新生成，避免覆盖新规划。");
-    return job.adopted && job.planningPreview ? job.planningPreview : require("./planning-routes.cjs").planningRows(store.book(job.bookId), job, store.chapter(job.chapterId));
-  },
   "ai:adopt": (d) => {
     assert(!running.has(d.id), "请等待变化分析完成，或先停止分析");
-    const b = store.adopt(d.id, d.mode),
+    const b = store.adopt(d.id, d.mode, d.planningSelection),
       job = store.job(d.id);
     if (job.review?.status === "ready") {
       const c = store.chapter(job.chapterId);
@@ -799,9 +880,18 @@ const actions = {
     }
     return store.book(b.id);
   },
+  "planning:preview": (d) => {
+    const job = store.job(d.id);
+    if (!job.adopted && job.planningSignature) assert(job.planningSignature === require("./planning-routes.cjs").planningSignature(store.book(job.bookId)), "生成后分卷或章节规划已修改，请重新生成，避免覆盖新规划。");
+    return job.adopted && job.planningPreview
+      ? job.planningPreview
+      : require("./planning-routes.cjs").planningRows(store.book(job.bookId), job, store.chapter(job.chapterId));
+  },
   "sync:analyze": async (d) => {
     assert(running.size === 0 && !preparing, "请等待当前生成或分析完成");
-    const job = store.job(d.id);
+    const chapterSync=require('./chapter-sync.cjs');
+    const syncStore=chapterSync.isChapterSync(d.id)?chapterSync.adapter(store):store;
+    const job = syncStore.job(d.id);
     assert(
       job.adopted && ["write", "continue", "polish"].includes(job.kind),
       "请先采用章节正文",
@@ -812,12 +902,12 @@ const actions = {
       controller = new AbortController();
     assert(!book.deletedAt && !c.deletedAt, "请先恢复作品和章节");
     running.set(job.id, controller);
-    job.review = { status: "analyzing" };
+    job.review = { ...(job.chapterSync?job.review:{}), status: "analyzing", applied:false };
     job.progress ||= {};
     job.progress.analysisStartedAt = now();
     delete job.progress.analysisEndedAt;
-    store.putJob(job);
-    emit(job);
+    syncStore.putJob(job);
+    if(!job.chapterSync)emit(job);
     const work = (async () => {
       try {
         const sync = require("./sync-review.cjs"),
@@ -834,7 +924,10 @@ const actions = {
           },
           controller.signal,
         );
+        if(controller.signal.aborted)throw Error("已停止分析，正文已保留");
         if (result.finishReason === "length") throw Error("分析未完成");
+        const latest=store.chapter(c.id);
+        assert(latest.revision===c.revision&&sync.hash(latest.body)===sync.hash(c.body),"分析期间正文已变化，请重新提交最新正文");
         const changes = sync.parse(raw, c.body);
         job.review = {
           status: changes.length ? "ready" : "empty",
@@ -844,14 +937,14 @@ const actions = {
           signature: require("./timeline.cjs").contextSignature(book, c),
         };
       } catch (e) {
-        job.review = { status: "error", error: e.message };
+        job.review = { ...(job.chapterSync?job.review:{}), status: "error", applied:false, error: controller.signal.aborted?"已停止分析，正文已保留":e.message };
       } finally {
         job.progress.analysisEndedAt = now();
         job.progress.endedAt = now();
-        store.putJob(job);
+        syncStore.putJob(job);
         running.delete(job.id);
         jobPromises.delete(job.id);
-        emit(job);
+        if(!job.chapterSync)emit(job);
       }
       return store.book(job.bookId);
     })();
@@ -859,7 +952,7 @@ const actions = {
     return work;
   },
   "sync:apply": (d) =>
-    require("./sync-review.cjs").apply(store, d.id, d.changes),
+    require("./chapter-sync.cjs").isChapterSync(d.id)?require("./chapter-sync.cjs").apply(store,d):require("./sync-review.cjs").apply(store, d.id, d.changes),
   "config:get": publicConfig,
   "config:save": saveConfig,
   
@@ -894,7 +987,8 @@ const actions = {
     const reference = await fs.readFile(result.filePaths[0], "utf8");
     assert(
       !reference.includes("\uFFFD"),
-      "文件不是 UTF-8 编码，请转换后再导入");
+      "文件不是 UTF-8 编码，请转换后再导入",
+    );
     return store.updateBook(d.bookId, {
       reference,
       referenceName: basename(result.filePaths[0]),

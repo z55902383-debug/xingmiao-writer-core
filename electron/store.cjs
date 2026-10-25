@@ -96,8 +96,16 @@ class Store {
     return JSON.parse(row.data);
   }
   book(bookId, includeDeleted = false) {
+    const book = this.rawBook(bookId);
     return {
-      ...this.rawBook(bookId),
+      ...book,
+      // 旧作品没有知识蓝图字段时按空数组读取，读、保存、生成、对话和备份都不受影响。
+      atlasMaps: Array.isArray(book.atlasMaps) ? book.atlasMaps : [],
+      atlasNodes: Array.isArray(book.atlasNodes) ? book.atlasNodes : [],
+      atlasEdges: Array.isArray(book.atlasEdges) ? book.atlasEdges : [],
+      atlasItems: Array.isArray(book.atlasItems) ? book.atlasItems : [],
+      atlasPositions: Array.isArray(book.atlasPositions) ? book.atlasPositions : [],
+      memos: (book.memos || []).map(require('./creative-import-note.cjs').readableImportMemo),
       chapters: this.chapters(bookId, includeDeleted),
       candidates: this.jobs(bookId),
     };
@@ -173,12 +181,13 @@ class Store {
   createBook(input) {
     const title = text(input.title, 120).trim();
     assert(title, "请填写书名");
+    const autoConfig = input.autoCreationConfig ? require('./auto-creation.cjs').normalize(input.autoCreationConfig) : null;
     const book = {
       id: id(),
       title,
       genre: text(input.genre || "未分类", 40),
       premise: text(input.premise || ""),
-      outline: "",
+      outline: autoConfig?.prepareModes?.outline === '手动填写' ? text(autoConfig.prepareNotes.outline) : "",
       style: "",
       reference: "",
       referenceName: "",
@@ -189,18 +198,47 @@ class Store {
       characters: [],
       volumes: [],
       timeline: [],
-      chapterTargetWords: input.creationMode === 'short' ? 1000 : 2000,
-      creationMode: input.creationMode === 'short' ? 'short' : 'long',
+      atlasMaps: [],
+      atlasNodes: [],
+      atlasEdges: [],
+      atlasItems: [],
+      atlasPositions: [],
+      chapterTargetWords: autoConfig?.chapterWords ?? (input.creationMode === 'short' ? 1000 : 2000),
+      creationMode: input.creationMode === 'short' || (autoConfig && Number(input.target ?? autoConfig.target) <= 30000) ? 'short' : 'long',
       writingMode: input.writingMode === 'imitate' ? 'imitate' : 'original',
       contextChapters: 10,
-      world: "",
+      world: autoConfig?.prepareModes?.world === '手动填写' ? text(autoConfig.prepareNotes.world) : "",
       memories: [],
       memos: [],
+      ...(autoConfig ? { autoCreationConfig: autoConfig } : {}),
       archived: false,
       createdAt: now(),
       updatedAt: now(),
     };
     return this.transaction(() => {
+      if(book.autoCreationConfig){
+        const ids=book.autoCreationConfig.skillIds||[];
+        assert(Array.isArray(ids)&&ids.length<=100,'Skill选择格式无效');
+        const installed=this.skills();
+        book.autoCreationConfig.skillSnapshots=[...new Set(ids)].map(id=>{const row=installed.find(s=>s.id===id&&s.instructionKind!=='prompt');assert(row,'所选Skill已删除，请刷新后重新选择');return {id:row.id,name:row.name,body:row.body,tasks:row.tasks.filter(t=>!['style','memory'].includes(t)),version:row.version};});
+      }
+      const refs = autoConfig?.references;
+      if (Array.isArray(refs) && refs.length) {
+        assert(refs.length <= 20, '最多20篇风格参考');
+        book.writingProfiles = refs.map(r => ({ ...require('./writing-profiles.cjs').normalizeRecord({kind:'style',title:r.title,body:r.confirmed?r.body:'',source:r.source,sourceName:r.title}, id()),revision:1,createdAt:now(),updatedAt:now(),history:[] }));
+        const selected=refs.map((r,i)=>({r,p:book.writingProfiles[i]})).filter(({r})=>r.selected&&r.confirmed);
+        book.writingSelection={styleIds:selected.map(({p})=>p.id),requirementIds:[],styleWeights:Object.fromEntries(selected.map(({r,p})=>[p.id,r.weight]))};
+        require('./writing-profiles.cjs').references(book);
+      }
+      if (autoConfig) {
+        const body = require('./auto-creation.cjs').narrative(autoConfig);
+        if (body) {
+          const entry = {...require('./writing-profiles.cjs').normalizeRecord({kind:'requirement',title:'自动创作 · 叙事与边界',body},id()),revision:1,createdAt:now(),updatedAt:now(),history:[]};
+          book.writingProfiles = [...(book.writingProfiles || []),entry];
+          book.writingSelection ||= {styleIds:[],requirementIds:[]};
+          book.writingSelection.requirementIds.push(entry.id);
+        }
+      }
       this.putBook(book);
       // 与 createChapter 的自动命名保持同一种写法（阿拉伯数字）。
       // 原来这里写「第一章」、后续却是「第2章」，同一个列表里两种数字体例。
@@ -224,6 +262,7 @@ class Store {
       if (key in patch)
         book[key] = text(patch[key], key === "title" ? 120 : Infinity);
     assert(book.title.trim(), "书名不能为空");
+    if ('cheat' in patch) book.cheat = require('./cheat.cjs').normalize(patch.cheat);
     if ("style" in patch && !book.style.trim() && book.writingSelection) {
       book.writingSelection.styleIds = book.writingSelection.styleIds.filter(id => id !== require("./writing-profiles.cjs").LEGACY);
       if (book.writingSelection.styleWeights) book.writingSelection.styleWeights = require('./style-weights.mjs').normalizeWeights(book.writingSelection.styleIds, book.writingSelection.styleWeights);
@@ -310,14 +349,24 @@ class Store {
         Array.isArray(patch.memos) && patch.memos.length <= 1000,
         "备忘录最多保存 1000 条",
       );
-      book.memos = patch.memos.map((memo) => ({
-        id: text(memo.id, 100),
-        title: text(memo.title || "未命名备忘录", 160).trim() || "未命名备忘录",
-        content: text(memo.content || ""),
-        createdAt: text(memo.createdAt || now(), 64),
-        updatedAt: now(),
-      }));
+      assert(new Set(patch.memos.map(memo=>memo.id)).size === patch.memos.length, '备忘录编号不能重复');
+      book.memos = patch.memos.map(memo => {
+        const current=(book.memos || []).find(row=>row.id === memo.id);
+        const metadata=require('./memo-metadata.mjs').normalizeMemoMetadata(memo,current);
+        const next={...metadata,id:text(memo.id,100),title:text(memo.title || '未命名备忘录',160).trim() || '未命名备忘录',content:text(memo.content || ''),createdAt:current?.createdAt || text(memo.createdAt || now(),64)};
+        const unchanged=current && current.title===next.title && current.content===next.content && Object.entries(metadata).every(([key,value])=>(current[key] || (key==='category'?'未分类':''))===value);
+        return {...next,updatedAt:unchanged?current.updatedAt:new Date(Math.max(Date.now(),(Date.parse(current?.updatedAt || '') || 0)+1)).toISOString()};
+      });
     }
+    const atlas = require("./atlas.cjs");
+    if (atlas.ATLAS_FIELDS.some((key) => key in patch))
+      Object.assign(
+        book,
+        atlas.normalize(book, patch, {
+          chapters: this.chapters(bookId),
+          characters: book.characters || [],
+        }),
+      );
     this.putBook(book);
     return this.book(bookId);
   }
@@ -412,6 +461,7 @@ class Store {
         ? { ...m, stale: true }
         : m,
     );
+    require("./atlas.cjs").invalidateAtlas(book, c, order);
   }
   updateChapter(chapterId, patch, revision, label = "自动保存") {
     return this.transaction(() => {
@@ -430,12 +480,22 @@ class Store {
         if (key in patch)
           next[key] = text(patch[key], key === "title" ? 160 : Infinity);
       if ('writingCard' in patch) next.writingCard = require('./author-tools.cjs').writingCard(patch.writingCard);
+      if ('localCast' in patch) {
+        // 本章出场人物覆盖：只接受本书真实人物 id 列表；空数组表示清除覆盖、回退自动推断
+        const validIds = new Set((book.characters || []).map(c => c.id));
+        const ids = Array.isArray(patch.localCast)
+          ? [...new Set(patch.localCast.filter(id => typeof id === 'string' && validIds.has(id)))]
+          : [];
+        if (ids.length) next.localCast = ids;
+        else delete next.localCast;
+      }
       if (
         c.title === next.title &&
         c.outline === next.outline &&
         c.body === next.body &&
         c.summary === next.summary &&
-        JSON.stringify(c.writingCard) === JSON.stringify(next.writingCard)
+        JSON.stringify(c.writingCard) === JSON.stringify(next.writingCard) &&
+        JSON.stringify(c.localCast || []) === JSON.stringify(next.localCast || [])
       )
         return c;
       this.snapshot(c, label);
@@ -732,7 +792,7 @@ class Store {
     return {
       format: "xingmiao-backup",
       version: 1,
-      excludedHistory: ["knowledge-chat", "knowledge-proposal-undo", "craft-analysis-runs"],
+      excludedHistory: ["knowledge-chat", "knowledge-proposal-undo", "craft-analysis-runs", "creative-import-proposals-and-undo"],
       createdAt: now(),
       books: this.list(true).map((b) => this.book(b.id, true)),
       skills: this.skills(),
@@ -748,6 +808,7 @@ class Store {
 require("./extensions.cjs").extendStore(Store);
 require("./timeline.cjs").installTimeline(Store);
 require("./canvas.cjs").installCanvas(Store);
+require("./atlas.cjs").installAtlas(Store);
 require("./writing-profiles.cjs").extendStore(Store);
 require('./imitation.cjs').extendStore(Store);
 Store.prototype.cleanWritingCard = require('./author-tools.cjs').writingCard;

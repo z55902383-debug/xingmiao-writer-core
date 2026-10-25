@@ -1,0 +1,36 @@
+.cheat-panel { max-width: 960px; padding-bottom: 24px; }
+.cheat-enable { display: flex; align-items: flex-start; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.cheat-enable input { margin-top: 3px; }
+.cheat-enable span { display: grid; gap: 6px; }
+.cheat-enable small, .feature-help { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.feature-help { margin: 14px 0 20px; }
+.cheat-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px 24px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.cheat-fields textarea { min-height: 92px; resize: vertical; }
+.creative-memo-picker.memo-save-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; gap: 14px; }
+.memo-save-form > .memo-save-heading, .memo-save-form > .memo-save-title, .memo-save-form > .memo-save-actions { grid-column: 1/-1; }
+.memo-save-form > .memo-save-heading { min-width: 0; }
+.creative-memo-picker.memo-save-form strong { font-size: 13px; }
+.creative-memo-picker.memo-save-form small { font-size: 12px; line-height: 1.7; }
+.creative-memo-picker.memo-save-form .button { font-size: 12px; min-height: 36px; }
+.memo-save-form .field { min-width: 0; }
+.memo-save-form .field select, .memo-save-form .field input { width: 100%; min-height: 36px; font-size: 13px; }
+.memo-save-form .memo-save-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.memo-category-editor { padding: 0 16px 12px; }
+.memo-category-editor small { display: block; color: var(--muted); font-size: 12px; line-height: 1.7; margin-top: 8px; }
+.memo-list-panel > .field { padding: 0 10px; margin-bottom: 10px; }
+@media(max-width:700px) { .cheat-fields, .creative-memo-picker.memo-save-form { grid-template-columns: minmax(0,1fr); } }
+
+.cheat-panel input:not([type=checkbox]), .cheat-panel select, .cheat-panel textarea { width:100%; }
+.cheat-tabs { display:flex; gap:24px; border-bottom:1px solid var(--border); margin:20px 0 0; }
+.cheat-tabs button { padding:12px 0; background:none; color:var(--muted); border:0; border-bottom:2px solid transparent; cursor:pointer; }
+.cheat-tabs button[aria-selected=true] { color:var(--text); border-bottom-color:currentColor; }
+.cheat-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin:16px 0; }
+.cheat-toolbar .feature-help { flex:1 1 260px; margin:0; }
+.cheat-toolbar .field { flex:1 1 260px; min-width:0; }
+.cheat-holder { border:1px solid var(--border); border-radius:8px; padding:18px; margin:18px 0; min-width:0; }
+.cheat-holder legend { padding:0 6px; font-weight:600; }
+.cheat-wide { grid-column:1/-1; }
+.cheat-holder-details { margin:16px 0; }
+.cheat-holder-details summary { cursor:pointer; padding:8px 0; color:var(--muted); }
+.cheat-holder-details[open] summary { margin-bottom:12px; }
+.cheat-document { min-height:360px; resize:vertical; line-height:1.8; }

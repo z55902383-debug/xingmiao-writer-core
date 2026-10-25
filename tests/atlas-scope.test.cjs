@@ -1,0 +1,15 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {atlasScope}=require('../src/atlasScope.ts');
+const atlas=require('../electron/atlas.cjs');
+const maps=[{id:'world',parentMapId:''},{id:'city',parentMapId:'world'},{id:'campus',parentMapId:'city'},{id:'outside',parentMapId:''}];
+const nodes=maps.map(map=>({id:'n-'+map.id,mapId:map.id}));
+const position=(characterId,nodeId,sourceOrder,patch={})=>({id:characterId+sourceOrder,characterId,nodeId,sourceOrder,chapterId:'c'+sourceOrder,status:'present',state:'confirmed',...patch});
+const projection=()=>({maps,nodes,positions:[position('a','n-city',1),position('a','n-outside',2),position('b','n-campus',1),position('c','n-city',1,{status:'mentioned'}),position('d','n-city',1,{state:'planned',status:'planned'})],items:[{id:'local',nodeId:'n-campus',ownerCharacterId:'b'},{id:'remote',nodeId:'n-outside',ownerCharacterId:'b'},{id:'unknown',nodeId:'',ownerCharacterId:'b'}],chapterId:'c2'});
+test('地点范围包含下级，可切换本层；先取最新位置再筛范围，不让离开人物残留',()=>{const all=atlasScope(projection(),'city');assert.deepEqual([...all.mapIds],['city','campus']);assert.deepEqual([...all.people],['b']);assert.deepEqual(all.items.map(item=>item.id),['local','unknown']);assert.equal(atlasScope(projection(),'city',false).positions.length,0);});
+test('提及、计划不充当在场；本章过滤沿用章节编号',()=>{assert.deepEqual([...atlasScope(projection(),'city',true,false,true).people],['b','c']);assert.equal(atlasScope(projection(),'city',true,true).positions.length,0);assert.deepEqual([...atlasScope(projection(),'').people],['a','b']);});
+const map=(id,parentMapId='',entryNodeId='')=>({id,name:id,parentMapId,entryNodeId,kind:'world',description:'',status:'fixed',chapterId:'',theme:'ink',order:0});
+const node=(id,mapId)=>({id,mapId,parentId:'',kind:'building',name:id,description:'',x:100,y:100,status:'fixed',chapterId:''});
+test('子地图入口按编号验证，跨上级地图入口拒绝',()=>{const source={chapters:[],characters:[]};const patch={maps:[map('world'),map('child','world','entry')],nodes:[node('entry','world')],edges:[],items:[],positions:[]};const valid=atlas.normalize(source,patch);assert.equal(valid.atlasMaps[1].entryNodeId,'entry');assert.throws(()=>atlas.normalize(source,{...patch,maps:[map('world'),map('other'),map('child','other','entry')]}),/入口地点必须属于上级地图/);const clean=atlas.normalize(valid,{nodes:[]});assert.equal(clean.atlasMaps[1].entryNodeId,'');assert.equal(clean.atlasMaps.length,2);});
+test('备份恢复重新映射子地图入口，保持入口属于正确父地图',()=>{const result=atlas.restoreAtlas({atlasMaps:[map('world'),map('child','world','entry')],atlasNodes:[node('entry','world')]},{});const child=result.atlasMaps.find(m=>m.name==='child');assert.notEqual(child.entryNodeId,'entry');assert.equal(child.entryNodeId,result.atlasNodes[0].id);assert.equal(child.parentMapId,result.atlasNodes[0].mapId);});
+
+test('较新的待复核位置不能让人物悄悄退回旧位置',()=>{const p=projection();p.positions=[position('a','n-city',1),position('a','n-outside',2,{state:'stale'})];assert.equal(atlasScope(p,'city').positions.length,0);assert.equal(atlasScope(p,'outside').positions.length,0);});

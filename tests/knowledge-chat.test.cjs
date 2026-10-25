@@ -540,6 +540,7 @@ test("rechecking unadopted suggestions uses fresh knowledge rather than acceptin
     "knowledge-chat",
     "knowledge-proposal-undo",
     "craft-analysis-runs",
+    "creative-import-proposals-and-undo",
   ]);
   assert.ok(!Object.hasOwn(store.backup(), "knowledgeChats"));
 });

@@ -138,4 +138,4 @@ function restoreFields(source) {
   const book = { ...source, writingProfiles };
   return { writingProfiles, writingProfileTrash, ...(source.writingSelection ? { writingSelection: checkedSelection(book, source.writingSelection) } : {}), ...require('./imitation.cjs').restoreFields(source) };
 }
-module.exports = { LEGACY, profiles, selection, references, contextValue, distillationContext, extendStore, restoreFields };
+module.exports = { normalizeRecord, LEGACY, profiles, selection, references, contextValue, distillationContext, extendStore, restoreFields };

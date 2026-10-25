@@ -1,4 +1,5 @@
 import { tr } from "./i18n";
+import ChapterSyncDialog from "./ChapterSyncDialog";
 import CompareWriter from './CompareWriter';
 import {
   useCallback,
@@ -342,12 +343,14 @@ export default function ManualTyping({
   notify,
   closeGuard,
   onSettings,
+  onOpenBook,
 }: {
   books: BookSummary[];
   onBack: () => Promise<void>;
   notify: (msg: string) => void;
   closeGuard: MutableRefObject<() => Promise<void>>;
   onSettings: () => void;
+  onOpenBook?: (book:Book,target:"atlas"|"memory",chapterId:string)=>void;
 }) {
   const [library, setLibrary] = useState<Library>(loadLibrary);
   const libraryRef = useRef(library);
@@ -368,6 +371,8 @@ export default function ManualTyping({
   const memos = useManualMemos(books, draft.bookId);
   const ideaCloseGuard = useRef<() => Promise<void>>(async () => {});
   const [showAttach, setShowAttach] = useState(false);
+  const [syncTarget,setSyncTarget]=useState<{bookId:string;chapterId:string}|null>(null);
+  const submitAfterAttach=useRef(false);
   const [showReload, setShowReload] = useState(false);
   const [showDrafts, setShowDrafts] = useState(false);
   const [showSources, setShowSources] = useState(false);
@@ -1206,6 +1211,14 @@ export default function ManualTyping({
             </div>
           </div>
           <div className="mt-header-right">
+            {!compareMode&&<Button disabled={saving||!draft.text.trim()} title={tr('保存并定稿后分析本章资料，核对后同步记忆与蓝图')} onClick={async()=>{
+              if(!draft.chapterId){submitAfterAttach.current=true;setShowAttach(true);return;}
+              if(await saveChapter()){
+                const current=libraryRef.current.drafts[libraryRef.current.activeKey];
+                if(current.bookId&&current.chapterId)setSyncTarget({bookId:current.bookId,chapterId:current.chapterId});
+              }
+            }}>{tr('提交并分析')}</Button>}
+
             <Button
               variant="primary"
               busy={saving}
@@ -1771,11 +1784,12 @@ export default function ManualTyping({
           </div>
         </Modal>
       )}
+      {syncTarget&&<ChapterSyncDialog bookId={syncTarget.bookId} chapterId={syncTarget.chapterId} onClose={()=>setSyncTarget(null)} onOpenBook={onOpenBook?(value,target)=>{setSyncTarget(null);onOpenBook(value,target,syncTarget.chapterId);}:undefined}/>}
       {showAttach && (
         <AttachDraft
           books={books}
           draft={draft}
-          onClose={() => setShowAttach(false)}
+          onClose={() => {submitAfterAttach.current=false;setShowAttach(false);}}
           onSaved={(saved) => {
             const next = chapterDraft(saved);
             commit((lib) => {
@@ -1799,6 +1813,7 @@ export default function ManualTyping({
             }
             setSaveError("");
             setShowAttach(false);
+            if(submitAfterAttach.current){submitAfterAttach.current=false;setSyncTarget({bookId:saved.bookId,chapterId:saved.id});}
             notify(tr("已保存到「{0}」", { 0: saved.title }));
           }}
         />

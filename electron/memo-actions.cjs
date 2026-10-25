@@ -17,8 +17,9 @@ function saveMemo(store, input) {
     );
     const title = text(input.title ?? "", 160).trim() || "未命名备忘录";
     const content = text(input.content ?? "");
+    const metadata = require('./memo-metadata.mjs').normalizeMemoMetadata(input, current);
     if (current) {
-      if (current.title === title && current.content === content)
+      if (current.title === title && current.content === content && Object.entries(metadata).every(([key,value]) => (current[key] || (key === 'category' ? '未分类' : '')) === value))
         return current;
       assert(
         typeof input.baseUpdatedAt === "string" &&
@@ -39,6 +40,7 @@ function saveMemo(store, input) {
       id: noteId,
       title,
       content,
+      ...metadata,
       createdAt: current?.createdAt || timestamp,
       updatedAt: timestamp,
     };

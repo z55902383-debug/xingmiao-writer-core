@@ -8,6 +8,7 @@ import {
   GlobeHemisphereWest,
   Brain,
   ArrowCounterClockwise,
+  MapTrifold,
   Check,
   Trash,
 } from "@phosphor-icons/react";
@@ -24,6 +25,11 @@ const targets: Record<string, string> = {
   memory: "事实记忆",
   timeline: "时间线与关系",
   foreshadow: "伏笔记录",
+  atlasMap: "蓝图地图",
+  atlasNode: "地点节点",
+  atlasEdge: "地点关系",
+  atlasItem: "物品归属",
+  atlasPosition: "人物位置",
 };
 const fields: Record<string, string> = {
   premise: "故事简介",
@@ -56,6 +62,15 @@ const fields: Record<string, string> = {
   sourceRevision: "来源版本",
   evidence: "原文证据",
   stale: "待复核",
+  mapId: "所属地图",
+  parentMapId: "上级地图",
+  parentId: "上级地点",
+  nodeId: "所在地点",
+  ownerCharacterId: "保管人",
+  theme: "地图主题",
+  source: "连线起点",
+  target: "连线终点",
+  label: "连线名称",
 };
 function shown(value: unknown, book: Book) {
   if (value == null || value === "") return tr("无");
@@ -63,17 +78,35 @@ function shown(value: unknown, book: Book) {
   if (typeof value === "string") {
     const person = book.characters.find((row) => row.id === value);
     if (person) return person.name;
+    const place = (book.atlasNodes || []).find((row) => row.id === value);
+    if (place) return place.name;
+    const map = (book.atlasMaps || []).find((row) => row.id === value);
+    if (map) return map.name;
     const label: Record<string, string> = {
       planned: "计划",
       confirmed: "已确认",
       fixed: "固定",
       provisional: "待确认",
+      present: "在场",
+      mentioned: "提及",
       open: "待回收",
       resolved: "已回收",
       abandoned: "已放弃",
       world: "世界",
       character: "人物",
       relation: "关系",
+      region: "区域",
+      settlement: "聚落",
+      landmark: "地标",
+      building: "建筑",
+      room: "房间",
+      object: "物件",
+      contain: "从属",
+      route: "路线",
+      portal: "通道",
+      link: "关联",
+      site: "地点",
+      floor: "楼层",
     };
     return label[value] ? tr(label[value]) : value;
   }
@@ -270,7 +303,12 @@ export default function KnowledgeAssistant({
             <Brain size={13} />
             {tr("关系与记忆")}
           </span>
+          <span>
+            <MapTrifold size={13} />
+            {tr("知识蓝图")}
+          </span>
         </div>
+        <small>{tr("地图、地点、人物位置与物品归属也可以在这里整理。")}</small>
         <small>{tr("不读取或修改章节正文、章纲、风格档案和备忘录。")}</small>
       </div>
       <div
@@ -291,6 +329,7 @@ export default function KnowledgeAssistant({
               "列出现有的人物及关系",
               "检查世界规则是否有冲突",
               "梳理大纲中尚未解决的问题",
+              "把本章人物当前位置整理到地图",
             ].map((text) => (
               <button
                 key={text}
@@ -380,6 +419,7 @@ export default function KnowledgeAssistant({
                               record?.name ||
                                 record?.title ||
                                 record?.subject ||
+                                record?.label ||
                                 book.title,
                             )}
                           </small>

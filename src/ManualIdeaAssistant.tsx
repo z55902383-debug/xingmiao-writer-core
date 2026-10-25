@@ -695,6 +695,7 @@ export default function ManualIdeaAssistant({
           void send();
         }}
       >
+        <div className="mt-idea-inputs">
         <label htmlFor={`${id}-mode`}>{tr("发散方式")}</label>
         <select
           id={`${id}-mode`}
@@ -742,6 +743,8 @@ export default function ManualIdeaAssistant({
             {tr(actionError)}
           </p>
         )}
+        </div>
+        <div className="mt-idea-submit">
         {running ? (
           <Button type="button" busy={stopping} onClick={() => void stop()}>
             <Stop size={15} />
@@ -752,6 +755,7 @@ export default function ManualIdeaAssistant({
             {tr("开始构思")}
           </Button>
         )}
+        </div>
       </form>
       {showReferencePicker && memo && (
         <MemoReferencePicker memo={memo} notes={notes} choices={session.memoChoices} value={referenceChoice} onClose={() => setShowReferencePicker(false)} onApply={async (choice, memoId) => {

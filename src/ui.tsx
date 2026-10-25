@@ -1,6 +1,7 @@
 import { tr } from "./i18n";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useId,
   useState,
@@ -63,10 +64,20 @@ export function Modal({
   icon?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  const opener = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  useLayoutEffect(() => {
     ref.current?.showModal();
     const dialog = ref.current;
-    return () => dialog?.close();
+    return () => {
+      dialog?.close();
+      queueMicrotask(() => {
+        const target = opener.current;
+        const topDialog = [...document.querySelectorAll('dialog[open]')].at(-1);
+        if (target?.isConnected && !target.closest('[inert]') && (!topDialog || topDialog.contains(target))) {
+          target.focus({ preventScroll: true });
+        }
+      });
+    };
   }, []);
   return (
     <dialog

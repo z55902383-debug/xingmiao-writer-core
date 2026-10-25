@@ -1,8 +1,11 @@
+import MemoLibrary from "./MemoLibrary";
 import { readOverrides, writeOverrides, selectedInstructions, type InstructionOverrides } from "./instruction-choice";
+import CheatPanel from './CheatPanel';
 import LanguageSwitcher from "./LanguageSwitcher";
 import KnowledgeAssistant from "./KnowledgeAssistant";
 import { tr, genreLabel } from "./i18n";
 import SyncReview from "./SyncReview";
+import ChapterSyncDialog from "./ChapterSyncDialog";
 import CandidateRecovery from "./CandidateRecovery";
 import ContinuityPanel from "./ContinuityPanel";
 import RelationMemory, { CandidateRelationReview } from './RelationMemory';
@@ -10,6 +13,7 @@ import CompareWriter from './CompareWriter';
 import { AuthorToolsPanel, WritingCardEditor, ProseReview } from "./AuthorTools";
 import "./onboarding.css";
 import CreationGuideIsland from "./CreationGuideIsland";
+import KnowledgeAtlas from "./KnowledgeAtlas";
 import TimelinePanel from "./TimelinePanel";
 import VolumePlanner from "./VolumePlanner";
 import { PlanningCandidate, PlanningText } from "./PlanningText";
@@ -30,9 +34,11 @@ import CanvasSourceEditor, {
   type CanvasSourceRequest,
 } from "./CanvasSourceEditor";
 import "./canvas-integration.css";
+import "./atlas-integration.css";
 import {
   useEffect,
   useLayoutEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -83,6 +89,7 @@ import {
   ChatCircle,
   NotePencil,
   Cpu,
+  MapTrifold,
   X,
 } from "@phosphor-icons/react";
 import type {
@@ -110,7 +117,7 @@ import ManuscriptSettings, { useManuscriptFormat } from "./ManuscriptSettings";
 import { handleManuscriptEnter, useManuscriptTyping } from "./manuscriptInput";
 import { formatManuscript } from "../electron/manuscript-format.mjs";
 type View =
-  "editor" | "outline" | "characters" | "world" | "memory" | "notes" | "style" | "imitation";
+  "editor" | "outline" | "characters" | "world" | "atlas" | "memory" | "notes" | "style" | "imitation" | "cheat";
 
 /* 阅读偏好：只影响本机显示，不进作品数据。
    默认值取产品规范的推荐区间（字号 18、行高 1.8、正文宽度 760）。 */
@@ -222,16 +229,46 @@ const kinds: Record<Kind, string> = {
   check: "检查情节连续性",
   style: "分析参考写法",
 };
-const sections: { key: View; label: string; icon: typeof BookOpen }[] = [
-  { key: "editor", label: "章节正文", icon: BookOpen },
-  { key: "outline", label: "故事大纲", icon: ListBullets },
-  { key: "characters", label: "人物档案", icon: Users },
-  { key: "world", label: "世界设定", icon: GlobeHemisphereWest },
-  { key: "memory", label: "关系与记忆", icon: Brain },
-  { key: "notes", label: "备忘录", icon: NotePencil },
-  { key: "style", label: "风格档案", icon: PaintBrush },
-  { key: 'imitation', label: '仿写对标', icon: FileText },
+type NavItem = { key: View; label: string; icon: typeof BookOpen };
+/* 功能入口按「现在想处理什么」分组：正文、故事结构、设定、记忆、参考资料。
+   分组只改变排列，不改变原有页面和按钮名称，作者仍可一键直达。 */
+const navGroups: { key: string; label: string; items: NavItem[] }[] = [
+  {
+    key: "writing",
+    label: "写作",
+    items: [{ key: "editor", label: "章节正文", icon: BookOpen }],
+  },
+  {
+    key: "story",
+    label: "故事",
+    items: [{ key: "outline", label: "故事大纲", icon: ListBullets }],
+  },
+  {
+    key: "setting",
+    label: "设定",
+    items: [
+      { key: "characters", label: "人物档案", icon: Users },
+      { key: "world", label: "世界设定", icon: GlobeHemisphereWest },
+      { key: "atlas", label: "知识蓝图", icon: MapTrifold },
+      { key: "cheat", label: "金手指", icon: Sparkle },
+    ],
+  },
+  {
+    key: "memory",
+    label: "记忆",
+    items: [{ key: "memory", label: "关系与记忆", icon: Brain }],
+  },
+  {
+    key: "material",
+    label: "资料",
+    items: [
+      { key: "notes", label: "备忘录", icon: NotePencil },
+      { key: "style", label: "风格档案", icon: PaintBrush },
+      { key: "imitation", label: "仿写对标", icon: FileText },
+    ],
+  },
 ];
+const sections: NavItem[] = navGroups.flatMap((group) => group.items);
 /* 任务按「用户想做什么」分组，而不是按当前所在资料页分组——
    作者写到一半想检查设定冲突时，不该先切到某个资料页才找得到入口。 */
 const INTENTS: { id: string; label: string; hint: string; kinds: Kind[] }[] = [
@@ -285,14 +322,17 @@ const VIEW_KINDS: Record<View, Kind[]> = {
   ],
   characters: ["characters", "timelinePlan"],
   world: ["worldBuild", "timelinePlan"],
+  atlas: [],
   memory: ["memory", "timelinePlan", "check"],
   notes: [],
+  cheat: [],
   style: ["style"],
   imitation: ['style'],
 };
 export default function Workspace({
   initial,
   preferredChapterId,
+  initialView,
   config,
   onBack,
   onConfigSaved,
@@ -303,6 +343,7 @@ export default function Workspace({
 }: {
   initial: Book;
   preferredChapterId?: string;
+  initialView?: View;
   config: Config;
   onConfigSaved: (c: Config) => void;
   onBack: () => Promise<void>;
@@ -329,10 +370,12 @@ export default function Workspace({
       ? preferredChapterId!
       : (preferredChapterId ? [...initial.chapters].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id : initial.chapters[0]?.id) || "",
   );
-  const [view, setView] = useState<View>('editor');
+  const [syncChapterId,setSyncChapterId]=useState<string|null>(null);
+  const [view, setView] = useState<View>(initialView||'editor');
   const [sidebarSection, setSidebarSection] = useState<"chapters" | "features">(
-    'chapters',
+    initialView&&initialView!=='editor'?'features':'chapters',
   );
+  const sidebarTabsId = useId();
   const [outlineTab, setOutlineTab] = useState<
     "foundation" | "timeline" | "volumes" | "board"
   >("foundation");
@@ -531,9 +574,9 @@ export default function Workspace({
   }
   const [worldRecord, setWorldRecord] = useState<WorldRecord | null>(null);
   const [foreshadowTitle, setForeshadowTitle] = useState("");
-  const [memoSearch, setMemoSearch] = useState("");
   const [selectedMemoId, setSelectedMemoId] = useState("");
   const [memoDrawerOpen, setMemoDrawerOpen] = useState(false);
+  const [memoDrawerWide, setMemoDrawerWide] = useState(false);
   const [memoBooks, setMemoBooks] = useState<BookSummary[]>([]);
   const [memoBook, setMemoBook] = useState<Book | null>(null);
   const [memoDrawerLoading, setMemoDrawerLoading] = useState(false);
@@ -676,10 +719,12 @@ export default function Workspace({
     const pending = memoDrawerPendingSave.current;
     memoDrawerPendingSave.current = null;
     if (!pending) return;
-    await api<Book>("book:update", {
-      id: pending.id,
-      patch: { memos: pending.memos },
-    });
+    try {
+      await api<Book>("book:update", { id: pending.id, patch: { memos: pending.memos } });
+    } catch (error) {
+      if (!memoDrawerPendingSave.current) memoDrawerPendingSave.current = pending;
+      throw error;
+    }
   };
   const openMemoDrawer = async () => {
     setMemoDrawerOpen(true);
@@ -911,7 +956,7 @@ export default function Workspace({
     }
   }
   useEffect(() => {
-    closeGuard.current = async () => { await comparisonGuard.current(); await flush(); };
+    closeGuard.current = async () => { await comparisonGuard.current(); await persistMemoDrawerPending(); await flush(); };
     return () => {
       closeGuard.current = async () => {};
     };
@@ -932,11 +977,12 @@ export default function Workspace({
       const mod = event.ctrlKey || event.metaKey;
       if (mod && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        comparisonGuard.current().then(flush)
+        comparisonGuard.current().then(persistMemoDrawerPending).then(flush)
           .then(() => notify(tr("已保存到本机")))
           .catch((e) => notify(e.message));
       }
       if (mod && event.key.toLowerCase() === "f") {
+        if (memoDrawerOpen) { event.preventDefault(); document.querySelector<HTMLInputElement>('.memo-drawer .memo-browser-search input')?.focus(); return; }
         if (compareMode) { event.preventDefault(); document.querySelector<HTMLTextAreaElement>('.compare-column textarea:not([readonly])')?.focus(); return; }
         event.preventDefault();
         setShowFind(true);
@@ -948,6 +994,7 @@ export default function Workspace({
       }
       // Esc 逐层退出：先关浮层，再退专注模式
       if (event.key === "Escape") {
+        if (memoDrawerOpen) return closeMemoDrawer();
         if (chapterTools) return setChapterTools(null);
         if (showDisplay) return setShowDisplay(false);
         if (showFind) return setShowFind(false);
@@ -1279,7 +1326,7 @@ export default function Workspace({
       {relationFocus && chapter && <Modal title={tr('关联旧文与变化')} wide onClose={() => setRelationFocus(null)}><div className="modal-body continuity-panel"><RelationMemory book={book} chapter={chapter} focusId={relationFocus} disabled={busy || !!running} onSource={id => void run(async () => { await flush(); setRelationFocus(null); setChapterId(id); setView('editor'); })}/></div></Modal>}
       {chapterTools && chapter && view === 'editor' && <aside className="chapter-tools-drawer" aria-label={tr(chapterTools === 'continuity' ? '续写资料' : '本章写前卡')} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setChapterTools(null); } }}>
         <div className="chapter-tools-head"><strong>{tr(chapterTools === 'continuity' ? '续写资料' : '本章写前卡')}</strong><IconButton label={tr('关闭章节资料')} onClick={() => setChapterTools(null)}><X size={18}/></IconButton></div>
-        <div className="chapter-tools-body">{chapterTools === 'continuity' ? <ContinuityPanel key={`continuity-${book.id}-${chapter.id}`} defaultOpen book={book} chapter={chapter} chapterIds={contextChapterIds} excerptIds={excerptIds} query={retrievalQuery} disabled={busy || !!running} onQuery={setRetrievalQuery} onExcerpts={setExcerptIds} onChanged={replace} onInclude={includeContinuity => editBook({ includeContinuity })} onRelated={relatedMemoryOnly => editBook({ relatedMemoryOnly })} onSource={id => void run(async () => { await comparisonGuard.current(); await flush(); setChapterId(id); setChapterTools(null); setView('editor'); })} flush={flush}/> : <WritingCardEditor defaultOpen chapter={chapter} book={book} disabled={busy || !!running} onChange={writingCard => editChapter(chapter.id, { writingCard })}/>}</div>
+        <div className="chapter-tools-body">{chapterTools === 'continuity' ? <ContinuityPanel key={`continuity-${book.id}-${chapter.id}`} defaultOpen book={book} chapter={chapter} chapterIds={contextChapterIds} excerptIds={excerptIds} query={retrievalQuery} disabled={busy || !!running} onQuery={setRetrievalQuery} onExcerpts={setExcerptIds} onChanged={replace} onInclude={includeContinuity => editBook({ includeContinuity })} onRelated={relatedMemoryOnly => editBook({ relatedMemoryOnly })} onSource={id => void run(async () => { await comparisonGuard.current(); await flush(); setChapterId(id); setChapterTools(null); setView('editor'); })} flush={flush}/> : <WritingCardEditor key={`card-${chapter.id}`} defaultOpen chapter={chapter} book={book} disabled={busy || !!running} onChange={writingCard => editChapter(chapter.id, { writingCard })} onLocalCastChange={ids => editChapter(chapter.id, { localCast: ids })}/>}</div>
       </aside>}
       <aside className="workspace-sidebar">
         <div className="sidebar-top">
@@ -1322,9 +1369,20 @@ export default function Workspace({
             </div>
           </div>
         </div>
-        <div className="sidebar-switcher" role="tablist" aria-label={tr("侧栏内容")}>
+        <div className="sidebar-switcher" role="tablist" aria-label={tr("侧栏内容")} onKeyDown={event => {
+          if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+          const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+          const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
+          if (index < 0) return;
+          event.preventDefault();
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+          tabs[next]?.focus(); tabs[next]?.click();
+        }}>
           <button
             role="tab"
+            id={`${sidebarTabsId}-chapters`}
+            aria-controls={`${sidebarTabsId}-chapter-panel`}
+            tabIndex={sidebarSection === 'chapters' ? 0 : -1}
             aria-selected={sidebarSection === "chapters"}
             className={sidebarSection === "chapters" ? "active" : ""}
             onClick={() => setSidebarSection("chapters")}
@@ -1333,6 +1391,9 @@ export default function Workspace({
           </button>
           <button
             role="tab"
+            id={`${sidebarTabsId}-features`}
+            aria-controls={`${sidebarTabsId}-feature-panel`}
+            tabIndex={sidebarSection === 'features' ? 0 : -1}
             aria-selected={sidebarSection === "features"}
             className={sidebarSection === "features" ? "active" : ""}
             onClick={() => setSidebarSection("features")}
@@ -1340,20 +1401,26 @@ export default function Workspace({
             <SquaresFour size={15} />{tr("功能")}</button>
         </div>
         {sidebarSection === "features" ? (
-          <nav className="workspace-nav" role="tabpanel">
-            {sections.map((s) => (
-              <button
-                key={s.key}
-                className={`nav-item ${view === s.key ? "active" : ""}`}
-                title={s.label}
-                onClick={() => setView(s.key)}
-              >
-                <s.icon size={19} />
-                {tr(s.label)}
-                {s.key === "memory" && validCount > 0 && (
-                  <span>{validCount}</span>
-                )}
-              </button>
+          <nav className="workspace-nav" role="tabpanel" id={`${sidebarTabsId}-feature-panel`} aria-labelledby={`${sidebarTabsId}-features`}>
+            {navGroups.map((group) => (
+              <div className="workspace-nav-group" key={group.key}>
+                <span className="workspace-nav-label">{tr(group.label)}</span>
+                {group.items.map((s) => (
+                  <button
+                    key={s.key}
+                    className={`nav-item ${view === s.key ? "active" : ""}`}
+                    title={s.label}
+                    aria-current={view === s.key ? "page" : undefined}
+                    onClick={() => setView(s.key)}
+                  >
+                    <s.icon size={19} />
+                    {tr(s.label)}
+                    {s.key === "memory" && validCount > 0 && (
+                      <span>{validCount}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
         ) : (
@@ -1368,7 +1435,7 @@ export default function Workspace({
                 <Plus size={18} />
               </IconButton>
             </div>
-            <div className="chapter-list" role="tabpanel">
+            <div className="chapter-list" role="tabpanel" id={`${sidebarTabsId}-chapter-panel`} aria-labelledby={`${sidebarTabsId}-chapters`}>
               {[
                 ...(book.volumes || []),
                 { id: "", title: book.volumes?.length ? "未分卷" : "章节" },
@@ -1478,6 +1545,16 @@ export default function Workspace({
             <b>{tr(sections.find((s) => s.key === view)?.label)}</b>
           </div>
           <div className="top-actions">
+            <Button
+              variant="quiet"
+              className={`workspace-memo-trigger${memoDrawerOpen ? " memo-toolbar-active" : ""}`}
+              aria-label={tr("打开备忘录")}
+              aria-expanded={memoDrawerOpen}
+              aria-controls="workspace-memo-drawer"
+              onClick={() => memoDrawerOpen ? closeMemoDrawer() : void openMemoDrawer()}
+            >
+              <NotePencil size={17} /><span>{tr("备忘录")}</span>
+            </Button>
             <LanguageSwitcher />
             <IconButton
               className="chapter-drawer-trigger"
@@ -1503,6 +1580,8 @@ export default function Workspace({
             </IconButton>
             <button
               className={`save-state ${saveState === "保存失败" ? "failed" : ""}`}
+              aria-label={tr('保存作品，当前状态：{0}', {0:tr(saveState)})}
+              title={tr('保存作品，当前状态：{0}', {0:tr(saveState)})}
               onClick={() =>
                 flush()
                   .then(() => notify(tr("保存完成")))
@@ -1516,6 +1595,7 @@ export default function Workspace({
               )}
               <span>{tr(saveState)}</span>
             </button>
+            <span className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{tr(saveState)}</span>
             <span className="top-divider" />
             <IconButton
               label={focus ? tr("退出专注模式") : tr("专注模式")}
@@ -1562,16 +1642,7 @@ export default function Workspace({
               </div>
               <div className="toolbar-actions">
                 <Button className="author-tools-trigger" variant="quiet" onClick={() => setAuthorToolsOpen(true)}>{tr("素材与复核")}</Button>
-                <IconButton
-                  label={tr("打开备忘录")}
-                  className={memoDrawerOpen ? "memo-toolbar-active" : ""}
-                  aria-expanded={memoDrawerOpen}
-                  onClick={() =>
-                    memoDrawerOpen ? closeMemoDrawer() : void openMemoDrawer()
-                  }
-                >
-                  <NotePencil size={18} />
-                </IconButton>
+
                 <IconButton
                   label={tr("历史版本")}
                   onClick={() =>
@@ -1592,27 +1663,20 @@ export default function Workspace({
                   }
                   title={
                     chapter.status === "final"
-                      ? tr("本章已确认；修改正文后会自动标记为草稿并要求重新核对")
-                      : tr("确认本章正文，后续 AI 才会把它作为可靠事实提取记忆")
+                      ? tr("查看本章资料同步状态，可核对变化或重新分析")
+                      : tr("先保存并定稿，再分析本章资料；核对后同步记忆与蓝图")
                   }
                   disabled={
-                    compareMode || busy || chapter.status === "final" || !chapter.body.trim()
+                    compareMode || busy || !chapter.body.trim()
                   }
                   onClick={() =>
                     run(async () => {
-                      await api("chapter:finalize", {
-                        id: chapter.id,
-                        revision: current.current.chapters.find(
-                          (c) => c.id === chapter.id,
-                        )!.revision,
-                      });
-                      await reload();
-                      notify(tr("章节已定稿，现在可以在助手中提取本章记忆"));
+                      setSyncChapterId(chapter.id);
                     })
                   }
                 >
                   <Check size={16} />
-                  {chapter.status === "final" ? tr("已定稿") : tr("本章定稿")}
+                  {chapter.status === "final" ? tr("核对本章资料") : tr("本章定稿")}
                 </Button>
               </div>
             </div>
@@ -2407,6 +2471,9 @@ export default function Workspace({
                     <div className="module-section-intro">
                       <strong>{tr("故事开始时，世界是什么样？")}</strong>
                       <span>{tr("记录时代、地点、组织和固定规则。后续变化单独记入时间线。")}</span>
+                      <Button variant="ghost" onClick={() => setView("atlas")}>
+                        <MapTrifold size={15} />{tr("在地图上整理地点")}
+                      </Button>
                     </div>
                     <Field label={tr("世界观与固定规则")}>
                       <textarea
@@ -2492,6 +2559,28 @@ export default function Workspace({
                 )}
               </div>
             )}
+          </div>
+        )}
+        {view === "atlas" && (
+          <div className="document-page module-page atlas-page">
+            <div className="module-page-head">
+              <PageHeading
+                icon={<MapTrifold size={23} />}
+                title={tr("把整个世界摊开来看")}
+                text="按世界、地点、建筑分层查看地图；人物位置与物品归属随章节同步，计划、待确认和待复核分别标注。"
+              />
+            </div>
+            <div className="module-content-scroll atlas-content-scroll">
+              <KnowledgeAtlas
+                onReviewChapter={async(id)=>{try{await flush();setSyncChapterId(id);}catch(e){notify((e as Error).message);}}}
+                book={book}
+                chapterId={chapter?.id || ""}
+                disabled={busy || !!running}
+                onChange={(patch) => editBook(patch)}
+                flush={flush}
+                notify={notify}
+              />
+            </div>
           </div>
         )}
         {view === "memory" && (
@@ -2868,188 +2957,14 @@ export default function Workspace({
               />
             </div>
             <div className="module-content-scroll memo-content-scroll">
-              {(() => {
-                const memos = book.memos || [];
-                const visibleMemos = memos.filter((memo) =>
-                  `${memo.title} ${memo.content}`
-                    .toLocaleLowerCase()
-                    .includes(memoSearch.toLocaleLowerCase()),
-                );
-                const selected =
-                  memos.find((memo) => memo.id === selectedMemoId) ||
-                  visibleMemos[0];
-                return memos.length ? (
-                  <div className="memo-layout">
-                    <aside className="memo-list-panel">
-                      <label className="search memo-search">
-                        <MagnifyingGlass size={17} />
-                        <input
-                          aria-label={tr("搜索备忘录")}
-                          value={memoSearch}
-                          onChange={(e) => setMemoSearch(e.target.value)}
-                          placeholder={tr("搜索备忘录")}
-                        />
-                      </label>
-                      <div className="memo-list">
-                        {visibleMemos.map((memo) => (
-                          <button
-                            key={memo.id}
-                            className={`memo-list-item ${selected?.id === memo.id ? "active" : ""}`}
-                            onClick={() => setSelectedMemoId(memo.id)}
-                          >
-                            <NotePencil size={17} />
-                            <span>
-                              <strong>{memo.title || tr("未命名备忘录")}</strong>
-                              <small>
-                                {memo.content.trim().slice(0, 56) ||
-                                  tr("空白备忘录")}
-                              </small>
-                            </span>
-                            <time>
-                              {new Date(memo.updatedAt).toLocaleDateString(
-                                "zh-CN",
-                                { month: "numeric", day: "numeric" },
-                              )}
-                            </time>
-                          </button>
-                        ))}
-                        {!visibleMemos.length && (
-                          <p className="memo-no-results">{tr("没有匹配的备忘录")}</p>
-                        )}
-                      </div>
-                    </aside>
-                    {selected ? (
-                      <article className="memo-editor-card">
-                        <div className="memo-editor-toolbar">
-                          <span>
-                            <i />{tr("自动保存到「")}{book.title}」
-                          </span>
-                          <div>
-                            <Button
-                              disabled={!selected.content.trim()}
-                              onClick={() => {
-                                void copyText(selected.content).then(() =>
-                                  notify(tr("备忘录内容已复制，可以粘贴到正文")),
-                                );
-                              }}
-                            >
-                              <Copy size={15} />{tr("复制内容")}</Button>
-                            <IconButton
-                              label={tr("删除备忘录")}
-                              onClick={() =>
-                                setConfirm({
-                                  title: "删除这条备忘录？",
-                                  message: "删除后无法恢复。",
-                                  action: async () => {
-                                    editBook({
-                                      memos: memos.filter(
-                                        (memo) => memo.id !== selected.id,
-                                      ),
-                                    });
-                                    setSelectedMemoId(
-                                      visibleMemos.find(
-                                        (memo) => memo.id !== selected.id,
-                                      )?.id || "",
-                                    );
-                                  },
-                                })
-                              }
-                            >
-                              <Trash size={16} />
-                            </IconButton>
-                          </div>
-                        </div>
-                        <input
-                          className="memo-title-input"
-                          aria-label={tr("备忘录标题")}
-                          value={selected.title}
-                          maxLength={160}
-                          onChange={(e) =>
-                            editBook({
-                              memos: memos.map((memo) =>
-                                memo.id === selected.id
-                                  ? {
-                                      ...memo,
-                                      title: e.target.value,
-                                      updatedAt: new Date().toISOString(),
-                                    }
-                                  : memo,
-                              ),
-                            })
-                          }
-                          placeholder={tr("给这条备忘录起个标题")}
-                        />
-                        <textarea
-                          className="memo-textarea"
-                          aria-label={tr("备忘录内容")}
-                          value={selected.content}
-
-                          onChange={(e) =>
-                            editBook({
-                              memos: memos.map((memo) =>
-                                memo.id === selected.id
-                                  ? {
-                                      ...memo,
-                                      content: e.target.value,
-                                      updatedAt: new Date().toISOString(),
-                                    }
-                                  : memo,
-                              ),
-                            })
-                          }
-                          placeholder={tr("粘贴创意工具箱生成的结果，或记下写作时突然想到的内容……")}
-                        />
-                        <footer className="memo-editor-footer">
-                          <span>
-                            {selected.content.length.toLocaleString("zh-CN")}{" "}{tr("/ 不设字数上限")}</span>
-                          <span>{tr("修改于")}{" "}
-                            {new Date(selected.updatedAt).toLocaleString(
-                              "zh-CN",
-                              {
-                                month: "2-digit",
-                                day: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
-                          </span>
-                        </footer>
-                      </article>
-                    ) : (
-                      <Empty
-                        icon={<NotePencil size={34} />}
-                        title={tr("搜索不到这条备忘录")}
-                      >{tr("清除搜索词，或新建一条备忘录。")}</Empty>
-                    )}
-                  </div>
-                ) : (
-                  <Empty
-                    icon={<NotePencil size={36} />}
-                    title={tr("先建一条备忘录")}
-                    action={
-                      <Button
-                        variant="primary"
-                        onClick={() => {
-                          const now = new Date().toISOString();
-                          const memo: MemoNote = {
-                            id: crypto.randomUUID(),
-                            title: "新备忘录",
-                            content: "",
-                            createdAt: now,
-                            updatedAt: now,
-                          };
-                          editBook({ memos: [memo] });
-                          setSelectedMemoId(memo.id);
-                        }}
-                      >
-                        <Plus size={16} />{tr("新建备忘录")}</Button>
-                    }
-                  >{tr("把工具箱中的生成结果复制到这里，或记录写作时想保留的灵感。备忘录按作品分别保存。")}</Empty>
-                );
-              })()}
+              <MemoLibrary key={book.id} notes={book.memos || []} bookTitle={book.title}
+                selectedId={selectedMemoId} onSelect={setSelectedMemoId}
+                onChange={memos => editBook({ memos })} notify={notify}
+                onDelete={note => setConfirm({ title: "删除这条备忘录？", message: "删除后无法恢复。", action: async () => { editBook({ memos: (book.memos || []).filter(memo => memo.id !== note.id) }); setSelectedMemoId(""); } })} />
             </div>
           </div>
         )}
+        {view === 'cheat' && <div className="document-page module-page"><div className="module-page-head"><PageHeading icon={<Sparkle size={23}/>} title={tr('金手指设定')} text="为本书配置贯穿全书的核心能力、限制与成长计划。"/></div><div className="module-content-scroll"><CheatPanel characters={book.characters} memos={book.memos || []} value={book.cheat} disabled={busy || !!running} onChange={cheat=>editBook({cheat})}/></div></div>}
         {view === 'imitation' && <div className="document-page style-page"><PageHeading icon={<FileText size={23}/>} title={tr('仿写小说对标')} text="故事对标与文风蒸馏分别管理。"/><ImitationProfiles book={book} disabled={busy || !!running} onChanged={replace} flush={flush} onSaving={markWritingSaving} preview={imitationBlendPreview} onPreview={setImitationBlendPreview} onAnalyze={id => generateFor('style', undefined, undefined, undefined, id)}/></div>}
         {view === "style" && (
           <div className="document-page style-page">
@@ -3768,7 +3683,8 @@ export default function Workspace({
         onClick={closeMemoDrawer}
       />
       <aside
-        className={`memo-drawer ${memoDrawerOpen ? "open" : ""}`}
+        className={`memo-drawer ${memoDrawerOpen ? "open" : ""} ${memoDrawerWide ? "is-wide" : ""}`}
+        id="workspace-memo-drawer"
         aria-label={tr("备忘录侧边栏")}
         aria-hidden={!memoDrawerOpen}
       >
@@ -3782,9 +3698,10 @@ export default function Workspace({
               <small>{tr("收好灵感，写作时随时取用")}</small>
             </span>
           </div>
+          <div className="memo-drawer-window-actions"><IconButton label={tr(memoDrawerWide ? "还原备忘录宽度" : "展开备忘录")} aria-pressed={memoDrawerWide} onClick={() => setMemoDrawerWide(value => !value)}>{memoDrawerWide ? <ArrowsIn size={18} /> : <ArrowsOut size={18} />}</IconButton>
           <IconButton label={tr("关闭备忘录")} onClick={closeMemoDrawer}>
             <X size={18} />
-          </IconButton>
+          </IconButton></div>
         </header>
         <div className="memo-drawer-book">
           <label htmlFor="memo-book-select">{tr("选择作品")}</label>
@@ -3818,125 +3735,10 @@ export default function Workspace({
               </span>
               <p>{tr("正在打开备忘录…")}</p>
             </div>
-          ) : memoBook ? (
-            (() => {
-              const memos = memoBook.memos || [];
-              const selected =
-                memos.find((memo) => memo.id === memoDrawerSelectedId) ||
-                memos[0];
-              const createMemo = () => {
-                const now = new Date().toISOString();
-                const memo: MemoNote = {
-                  id: crypto.randomUUID(),
-                  title: "新备忘录",
-                  content: "",
-                  createdAt: now,
-                  updatedAt: now,
-                };
-                updateMemoDrawerNotes([memo, ...memos]);
-                setMemoDrawerSelectedId(memo.id);
-              };
-              return (
-                <>
-                  <div className="memo-drawer-list-head">
-                    <span>{memos.length}{" "}{tr("条备忘录")}</span>
-                    <Button onClick={createMemo}>
-                      <Plus size={15} />{tr("新建")}</Button>
-                  </div>
-                  {memos.length > 0 && (
-                    <div className="memo-drawer-list">
-                      {memos.map((memo) => (
-                        <button
-                          type="button"
-                          key={memo.id}
-                          className={selected?.id === memo.id ? "active" : ""}
-                          onClick={() => setMemoDrawerSelectedId(memo.id)}
-                        >
-                          <NotePencil size={15} />
-                          <span>
-                            <strong>{memo.title || tr("未命名备忘录")}</strong>
-                            <small>
-                              {memo.content.trim().slice(0, 48) || tr("空白备忘录")}
-                            </small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {selected ? (
-                    <section className="memo-drawer-editor">
-                      <label htmlFor="memo-drawer-title">{tr("标题")}</label>
-                      <input
-                        id="memo-drawer-title"
-                        aria-label={tr("备忘录标题")}
-                        value={selected.title}
-                        maxLength={160}
-                        onChange={(event) =>
-                          updateMemoDrawerNotes(
-                            memos.map((memo) =>
-                              memo.id === selected.id
-                                ? {
-                                    ...memo,
-                                    title: event.target.value,
-                                    updatedAt: new Date().toISOString(),
-                                  }
-                                : memo,
-                            ),
-                          )
-                        }
-                        placeholder={tr("给灵感起个标题")}
-                      />
-                      <label htmlFor="memo-drawer-content">{tr("内容")}</label>
-                      <textarea
-                        id="memo-drawer-content"
-                        aria-label={tr("备忘录内容，可粘贴生成结果")}
-                        value={selected.content}
-
-                        onChange={(event) =>
-                          updateMemoDrawerNotes(
-                            memos.map((memo) =>
-                              memo.id === selected.id
-                                ? {
-                                    ...memo,
-                                    content: event.target.value,
-                                    updatedAt: new Date().toISOString(),
-                                  }
-                                : memo,
-                            ),
-                          )
-                        }
-                        placeholder={tr("在这里粘贴创意工具箱的生成结果，或记下写作灵感…")}
-                      />
-                      <div className="memo-drawer-editor-actions">
-                        <small>{tr("自动保存到「")}{memoBook.title}」</small>
-                        <Button
-                          variant="primary-soft"
-                          disabled={!selected.content.trim()}
-                          onClick={() =>
-                            void copyText(selected.content)
-                              .then(() =>
-                                notify(tr("已复制备忘录内容，可以粘贴到正文")),
-                              )
-                              .catch(() =>
-                                notify(tr("复制失败，请手动选择内容复制")),
-                              )
-                          }
-                        >
-                          <Copy size={15} />{tr("复制内容")}</Button>
-                      </div>
-                    </section>
-                  ) : (
-                    <div className="memo-drawer-empty">
-                      <NotePencil size={24} />
-                      <strong>{tr("先收下一条灵感")}</strong>
-                      <p>{tr("可以把生成结果粘贴到这里，之后在写作时随时打开。")}</p>
-                      <Button variant="primary-soft" onClick={createMemo}>
-                        <Plus size={15} />{tr("新建备忘录")}</Button>
-                    </div>
-                  )}
-                </>
-              );
-            })()
+          ) : memoBook && memoDrawerOpen ? (
+            <MemoLibrary key={memoBook.id} drawer notes={memoBook.memos || []} bookTitle={memoBook.title}
+              selectedId={memoDrawerSelectedId} onSelect={setMemoDrawerSelectedId}
+              onChange={updateMemoDrawerNotes} notify={notify} />
           ) : null}
         </div>
       </aside>
@@ -3952,6 +3754,7 @@ export default function Workspace({
           applyDisabled={busy || formatLoading || !chapter?.body.trim()}
         />
       )}
+      {syncChapterId&&<ChapterSyncDialog bookId={book.id} chapterId={syncChapterId} onClose={()=>setSyncChapterId(null)} onChange={replace} onOpenBook={(value,target)=>{replace(value);setChapterId(syncChapterId);setSyncChapterId(null);setView(target);setSidebarSection('features');}}/>}
       {history && (
         <Modal title={tr("章节历史版本")} wide onClose={() => setHistory(null)}>
           <div className="modal-body history-list">

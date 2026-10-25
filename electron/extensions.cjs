@@ -378,6 +378,70 @@ function extendStore(Store) {
           b.reference = entry.item.body;
           b.referenceName = entry.item.name;
           this.putBook(b);
+        } else if (["atlasMap", "atlasNode", "atlasEdge", "atlasItem", "atlasPosition"].includes(entry.type)) {
+          // 知识蓝图删除项恢复：回到对应集合；带章节来源的记录恢复为待复核，
+          // 避免直接当作已确认事实参与生成。恢复后统一规范化，清掉悬空引用。
+          const field = {
+            atlasMap: "atlasMaps",
+            atlasNode: "atlasNodes",
+            atlasEdge: "atlasEdges",
+            atlasItem: "atlasItems",
+            atlasPosition: "atlasPositions",
+          }[entry.type];
+          b[field] ||= [];
+          if (!b[field].some((row) => row.id === entry.item.id)) {
+            const item = { ...entry.item };
+            const hasMap = (id) => (b.atlasMaps || []).some((row) => row.id === id);
+            const hasNode = (id) => (b.atlasNodes || []).some((row) => row.id === id);
+            const hasCharacter = (id) => (b.characters || []).some((row) => row.id === id);
+            if (entry.type === "atlasNode" || entry.type === "atlasEdge")
+              requireValue(hasMap(item.mapId), "请先恢复所属地图，再恢复这条地图资料");
+            if (entry.type === "atlasEdge")
+              requireValue(hasNode(item.source) && hasNode(item.target), "请先恢复连线两端的节点");
+            if (entry.type === "atlasPosition")
+              requireValue(hasCharacter(item.characterId) && hasNode(item.nodeId), "请先恢复人物和所在地点");
+            if (entry.type === "atlasMap" && item.parentMapId && !hasMap(item.parentMapId))
+              item.parentMapId = "";
+            if (entry.type === "atlasNode" && item.parentId && !hasNode(item.parentId))
+              item.parentId = "";
+            if (entry.type === "atlasItem") {
+              if (item.nodeId && !hasNode(item.nodeId)) item.nodeId = "";
+              if (item.ownerCharacterId && !hasCharacter(item.ownerCharacterId))
+                item.ownerCharacterId = "";
+            }
+            if (
+              item.chapterId &&
+              !this.chapters(b.id, true).some((chapter) => chapter.id === item.chapterId)
+            ) {
+              // 来源章节已永久删除：保留资料本身，但清掉来源并继续待复核。
+              item.chapterId = "";
+              item.stale = true;
+            }
+            b[field].push({
+              ...item,
+              ...(item.chapterId ? { stale: true } : {}),
+            });
+            // 全部集合显式提供（strict）：前置校验已保证引用完整，
+            // 其余集合若因旧数据有悬空引用会得到中文报错而不是静默保存。
+            Object.assign(
+              b,
+              require("./atlas.cjs").normalize(
+                b,
+                {
+                  maps: b.atlasMaps || [],
+                  nodes: b.atlasNodes || [],
+                  edges: b.atlasEdges || [],
+                  items: b.atlasItems || [],
+                  positions: b.atlasPositions || [],
+                },
+                {
+                  chapters: this.chapters(b.id, true),
+                  characters: b.characters || [],
+                },
+              ),
+            );
+          }
+          this.putBook(b);
         }
         this.putSetting(
           "recycle-bin",

@@ -227,7 +227,6 @@ export default function Settings({
           <div hidden={tab !== "models"}>
             <ModelSettings config={config} onSaved={onSaved} />
           </div>
-
           {tab === "skills" && (
             <div className="settings-panel">
               <div className="section-intro">
@@ -471,6 +470,11 @@ export default function Settings({
                             timeline: "时间线变化",
                             volume: "分卷",
                             planning: "生成前资料",
+                            atlasMap: "蓝图地图",
+                            atlasNode: "地点节点",
+                            atlasEdge: "地点关系",
+                            atlasItem: "物品归属",
+                            atlasPosition: "人物位置",
                           } as Record<string, string>
                         )[t.type]
                       }{" "}

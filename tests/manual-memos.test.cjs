@@ -151,7 +151,7 @@ test("同名笔记ID按作品隔离，跨书编辑凭据不会覆盖，删除作
   assert.throws(() => deleteMemo(db, { bookId: other.id, id: second.id, baseUpdatedAt: second.updatedAt }), /恢复作品/);
 });
 
-test("备忘录原子编辑与旧book:update改时间戳均不影响正文生成上下文", (t) => {
+test("未变更备忘录保留时间戳，真实并发修改拒绝旧凭据且不影响正文上下文", (t) => {
   const { db, bookId, chapterId } = setup(t);
   const timestamp = "2000-01-01T00:00:00.000Z";
   db.putBook({ ...db.rawBook(bookId), memos: [
@@ -164,9 +164,10 @@ test("备忘录原子编辑与旧book:update改时间戳均不影响正文生成
   const manuscript = manuscriptState(db, bookId);
   const notes = memoActions(db)["memo:list"]({ bookId });
   const legacy = db.updateBook(bookId, { memos: notes });
-  assert.notEqual(legacy.memos[0].updatedAt, notes[0].updatedAt);
-  assert.notEqual(legacy.memos[1].updatedAt, notes[1].updatedAt);
+  assert.equal(legacy.memos[0].updatedAt, notes[0].updatedAt);
+  assert.equal(legacy.memos[1].updatedAt, notes[1].updatedAt);
   assert.equal(legacy.memos[0].content, notes[0].content);
+  saveMemo(db, { bookId, id: notes[0].id, title: notes[0].title, content: "另一处真实修改", baseUpdatedAt: notes[0].updatedAt });
   assert.throws(() => saveMemo(db, { bookId, id: notes[0].id, title: notes[0].title, content: "旧凭据编辑", baseUpdatedAt: notes[0].updatedAt }), /其他地方修改/);
   const refreshed = memoActions(db)["memo:list"]({ bookId })[0];
   saveMemo(db, { bookId, id: refreshed.id, title: refreshed.title, content: "纯备忘修改", baseUpdatedAt: refreshed.updatedAt });

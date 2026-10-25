@@ -14,6 +14,7 @@ try{
   await call('chapter:save',{id:book.chapters[0].id,revision:book.chapters[0].revision,patch:{body:'雨落下来时，林舟正在关书店的门。\n他把纸箱挪到灯下，一封没有邮票的信从书页间滑落。\n信封上写着父亲的名字。落款却是一个他从未听过的人。'}});
  }
  await page.reload();await expect(page.getByRole('button',{name:'打开 雨港的旧钥匙',exact:true})).toBeVisible();
+ await expect(page.locator('.startup-splash')).toHaveCount(0,{timeout:6000});
  await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(250);
  await mkdir(resolve('docs/assets'),{recursive:true});await page.screenshot({path:resolve('docs/assets/library.png'),animations:'disabled'});
  await writeFile(resolve(data,'report.json'),JSON.stringify({singleScreenshot:true,isolatedDemo:true,path:'docs/assets/library.png'},null,2));

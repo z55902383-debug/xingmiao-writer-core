@@ -50,5 +50,5 @@ try {
   await verifyScroll(manual, ['.mt-header', '.mt-document-head'], 'manual writing');
   await page.getByRole('button', { name: '返回书架', exact: true }).click();
   assert.deepEqual(errors, []);
-  console.log('Page scroll regions passed: fixed controls, content-only wheel and boundary containment for shelf/archive/settings/manual. ' + data);
+  console.log('Page scroll regions passed: fixed controls, content-only wheel, boundary containment, search reset, low-height/narrow windows, shelf/archive/settings/manual. ' + data);
 } finally { await app.close(); }

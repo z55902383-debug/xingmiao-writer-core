@@ -353,8 +353,8 @@
   color: var(--muted);
 }
 .mt-idea-messages {
-  flex: 1;
-  min-height: 80px;
+  flex: 1 1 0;
+  min-height: 40px;
   overflow-y: auto;
   padding: 14px;
   overscroll-behavior: contain;
@@ -414,14 +414,32 @@
 .mt-idea-composer {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  gap: 5px;
-  padding: 12px 14px;
+  flex: 0 1 340px;
+  min-height: 140px;
+  padding: 0;
   border-top: 1px solid var(--border-strong);
   background: var(--panel);
   max-height: 58%;
-  overflow-y: auto;
+  overflow: hidden;
 }
+.mt-idea-inputs {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 5px;
+  padding: 12px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.mt-idea-inputs > :not(textarea) { flex-shrink: 0; }
+.mt-idea-submit {
+  flex: 0 0 auto;
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--border);
+}
+.mt-idea-submit > .button { width: 100%; min-height: 36px; }
+.mt-idea-panel > .mt-idea-context { max-height: 30%; overflow-y: auto; }
 .mt-idea-composer label {
   color: var(--soft);
   font-size: 12px;
@@ -442,7 +460,7 @@
   font-size: 13px;
   line-height: 1.7;
 }
-.mt-idea-composer > small {
+.mt-idea-inputs > small {
   color: var(--muted);
   line-height: 1.6;
   font-size: 11px;
@@ -648,7 +666,6 @@
   }
 }
 @media (max-height: 720px) {
-  .mt-idea-panel,
   .mt-memo-panel {
     overflow-y: auto;
   }
@@ -693,20 +710,20 @@
     line-height: 1.5;
   }
   .mt-idea-messages {
-    min-height: 64px;
+    min-height: 40px;
     padding-block: 8px;
   }
-  .mt-idea-composer {
+  .mt-idea-inputs {
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
     padding-block: 8px;
     gap: 3px;
     max-height: none;
   }
-  .mt-idea-composer > :not(:first-child):not(select) {
+  .mt-idea-inputs > :not(:first-child):not(select) {
     grid-column: 1 / -1;
   }
-  .mt-idea-composer > label:first-child {
+  .mt-idea-inputs > label:first-child {
     align-self: center;
     margin: 0;
   }
@@ -757,12 +774,11 @@
   }
 }
 @media (max-height: 620px) {
-  .mt-idea-panel,
   .mt-memo-panel {
     overflow-y: auto;
   }
   .mt-idea-composer {
-    overflow: visible;
+    overflow: hidden;
   }
   .mt-memo-editor {
     min-height: 218px;
@@ -772,7 +788,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 300px;
+  min-height: 0;
   max-height: none;
 }
 .mt-root .mt-idea-no-conversation .mt-idea-composer textarea {
@@ -781,8 +797,7 @@
   min-height: 80px;
   resize: none;
 }
-.mt-root .mt-idea-no-conversation .mt-idea-composer > :not(textarea) { flex-shrink: 0; }
-.mt-root .mt-idea-no-conversation .mt-idea-composer > label:first-child { align-self: stretch; }
+.mt-root .mt-idea-no-conversation .mt-idea-inputs > label:first-child { align-self: stretch; }
 @media (max-height: 720px) {
-  .mt-root .mt-idea-no-conversation .mt-idea-composer { min-height: 260px; }
+  .mt-root .mt-idea-no-conversation .mt-idea-composer { min-height: 0; }
 }

@@ -108,6 +108,7 @@ try {
     /陈默望向窗外/,
   );
   await page.getByRole("button", { name: "本章定稿", exact: true }).click();
+  await page.getByRole("dialog",{name:"提交章节与同步资料",exact:true}).getByRole("button",{name:"返回写作",exact:true}).click();
   // 任务改为按意图分组：先选分组页签，再点具体任务
   await page.getByRole("tab", { name: "故事检查", exact: true }).click();
   await page.getByRole("button", { name: "提取本章记忆", exact: true }).click();

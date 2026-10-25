@@ -1,3 +1,5 @@
+import { MemoCategoryInput, MemoCategoryFilter } from './MemoCategory';
+import { memoCategory } from '../electron/memo-metadata.mjs';
 import {
   useCallback,
   useEffect,
@@ -33,6 +35,7 @@ export default function ManualMemoPanel({
   model: ManualMemoModel;
   onClose: () => void;
 }) {
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [actionError, setActionError] = useState("");
   const [working, setWorking] = useState(false);
   const actionRunning = useRef(false);
@@ -60,10 +63,9 @@ export default function ManualMemoPanel({
     const query = model.query.trim().toLocaleLowerCase();
     return model.notes.filter(
       (note) =>
-        !query ||
-        `${note.title}\n${note.content}`.toLocaleLowerCase().includes(query),
+        (!query || `${memoCategory(note)}\n${note.title}\n${note.content}`.toLocaleLowerCase().includes(query)) && (!categoryFilter || memoCategory(note) === categoryFilter),
     );
-  }, [model.notes, model.query]);
+  }, [model.notes, model.query, categoryFilter]);
 
   async function run(action: () => Promise<void>) {
     if (actionRunning.current) return;
@@ -196,6 +198,7 @@ export default function ManualMemoPanel({
             {tr("临时稿也可以查看作品备忘录，先选择一本作品。")}
           </p>
         )}
+        <MemoCategoryFilter notes={model.notes} value={categoryFilter} onChange={setCategoryFilter} disabled={locked}/>
         <Field label={tr("搜索备忘录")}>
           <input
             type="search"
@@ -259,7 +262,7 @@ export default function ManualMemoPanel({
       </div>
       {selected && model.bookId && (
         <section className="mt-memo-editor" aria-label={tr("编辑备忘录")}>
-          <div className="field mt-memo-title-field">
+          <div className="mt-memo-metadata"><div className="field mt-memo-title-field">
             <label htmlFor={titleId}>{tr("备忘录标题")}</label>
             <input
               id={titleId}
@@ -273,6 +276,7 @@ export default function ManualMemoPanel({
               }}
             />
           </div>
+          <div className="mt-memo-category-field"><MemoCategoryInput value={memoCategory(selected)} disabled={locked} onChange={category=>model.edit({category})}/></div></div>
           <div className="field mt-memo-content-field">
             <div className="mt-memo-content-head">
               <label htmlFor={contentId}>{tr("备忘录内容")}</label>

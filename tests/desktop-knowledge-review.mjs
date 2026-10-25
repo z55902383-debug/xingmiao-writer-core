@@ -275,6 +275,7 @@ try {
   assert.deepEqual(backup.excludedHistory, [
     "knowledge-chat",
     "knowledge-proposal-undo",
+    "craft-analysis-runs", "creative-import-proposals-and-undo",
   ]);
   await call("backup:restore");
   const copy = (await call("books:list")).find((row) => row.id !== book.id);

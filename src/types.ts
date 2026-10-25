@@ -48,6 +48,8 @@ export type Chapter = {
   volumeId?: string;
   summary?: string;
   targetWords?: number;
+  /** 本章手动勾选的出场人物 ID 列表；存在时优先生成上下文，覆盖按 order 自动推断。 */
+  localCast?: string[];
   id: string;
   bookId: string;
   title: string;
@@ -77,6 +79,7 @@ export type Kind =
   | "summary"
   | "timelinePlan";
 export type ContextInfo = {
+  cheat?: CheatConfig;
   continuityCard?: ContinuityCard;
   relationSources?: { chapterId: string; revision: number }[];
   retrievedExcerpts?: RetrievedExcerpt[];
@@ -96,6 +99,7 @@ export type ContextInfo = {
   contextChapters?: number;
   targetWords?: number;
   timelineCount?: number;
+  atlasCount?: number;
   skills?: { id: string; name: string; version: number }[];
   warnings: string[];
   memoryCount: number;
@@ -114,6 +118,7 @@ export type SyncChange = {
   evidence: string;
 };
 export type Job = {
+  chapterSync?: boolean;
   progress?: { requestedAt?: string; firstOutputAt?: string; generationEndedAt?: string; analysisStartedAt?: string; analysisEndedAt?: string; endedAt?: string };
   planningBatch?: import('../electron/chapter-batches.mjs').ChapterBatch;
   lastOutputAt?: string;
@@ -194,7 +199,94 @@ export type TimelineSnapshot = {
   characters: TimelineEvent[];
   relations: TimelineEvent[];
 };
+/* ---------------------------------------------------------------------------
+ * 知识蓝图（Atlas）：可切换的多张代码渲染地图。
+ * 世界 / 区域 / 地点 / 建筑 / 楼层都是 map（parentMapId 形成从属链，可切换但关联）。
+ * 地图上放 node（区域、聚落、地标、建筑、房间、物件），node 之间是 edge。
+ * 人物位置（atlasPositions）与物品归属（atlasItems）按章节记录，便于时间线回看。
+ * 所有状态都来自作者资料或已定稿正文；不推断、不把计划当成已发生事实。
+ * ------------------------------------------------------------------------- */
+export type AtlasMapKind = "world" | "region" | "site" | "building" | "floor";
+export type AtlasNodeKind = "region" | "settlement" | "landmark" | "building" | "room" | "object";
+export type AtlasEdgeKind = "contain" | "route" | "portal" | "link";
+export type AtlasStatus = "fixed" | "provisional" | "planned";
+export type AtlasPositionStatus = "present" | "mentioned" | "planned";
+export type AtlasMap = {
+  /** 此地图在上级地图中的入口地点，按编号绑定。 */
+  entryNodeId?: string;
+  id: string;
+  name: string;
+  kind: AtlasMapKind;
+  /** 所属的上一级地图；空字符串表示根地图（一个世界或一个独立板块）。 */
+  parentMapId: string;
+  description: string;
+  /** 代码渲染的主题：ink | parchment | nocturne | frost。不保存图片。 */
+  theme: string;
+  status: AtlasStatus;
+  /** 来源章节；空字符串表示作者固定设定。 */
+  chapterId: string;
+  order: number;
+  stale?: boolean;
+};
+export type AtlasNode = {
+  id: string;
+  mapId: string;
+  /** 同地图内的从属节点（例如某个房间属于某座建筑）。 */
+  parentId: string;
+  kind: AtlasNodeKind;
+  name: string;
+  description: string;
+  /** 地图坐标，0–1000 的画布空间；由代码渲染，可拖动。 */
+  x: number;
+  y: number;
+  status: AtlasStatus;
+  chapterId: string;
+  stale?: boolean;
+  /** 章节变化分析写入的正文逐字证据。 */
+  evidence?: string;
+};
+export type AtlasEdge = {
+  id: string;
+  mapId: string;
+  source: string;
+  target: string;
+  kind: AtlasEdgeKind;
+  label: string;
+  status: AtlasStatus;
+  chapterId: string;
+  stale?: boolean;
+  evidence?: string;
+};
+export type AtlasItem = {
+  id: string;
+  name: string;
+  description: string;
+  /** 所在节点；空字符串表示尚未定位。 */
+  nodeId: string;
+  /** 保管人；空字符串表示无明确归属。 */
+  ownerCharacterId: string;
+  status: AtlasStatus;
+  chapterId: string;
+  stale?: boolean;
+  evidence?: string;
+};
+export type AtlasPosition = {
+  id: string;
+  characterId: string;
+  nodeId: string;
+  chapterId: string;
+  status: AtlasPositionStatus;
+  note: string;
+  stale?: boolean;
+  evidence?: string;
+};
 export type Book = {
+  atlasMaps?: AtlasMap[];
+  atlasNodes?: AtlasNode[];
+  atlasEdges?: AtlasEdge[];
+  atlasItems?: AtlasItem[];
+  atlasPositions?: AtlasPosition[];
+  cheat?: CheatConfig;
   includeContinuity?: boolean;
   relatedMemoryOnly?: boolean;
   techniques?: Technique[];
@@ -249,12 +341,17 @@ export type WritingProfile = {
   history?: { title: string; body: string; savedAt?: string }[];
 };
 export type MemoNote = {
+  category?: string;
+  sourceToolId?: string;
+  sourceToolName?: string;
   id: string;
   title: string;
   content: string;
   createdAt: string;
   updatedAt: string;
 };
+export type CheatHolder = { id: string; name: string; powerName: string; ability: string; trigger: string; limits: string; cost: string; growth: string; reveal: string };
+export type CheatConfig = { enabled: boolean; name: string; owner: string; ability: string; limits: string; cost: string; growth: string; reveal: string; notes: string; document?: string; holders?: CheatHolder[] };
 export type BrainstormEvent = {
   requestId: string;
   bookId: string | null;
@@ -355,6 +452,7 @@ declare global {
       onClose: (fn: () => void) => () => void;
       onUpdate: (fn: (value: UpdateState) => void) => () => void;
       onAuthToken: (fn: (value: boolean) => void) => () => void;
+      onCreativeImportProgress: (fn: (value: { requestId: string; outputLength: number }) => void) => () => void;
     };
   }
 }

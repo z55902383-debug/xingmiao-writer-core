@@ -31,8 +31,25 @@ export function ProseReview({ job }: { job: Job }) {
   </details>;
 }
 
-export function WritingCardEditor({ chapter, book, disabled, onChange, defaultOpen = false }: { chapter: Chapter; book: Book; disabled: boolean; onChange: (card: WritingCard) => void; defaultOpen?: boolean }) {
+export function WritingCardEditor({ chapter, book, disabled, onChange, onLocalCastChange, defaultOpen = false }: { chapter: Chapter; book: Book; disabled: boolean; onChange: (card: WritingCard) => void; onLocalCastChange?: (ids: string[]) => void; defaultOpen?: boolean }) {
   const card = chapter.writingCard || { must: '', avoid: '', knowledge: '', stop: '' };
+  // 默认自动推断规则：与 electron/context.cjs 里的 castFilter 保持一致
+  const autoCast = useMemo(() => {
+    const availableFrom = (chapterId?: string) => !chapterId || (book.chapters.find(c => c.id === chapterId)?.order ?? Infinity) <= chapter.order;
+    return book.characters.filter(c => (!c.introducedOrder || c.introducedOrder <= chapter.order) && availableFrom(c.knowledgeFromChapterId)).map(c => c.id);
+  }, [book, chapter]);
+  // 默认全不选；用户根据本章剧情手动勾选，或点"自动推断"按细纲/人物设定自动填充。
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  useEffect(() => () => { onLocalCastChange?.([]); }, []);  // 关闭写前卡时清空，下次打开重新开始
+  const toggle = (id: string) => {
+    const next = checkedIds.includes(id) ? checkedIds.filter(x => x !== id) : [...checkedIds, id];
+    setCheckedIds(next);
+    onLocalCastChange?.(next);
+  };
+  const autoFill = () => { setCheckedIds(autoCast); onLocalCastChange?.(autoCast); };
+  const castSet = new Set(checkedIds);
+  // 已勾选排前、未勾选排后；各自按书籍原有顺序
+  const ordered = [...book.characters].sort((a, b) => Number(castSet.has(b.id)) - Number(castSet.has(a.id)));
   return <details className="writing-card" open={defaultOpen}><summary>{tr('本章写前卡')} · {tr('目标、边界与停笔点')}</summary>
     <div className="writing-card-intro">
     <p>{tr('空项不限制自由创作；填写后随本章保存，并用于正文生成。')}</p>
@@ -43,6 +60,20 @@ export function WritingCardEditor({ chapter, book, disabled, onChange, defaultOp
       onChange({ must: card.must || outline.slice(0, 12000), avoid: card.avoid, knowledge: card.knowledge || knowledge.slice(0, 12000), stop: card.stop || stop.slice(0, 12000) });
     }}>{tr('从已有细纲整理空项')}</Button>
     </div>
+    <Field label={tr('本章出场人物')}>
+      <div className="local-cast-list">
+        <div className="local-cast-head">
+          <p className="feature-help">{tr('默认不选；根据本章剧情手动勾选出场人物，或点自动推断按细纲填充。')}</p>
+          {!!book.characters.length && <Button disabled={disabled} onClick={autoFill}>{tr('自动推断本章人物')}</Button>}
+        </div>
+        {book.characters.length === 0 && <p className="feature-help">{tr('尚未建立人物档案。')}</p>}
+        {ordered.map(c => <label key={c.id} className="local-cast-row">
+          <input type="checkbox" disabled={disabled} checked={castSet.has(c.id)} onChange={() => toggle(c.id)} />
+          <span className="local-cast-name">{c.name || tr('未命名')}</span>
+          {c.role && <small className="local-cast-role">{c.role}</small>}
+        </label>)}
+      </div>
+    </Field>
     {(['must', 'avoid', 'knowledge', 'stop'] as const).map((field, i) => <Field key={field} label={tr(['本章必须发生', '本章禁止发生', '人物与读者知情边界', '写到哪里停'][i])}><textarea rows={2} maxLength={12000} disabled={disabled} value={card[field]} onChange={e => onChange({ ...card, [field]: e.target.value })}/></Field>)}
   </details>;
 }

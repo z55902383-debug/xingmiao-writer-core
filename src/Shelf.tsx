@@ -1,7 +1,7 @@
 import { ManuscriptImport } from "./AuthorTools";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { tr, genreLabel, useLanguage } from "./i18n";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   MagnifyingGlass,
@@ -68,6 +68,8 @@ function sinceLabel(iso: string) {
   if (days < 30) return tr("{0} 天前", {0: days});
   return date(iso);
 }
+const emptyNewBook = () => ({ title: '', genre: '都市', premise: '', target: 200000, creationMode: 'long' as 'short' | 'long' });
+let newBookDraft: ReturnType<typeof emptyNewBook> | null = null;
 export function NewBook({
   onClose,
   onCreate,
@@ -78,16 +80,11 @@ export function NewBook({
     genre: string;
     premise: string;
     target: number;
-    creationMode: "short" | "long";
+    creationMode: 'short' | 'long';
   }) => Promise<void>;
 }) {
-  const [value, setValue] = useState({
-    title: "",
-    genre: "都市",
-    premise: "",
-    target: 200000,
-    creationMode: "long" as "short" | "long",
-  });
+  const [value, setValue] = useState(() => newBookDraft ?? emptyNewBook());
+  useEffect(() => { newBookDraft = value; }, [value]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
@@ -98,6 +95,7 @@ export function NewBook({
           setBusy(true);
           try {
             await onCreate(value);
+            newBookDraft = null;
           } catch (e) {
             setError((e as Error).message);
             setBusy(false);
@@ -106,6 +104,7 @@ export function NewBook({
       >
         <div className="modal-body">
           <p className="muted">{tr("先记下故事的起点。人物、设定和章节，之后慢慢展开。")}</p>
+          <p className="feature-help">{tr("未提交的构思会在本次会话中保留，关闭后可继续填写。")}</p>
           <Field label={tr("书名 *")}>
             <input
               autoFocus
@@ -137,7 +136,7 @@ export function NewBook({
                 ))}
               </select>
             </Field>
-            <Field label={tr('创作路径')} hint={tr('短篇可从简纲直接拆章节；长篇按需分卷细化。')}><select value={value.creationMode} onChange={e => setValue({ ...value, creationMode: e.target.value as 'short' | 'long', target: e.target.value === 'short' ? 3000 : 200000 })}><option value="long">{tr('长篇 · 分卷规划')}</option><option value="short">{tr('短篇 · 简化流程')}</option></select></Field>
+          <Field label={tr('创作路径')} hint={tr('短篇可从简纲直接拆章节；长篇按需分卷细化。')}><select value={value.creationMode} onChange={e => setValue({ ...value, creationMode: e.target.value as 'short' | 'long', target: e.target.value === 'short' ? 3000 : 200000 })}><option value="long">{tr('长篇 · 分卷规划')}</option><option value="short">{tr('短篇 · 简化流程')}</option></select></Field>
           <Field label={tr("目标字数")}>
               <input
                 type="number"
@@ -167,7 +166,7 @@ export function NewBook({
           )}
         </div>
         <div className="modal-footer">
-          <Button type="button" onClick={onClose}>{tr("暂不创建")}</Button>
+          <Button type="button" disabled={busy} onClick={onClose}>{tr("暂不创建")}</Button>
           <Button variant="primary" busy={busy} type="submit">
             <Plus size={18} />{tr("创建作品")}</Button>
         </div>

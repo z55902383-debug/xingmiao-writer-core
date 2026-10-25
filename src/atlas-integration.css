@@ -1,0 +1,61 @@
+/* 知识蓝图接入工作台：功能侧栏分组与整页高度。
+   颜色沿用 styles.css 的语义变量，不在这里新增主题色。 */
+
+.workspace-nav-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workspace-nav-group + .workspace-nav-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.workspace-nav-label {
+  padding: 6px 14px 4px;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  user-select: none;
+}
+
+.workspace-nav-group .nav-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 地图页交给组件自己处理内部滚动，外层只负责给出确定高度。 */
+.document-page.atlas-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.atlas-content-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.atlas-content-scroll > * {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .workspace-nav-label {
+    padding-inline: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-nav-group + .workspace-nav-group {
+    transition: none;
+  }
+}

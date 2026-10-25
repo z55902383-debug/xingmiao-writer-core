@@ -1,0 +1,1330 @@
+/* 知识蓝图（SVG 代码渲染地图）
+   颜色全部来自 styles.css 的语义变量，深浅主题跟随 :root[data-theme]。
+   地图的纸张、网格、等高线、房间分割都用 SVG pattern / gradient 绘制，不加载图片。 */
+
+.knowledge-atlas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* ----------------------------------------------------------------- 顶部工具栏 */
+
+.ka-toolbar {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.ka-toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ka-map-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--accent);
+}
+
+.ka-map-select {
+  min-width: 190px;
+  max-width: 280px;
+  min-height: 34px;
+  padding: 5px 26px 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md, 8px);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.ka-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px 4px;
+  border-radius: var(--r-sm, 6px);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ka-breadcrumb > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ka-breadcrumb button {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--soft);
+  font-size: 12px;
+}
+
+.ka-breadcrumb button:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.ka-breadcrumb button.is-current {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ka-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.ka-toolbar-actions .button,
+.ka-toolbar-filters .button {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ka-toolbar-actions .button.active,
+.ka-toolbar-filters .button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ka-toolbar-filters {
+  gap: 6px 10px;
+  padding-top: 2px;
+}
+
+.ka-field-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ka-field-inline select {
+  min-height: 32px;
+  max-width: 190px;
+  padding: 4px 24px 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm, 6px);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.ka-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--soft);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ka-check input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.ka-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--border-strong);
+}
+
+.ka-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm, 6px);
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.ka-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.ka-search:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ka-search input:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+.ka-connect-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--r-md, 8px);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.ka-connect-hint .button {
+  min-height: 28px;
+  margin-left: auto;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------------- 主体区 */
+
+.ka-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ka-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 240px;
+  overflow: hidden;
+  isolation: isolate;
+  touch-action: none;
+  cursor: grab;
+  background: var(--sunken);
+}
+
+.ka-stage:active {
+  cursor: grabbing;
+}
+
+.ka-stage:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.ka-stage.is-connecting {
+  cursor: crosshair;
+}
+
+.ka-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ------------------------------------------------------- 地图纸张与主题图案 */
+
+.ka-grad-start {
+  stop-color: var(--sunken);
+}
+
+.ka-grad-end {
+  stop-color: var(--bg);
+}
+
+.ka-grid-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--line) 48%, transparent);
+  stroke-width: 1;
+}
+
+.ka-contour-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent-mid) 26%, transparent);
+  stroke-width: 1;
+}
+
+.ka-room-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--line) 62%, transparent);
+  stroke-width: 1;
+}
+
+.ka-contour {
+  opacity: 0.55;
+}
+
+.ka-rooms {
+  opacity: 0.8;
+}
+
+.ka-border {
+  fill: none;
+  stroke: color-mix(in srgb, var(--line) 70%, transparent);
+  stroke-width: 2;
+}
+
+.ka-map-name {
+  fill: var(--ink);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.ka-map-kind {
+  fill: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.ka-compass {
+  fill: color-mix(in srgb, var(--accent) 72%, transparent);
+  stroke: var(--accent-mid);
+  stroke-width: 1;
+}
+
+.ka-compass-label {
+  fill: var(--muted);
+  font-size: 13px;
+}
+
+/* 四种地图主题：只改变纸张与线条色调，结构保持不变。 */
+.ka-svg[data-atlas-theme="ink"] .ka-grid-line {
+  stroke: color-mix(in srgb, var(--line) 42%, transparent);
+}
+
+.ka-svg[data-atlas-theme="parchment"] .ka-grad-start {
+  stop-color: color-mix(in srgb, var(--warning-soft) 64%, var(--bg));
+}
+
+.ka-svg[data-atlas-theme="parchment"] .ka-grad-end {
+  stop-color: color-mix(in srgb, var(--warning-soft) 32%, var(--bg));
+}
+
+.ka-svg[data-atlas-theme="parchment"] .ka-grid-line {
+  stroke: color-mix(in srgb, var(--warning) 26%, transparent);
+}
+
+.ka-svg[data-atlas-theme="parchment"] .ka-contour-line {
+  stroke: color-mix(in srgb, var(--warning) 34%, transparent);
+}
+
+.ka-svg[data-atlas-theme="nocturne"] .ka-grad-start {
+  stop-color: color-mix(in srgb, var(--accent-shade) 70%, var(--sunken));
+}
+
+.ka-svg[data-atlas-theme="nocturne"] .ka-grad-end {
+  stop-color: color-mix(in srgb, var(--accent-shade) 38%, var(--sunken));
+}
+
+.ka-svg[data-atlas-theme="nocturne"] .ka-grid-line {
+  stroke: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.ka-svg[data-atlas-theme="nocturne"] .ka-contour-line {
+  stroke: color-mix(in srgb, var(--accent-bright) 20%, transparent);
+}
+
+.ka-svg[data-atlas-theme="frost"] .ka-grad-start {
+  stop-color: color-mix(in srgb, var(--accent-soft) 62%, var(--bg));
+}
+
+.ka-svg[data-atlas-theme="frost"] .ka-grad-end {
+  stop-color: color-mix(in srgb, var(--accent-soft) 26%, var(--bg));
+}
+
+.ka-svg[data-atlas-theme="frost"] .ka-grid-line {
+  stroke: color-mix(in srgb, var(--accent-mid) 30%, transparent);
+}
+
+.ka-svg[data-atlas-theme="frost"] .ka-contour-line {
+  stroke: color-mix(in srgb, var(--accent-mid) 42%, transparent);
+}
+
+/* ------------------------------------------------------------------- 连线 */
+
+.ka-edge {
+  cursor: pointer;
+  outline: none;
+}
+
+.ka-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18;
+  pointer-events: stroke;
+}
+
+.ka-edge-line {
+  fill: none;
+  stroke: var(--accent-mid);
+  stroke-width: 1.8;
+  pointer-events: none;
+}
+
+.ka-edge-dash {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent-bright) 60%, transparent);
+  stroke-width: 3.4;
+  stroke-dasharray: 2 12;
+  pointer-events: none;
+}
+
+.ka-edge-contain .ka-edge-line {
+  stroke: color-mix(in srgb, var(--soft) 68%, transparent);
+  stroke-width: 1.5;
+}
+
+.ka-edge-route .ka-edge-line {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 9 6;
+}
+
+.ka-edge-portal .ka-edge-line {
+  stroke: var(--success);
+  stroke-dasharray: 2 7;
+}
+
+.ka-edge-link .ka-edge-line {
+  stroke: var(--accent-mid);
+  stroke-dasharray: 3 5;
+}
+
+.ka-edge.is-selected .ka-edge-line,
+.ka-edge:hover .ka-edge-line,
+.ka-edge:focus-visible .ka-edge-line {
+  stroke: var(--accent-bright);
+  stroke-width: 3;
+}
+
+.ka-edge.ka-state-stale .ka-edge-line,
+.ka-edge.ka-state-provisional .ka-edge-line {
+  stroke: var(--warning);
+}
+
+.ka-edge.ka-state-planned .ka-edge-line {
+  stroke-dasharray: 2 6;
+}
+
+.ka-edge.ka-state-planned .ka-edge-label text {
+  fill: var(--warning);
+}
+
+.ka-edge-label rect {
+  fill: var(--panel);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.ka-edge-label text {
+  fill: var(--soft);
+  font-family: inherit;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.ka-edge:focus-visible .ka-edge-label rect {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.ka-arrow {
+  fill: var(--accent-mid);
+}
+
+.ka-arrow-warning {
+  fill: var(--warning);
+}
+
+/* ------------------------------------------------------------------- 节点 */
+
+.ka-node {
+  cursor: grab;
+  outline: none;
+}
+
+.ka-node:active {
+  cursor: grabbing;
+}
+
+.ka-shape {
+  fill: var(--surface);
+  stroke: var(--line);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke 140ms var(--ease-ui, ease),
+    fill 140ms var(--ease-ui, ease);
+}
+
+.ka-kind-region .ka-shape {
+  fill: color-mix(in srgb, var(--accent-soft) 82%, var(--surface));
+  stroke: var(--accent-mid);
+}
+
+.ka-kind-settlement .ka-shape {
+  fill: color-mix(in srgb, var(--surface) 82%, var(--accent-soft));
+  stroke: var(--accent);
+}
+
+.ka-kind-landmark .ka-shape {
+  fill: var(--surface);
+  stroke: var(--accent-mid);
+}
+
+.ka-kind-building .ka-shape {
+  fill: var(--surface);
+  stroke: color-mix(in srgb, var(--accent-mid) 72%, var(--line));
+}
+
+.ka-kind-room .ka-shape {
+  fill: var(--bg);
+  stroke: var(--line);
+  stroke-dasharray: 7 4;
+}
+
+.ka-kind-object .ka-shape {
+  fill: color-mix(in srgb, var(--warning-soft) 55%, var(--surface));
+  stroke: var(--warning);
+}
+
+.ka-glyph {
+  fill: none;
+  stroke: var(--soft);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.ka-kind-region .ka-glyph,
+.ka-kind-settlement .ka-glyph {
+  stroke: var(--accent);
+}
+
+.ka-kind-object .ka-glyph {
+  stroke: var(--warning);
+}
+
+.ka-glyph-dot {
+  fill: var(--accent);
+}
+
+.ka-node:hover .ka-shape {
+  stroke: var(--accent-bright);
+}
+
+.ka-node.is-selected .ka-shape {
+  stroke: var(--accent-bright);
+  stroke-width: 3.5;
+}
+
+.ka-node:focus-visible .ka-shape {
+  stroke: var(--accent-bright);
+  stroke-width: 3;
+  stroke-dasharray: 6 3;
+}
+
+.ka-node-name {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: color-mix(in srgb, var(--sunken) 88%, transparent);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.ka-node-badge {
+  fill: var(--warning);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: color-mix(in srgb, var(--sunken) 88%, transparent);
+  stroke-width: 3px;
+  pointer-events: none;
+}
+
+.ka-node-warning {
+  fill: var(--warning);
+  stroke: var(--sunken);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.ka-state-planned .ka-shape {
+  stroke-dasharray: 8 5;
+  fill: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+}
+
+.ka-state-provisional .ka-shape {
+  stroke-dasharray: 3 3;
+  stroke: var(--warning);
+}
+
+.ka-state-stale .ka-shape {
+  stroke: var(--warning);
+  fill: color-mix(in srgb, var(--warning-soft) 48%, var(--surface));
+}
+
+.ka-state-stale .ka-node-name {
+  fill: color-mix(in srgb, var(--warning) 76%, var(--ink));
+}
+
+.ka-connect-target {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------- 地图角标 */
+
+.ka-zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md, 8px);
+  background: var(--panel);
+  box-shadow: var(--shadow-1);
+}
+
+.ka-zoom .icon-button {
+  width: 30px;
+  height: 30px;
+}
+
+.ka-zoom output {
+  min-width: 46px;
+  text-align: center;
+  color: var(--soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ka-legend {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  max-width: calc(100% - 150px);
+  padding: 6px 9px;
+  border-radius: var(--r-sm, 6px);
+  background: color-mix(in srgb, var(--panel) 84%, transparent);
+  color: var(--muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.ka-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ka-legend-line {
+  display: inline-block;
+  width: 20px;
+  height: 0;
+  border-top: 2px solid var(--accent-mid);
+}
+
+.ka-legend-line.ka-edge-contain {
+  border-top-color: var(--soft);
+}
+
+.ka-legend-line.ka-edge-route {
+  border-top-style: dashed;
+  border-top-color: var(--accent);
+}
+
+.ka-legend-line.ka-edge-portal {
+  border-top-style: dotted;
+  border-top-color: var(--success);
+}
+
+.ka-legend-line.ka-edge-link {
+  border-top-style: dashed;
+  border-top-color: var(--accent-mid);
+}
+
+.ka-legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+}
+
+.ka-legend-dot.is-planned {
+  border-style: dashed;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ka-legend-dot.is-stale {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.ka-stage-hint {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  max-width: calc(100% - 32px);
+  padding: 5px 8px;
+  border-radius: var(--r-sm, 6px);
+  background: color-mix(in srgb, var(--panel) 84%, transparent);
+  color: var(--muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------- 空状态 */
+
+.ka-empty {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(400px, calc(100% - 40px));
+  padding: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg, 12px);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: var(--shadow-1);
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.ka-empty .button {
+  pointer-events: auto;
+}
+
+.ka-empty strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.ka-empty p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.ka-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ka-empty-note {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+/* ----------------------------------------------------------------- 检查器 */
+
+.ka-inspector {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: 330px;
+  min-height: 0;
+  border-left: 1px solid var(--border-strong);
+  background: var(--panel);
+  overflow: auto;
+}
+
+.ka-inspector-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 13px;
+}
+
+.ka-inspector-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ka-saving {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ka-inspector-head .icon-button {
+  width: 26px;
+  height: 26px;
+}
+
+.ka-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 15px 20px;
+}
+
+.ka-detail h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.ka-detail-empty {
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.ka-detail-empty p {
+  max-width: 240px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.ka-state {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.ka-state.ka-state-confirmed,
+.ka-state.ka-state-fixed {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.ka-state.ka-state-planned,
+.ka-state.ka-state-provisional,
+.ka-state.ka-state-stale {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.ka-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 6px);
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.ka-meta > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.ka-meta dt {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ka-meta dd {
+  margin: 0;
+  color: var(--soft);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.ka-description {
+  margin: 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ka-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 42%, transparent);
+  border-radius: var(--r-sm, 6px);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.ka-note {
+  margin: 0;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.ka-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ka-detail-actions .button {
+  min-height: 31px;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.ka-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.ka-subsection h4 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.ka-placeholder {
+  margin: 0;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.ka-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ka-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 6px);
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.ka-list li.is-stale {
+  border-color: color-mix(in srgb, var(--warning) 38%, transparent);
+}
+
+.ka-list-main {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.ka-list-main em {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.ka-list-main em.is-warning {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.ka-list-note {
+  flex: 1;
+  min-width: 0;
+  color: var(--dim);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.ka-list-actions {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.ka-list-actions button,
+.ka-list-link {
+  padding: 1px 6px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.ka-list-actions button:hover,
+.ka-list-link:hover {
+  background: var(--accent-soft);
+}
+
+.ka-list-actions button:disabled {
+  color: var(--dim);
+  cursor: not-allowed;
+}
+
+.ka-list-link {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: baseline;
+  padding: 0;
+  color: var(--soft);
+  font-size: 12px;
+  text-align: left;
+}
+
+.ka-list-link span {
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.ka-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 6px);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ka-stat-grid span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ka-stat-grid b {
+  color: var(--soft);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ka-stat-grid .is-warning,
+.ka-stat-grid .is-warning b {
+  color: var(--warning);
+}
+
+.ka-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ka-chip {
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--soft);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ka-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ka-chip.is-muted {
+  color: var(--dim);
+}
+
+/* ----------------------------------------------------------------- 状态栏 */
+
+.ka-statusbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  min-height: 30px;
+  padding: 5px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ka-statusbar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ka-statusbar .is-warning {
+  color: var(--warning);
+}
+
+.ka-status-legend {
+  color: var(--dim);
+}
+
+/* ------------------------------------------------------------------- 弹窗 */
+
+.ka-form .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ka-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ka-field-row .field {
+  min-width: 0;
+}
+
+.ka-confirm-message {
+  margin: 0;
+  color: var(--soft);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.ka-form .modal-actions,
+.ka-confirm-message + * {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* --------------------------------------------------------------- 响应式 */
+
+@media (max-width: 1100px) {
+  .ka-inspector {
+    width: 300px;
+  }
+  .ka-map-select {
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 900px) {
+  .ka-body {
+    flex-direction: column;
+  }
+  .ka-stage {
+    min-height: 280px;
+  }
+  .ka-inspector {
+    width: auto;
+    max-height: 44%;
+    border-left: 0;
+    border-top: 1px solid var(--border-strong);
+  }
+  .ka-toolbar {
+    padding: 8px 12px;
+  }
+  .ka-toolbar-actions {
+    margin-left: 0;
+  }
+  .ka-map-switch,
+  .ka-map-select {
+    width: 100%;
+    max-width: none;
+  }
+  .ka-field-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .ka-legend {
+    max-width: calc(100% - 24px);
+    right: 12px;
+  }
+  .ka-statusbar {
+    padding-inline: 12px;
+  }
+  .ka-status-legend {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .ka-toolbar-filters {
+    gap: 6px;
+  }
+  .ka-search {
+    order: 20;
+    max-width: none;
+    flex: 1;
+  }
+  .ka-stage-hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ka-shape {
+    transition: none;
+  }
+  .ka-svg,
+  .ka-stage {
+    scroll-behavior: auto;
+  }
+}
+
+/* Spatial navigation and scoped lenses share the incumbent document palette. */
+.ka-lens-tabs { display:flex; align-items:center; gap:2px; margin-left:auto; padding:3px; border:1px solid var(--border); border-radius:8px; background:var(--bg); }
+.ka-lens-tabs button { border:0; background:transparent; color:var(--muted); padding:6px 10px; border-radius:5px; font-size:12px; cursor:pointer; }
+.ka-lens-tabs button[aria-pressed=true] { color:var(--ink); background:var(--hover); box-shadow:0 1px 3px #0002; }
+.ka-toolbar .ka-map-switch { display:none; }
+.ka-breadcrumb { flex:1; background:transparent; flex-wrap:nowrap; overflow-x:auto; }
+.ka-breadcrumb > span { flex-shrink:0; }
+.ka-tools { position:relative; flex:none; }
+.ka-tools > summary { list-style:none; cursor:pointer; padding:7px 10px; border:1px solid var(--border); border-radius:7px; font-size:12px; color:var(--soft); }
+.ka-tools > summary::after { content:'⌄'; margin-left:7px; }
+.ka-tools[open] > summary { background:var(--hover); }
+.ka-tools > .ka-toolbar-actions,.ka-tool-popover { position:absolute; right:0; top:calc(100% + 5px); z-index:12; display:flex; flex-direction:column; align-items:stretch; min-width:180px; padding:8px; gap:6px; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:0 8px 24px #0003; }
+.ka-tools .ka-toolbar-divider { display:none; }
+.ka-toolbar-filters > select { max-width:140px; min-height:30px; padding:4px 8px; font-size:12px; }
+.ka-toolbar-filters .button { min-height:30px; }
+.ka-child-nav { display:flex; flex:none; align-items:center; gap:8px; overflow-x:auto; padding:7px 16px; border-bottom:1px solid var(--border); font-size:12px; white-space:nowrap; }
+.ka-child-nav span { color:var(--muted); }
+.ka-child-nav button { border:0; padding:4px 7px; border-radius:5px; background:var(--hover); color:var(--ink); cursor:pointer; }
+.ka-node-entry { position:absolute; z-index:4; left:16px; top:40px; display:flex; gap:6px; flex-wrap:wrap; max-width:calc(100% - 32px); }
+.ka-node-entry-label { fill:var(--muted); font-size:12px; pointer-events:none; }
+.ka-stage.is-lens > .ka-svg { visibility:hidden; }
+.ka-stage.is-lens > .ka-zoom,.ka-stage.is-lens > .ka-stage-hint,.ka-stage.is-lens > .ka-legend { display:none; }
+.ka-scope-view { position:absolute; inset:0; z-index:2; overflow:auto; padding:20px; touch-action:pan-y; cursor:default; background:var(--bg); }
+.ka-scope-caption { display:flex; align-items:center; flex-wrap:wrap; gap:12px; font-size:13px; }
+.ka-scope-caption label { display:flex; align-items:center; gap:6px; margin-left:auto; color:var(--muted); font-size:12px; }
+.ka-scope-note { margin:10px 0 0; max-width:70ch; color:var(--muted); font-size:12px; line-height:1.7; }
+.ka-scope-svg { display:block; width:100%; min-height:180px; margin-top:12px; overflow:visible; }
+.ka-scope-entity { cursor:pointer; }
+.ka-scope-entity rect { fill:var(--panel); stroke:var(--border-strong); stroke-width:1.5; }
+.ka-scope-entity:hover rect,.ka-scope-entity:focus-visible rect { stroke:var(--accent); fill:var(--hover); }
+.ka-scope-entity text { fill:var(--ink); font-size:24px; font-weight:600; pointer-events:none; }
+.ka-scope-entity .ka-scope-subtitle { fill:var(--muted); font-size:17px; font-weight:400; }
+.ka-scope-relation { color:var(--muted); }
+.ka-scope-relation path { fill:none; stroke:var(--muted); stroke-width:1.5; }
+.ka-scope-relation text { fill:var(--soft); font-size:16px; paint-order:stroke; stroke:var(--bg); stroke-width:5px; }
+.ka-scope-empty { padding:70px 20px; text-align:center; color:var(--muted); line-height:1.8; font-size:13px; }
+.ka-scope-empty strong { color:var(--ink); font-size:15px; }
+.ka-scope-relations { font-size:12px; line-height:1.8; color:var(--soft); }
+.ka-inspector { width:290px; }
+@media(max-width:900px) { .ka-lens-tabs { margin-left:0; } .ka-toolbar .ka-map-switch { display:none; } .ka-breadcrumb { flex-basis:100%; } .ka-scope-view { padding:12px; } .ka-inspector { width:auto; } }
+
+.ka-peer-select { width:100px; min-width:80px; max-width:140px; height:30px; border-color:var(--border); font-size:12px; padding:3px 5px; }
+.ka-peer-select:focus { width:140px; }
+
+.ka-body > .ka-inspector { position:absolute; z-index:6; right:0; top:0; bottom:0; box-shadow:-6px 0 20px #0002; }
+@media(max-width:900px) { .ka-body > .ka-inspector { left:0; top:auto; bottom:0; max-height:50%; } }
+
+.chapter-sync-steps { display:flex; gap:24px; flex-wrap:wrap; padding:12px 16px 12px 32px; margin:16px 0; background:var(--panel); border:1px solid var(--border); border-radius:8px; font-size:13px; line-height:1.8; }
+.chapter-sync-dialog > .modal-body { max-height:65vh; overflow-y:auto; }
+
+.ka-sync-status { flex:none; display:flex; gap:12px; align-items:center; justify-content:space-between; padding:6px 16px; color:var(--muted); font-size:12px; border-bottom:1px solid var(--border); }
+.ka-sync-status .button { padding:4px 8px; min-height:28px; font-size:12px; }
+
+.sync-selection-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:12px 0; }
+.sync-selection-actions > span { margin-left:auto; font-size:12px; color:var(--muted); }

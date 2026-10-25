@@ -23,7 +23,7 @@ export type ManualMemoModel = {
   setQuery: (value: string) => void;
   selectBook: (id: string) => Promise<void>;
   selectNote: (id: string) => Promise<void>;
-  edit: (patch: { title?: string; content?: string }) => void;
+  edit: (patch: { title?: string; content?: string; category?: string }) => void;
   create: () => Promise<void>;
   add: (title: string, content: string) => Promise<void>;
   save: () => Promise<void>;
@@ -42,7 +42,7 @@ const changed = (s: Session) =>
   !!s.selected &&
   (!s.base ||
     s.selected.title !== s.base.title ||
-    s.selected.content !== s.base.content);
+    s.selected.content !== s.base.content || (s.selected.category || '未分类') !== (s.base.category || '未分类'));
 
 export function useManualMemos(
   books: BookSummary[],
@@ -99,13 +99,14 @@ export function useManualMemos(
         id: selected.id,
         title: selected.title,
         content: selected.content,
+        category: selected.category,
         baseUpdatedAt: s.base?.updatedAt ?? null,
       });
       const live = current.current;
       if (live.bookId === s.bookId && live.selectedId === selected.id) {
         const newer = live.selected!;
         const next =
-          newer.title === selected.title && newer.content === selected.content
+          newer.title === selected.title && newer.content === selected.content && newer.category === selected.category
             ? saved
             : { ...newer, updatedAt: saved.updatedAt };
         commit({
@@ -172,7 +173,7 @@ export function useManualMemos(
             remote &&
             live.base &&
             remote.title === live.base.title &&
-            remote.content === live.base.content;
+            remote.content === live.base.content && (remote.category || '未分类') === (live.base.category || '未分类');
           commit({
             ...live,
             notes: notes.map((note) =>
@@ -276,7 +277,7 @@ export function useManualMemos(
       setBusy(false);
     }
   };
-  const edit = (patch: { title?: string; content?: string }) => {
+  const edit = (patch: { title?: string; content?: string; category?: string }) => {
     const s = current.current;
     if (!s.selected) return;
     const selected = { ...s.selected, ...patch };
@@ -368,6 +369,7 @@ export function useManualMemos(
         id: crypto.randomUUID(),
         title: s.selected!.title,
         content: s.selected!.content,
+        category: s.selected!.category, sourceToolId:s.selected!.sourceToolId, sourceToolName:s.selected!.sourceToolName,
         baseUpdatedAt: null,
       });
       const notes = await api<MemoNote[]>("memo:list", { bookId: s.bookId });

@@ -3,18 +3,30 @@ import { useState } from "react";
 import type { Book, Chapter, Job, SyncChange } from "./types";
 import { api } from "./api";
 import { Button, Field, Modal } from "./ui";
+const changeKinds: Record<string, string> = {
+  newCharacter: "新增人物",
+  character: "人物状态",
+  relation: "人物关系",
+  world: "世界变化",
+  memory: "关键记忆",
+  place: "新增地点",
+  position: "人物位置",
+  item: "物品归属",
+};
 export default function SyncReview({
   job,
   chapter,
   unsaved = false,
   onChange,
   flush,
+  onBusyChange,
 }: {
   job: Job;
   chapter?: Chapter;
   unsaved?: boolean;
   onChange: (b: Book) => void;
   flush: () => Promise<void>;
+  onBusyChange?: (busy:boolean)=>void;
 }) {
   const [rows, setRows] = useState<SyncChange[] | null>(null),
     [chosen, setChosen] = useState<string[]>([]),
@@ -22,7 +34,7 @@ export default function SyncReview({
     [error, setError] = useState("");
   const review = job.review || { status: 'skipped' };
   async function retry() {
-    setBusy(true);
+    setBusy(true);onBusyChange?.(true);
     setError("");
     try {
       await flush();
@@ -30,12 +42,12 @@ export default function SyncReview({
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(false);onBusyChange?.(false);
     }
   }
   if (!['write', 'continue', 'polish'].includes(job.kind)) return null;
   if (review.status === "analyzing")
-    return <p className="notice">{tr("正文已生成，正在分析人物与世界变化…")}</p>;
+    return <p className="notice">{tr(job.chapterSync?"正文已定稿，正在分析记忆、人物和蓝图变化…":"正文已生成，正在分析人物与世界变化…")}</p>;
   const stale = job.adopted && (unsaved || (review.revision !== undefined && review.revision !== chapter?.revision));
   const edit = (id: string, key: keyof SyncChange, value: string) =>
     setRows((old) =>
@@ -58,7 +70,7 @@ export default function SyncReview({
         >{tr("查阅变化清单")}</Button>
       )}
       {job.adopted ? (
-        <Button disabled={busy} onClick={retry}>{tr("重新分析已采用正文")}</Button>
+        <Button disabled={busy} onClick={retry}>{tr(job.chapterSync?"重新分析本章资料":"重新分析已采用正文")}</Button>
       ) : (
         <small>{tr("先采用正文，再确认同步。自动分析会额外调用当前模型。")}</small>
       )}
@@ -70,8 +82,9 @@ export default function SyncReview({
       {rows && (
         <Modal title={tr("核对本章变化")} wide onClose={() => !busy && setRows(null)}>
           <div className="modal-body">
-            <p>{tr('仅同步勾选项。确认会将本章定稿，分别更新人物、时间线和关键记忆。新人被其他变化引用时，请同时勾选该新人。')}</p>
-            <p className="notice">{tr('默认不勾选。请重点核对准备、即将、已经等时间状态，以及推断和临时路人。')}</p>
+            <p>{tr('仅同步勾选项。确认会将本章定稿，分别更新人物、时间线、关键记忆与知识蓝图中的地点、位置和物品归属。新人被其他变化引用时，请同时勾选该新人。')}</p>
+            <p className="notice">{tr('默认不勾选。请重点核对准备、即将、已经等时间状态，以及推断和临时路人；地点与人物位置必须能在正文中找到依据。')}</p>
+            <div className="sync-selection-actions"><Button disabled={busy} onClick={()=>setChosen(rows.map(row=>row.id))}>{tr('全选已核对变化')}</Button><Button disabled={busy||!chosen.length} onClick={()=>setChosen([])}>{tr('取消全选')}</Button><span>{tr('已选择')} {chosen.length} / {rows.length}</span></div>
             {rows.map((r) => (
               <article className="sync-row" key={r.id}>
                 <label>
@@ -88,19 +101,13 @@ export default function SyncReview({
                   />
                   {
                     (
-                      {
-                        newCharacter: "新增人物",
-                        character: "人物状态",
-                        relation: "人物关系",
-                        world: "世界变化",
-                        memory: "关键记忆",
-                      } as Record<string, string>
+                      changeKinds as Record<string, string>
                     )[r.kind]
                   }
                 </label>
                 <div className="form-row">
-                  <Field label={tr('记录类型')}><select value={r.kind} onChange={e => edit(r.id, 'kind', e.target.value)}>{Object.entries({newCharacter:'新增人物',character:'人物状态',relation:'人物关系',world:'世界变化',memory:'关键记忆'}).map(([key,label]) => <option key={key} value={key}>{tr(label)}</option>)}</select></Field>
-                  <Field label={tr("人物 / 对象")}>
+                  <Field label={tr('记录类型')}><select value={r.kind} onChange={e => edit(r.id, 'kind', e.target.value)}>{Object.entries(changeKinds).map(([key,label]) => <option key={key} value={key}>{tr(label)}</option>)}</select></Field>
+                  <Field label={tr(r.kind === "place" ? "地点名称" : r.kind === "position" ? "人物" : r.kind === "item" ? "物品" : "人物 / 对象")}>
                     <input
                       value={r.subject}
                       onChange={(e) => edit(r.id, "subject", e.target.value)}
@@ -123,7 +130,7 @@ export default function SyncReview({
                       />
                     </Field>
                   ) : (
-                    <Field label={tr("变化类别")}>
+                    <Field label={tr(r.kind === "place" ? "地点类型" : r.kind === "position" ? "位置状态" : "变化类别")}>
                       <input
                         value={r.attribute}
                         onChange={(e) =>
@@ -135,7 +142,15 @@ export default function SyncReview({
                 </div>
                 <Field
                   label={
-                    r.kind === "newCharacter" ? tr("人物描述") : tr("更新后的状态")
+                    r.kind === "newCharacter"
+                      ? tr("人物描述")
+                      : r.kind === "place"
+                        ? tr("地点描述")
+                        : r.kind === "position"
+                          ? tr("所在地点")
+                          : r.kind === "item"
+                            ? tr("归属地点或保管人")
+                            : tr("更新后的状态")
                   }
                 >
                   <textarea
@@ -161,11 +176,12 @@ export default function SyncReview({
           </div>
           <div className="modal-footer">
             <Button onClick={() => setRows(null)}>{tr("暂不同步")}</Button>
+            {!chosen.length&&<small>{tr('请先勾选需要同步的变化')}</small>}
             <Button
               variant="primary"
               disabled={busy || stale || !job.adopted || !chosen.length || rows.some(r => chosen.includes(r.id) && r.kind === 'relation' && !r.target.trim())}
               onClick={async () => {
-                setBusy(true);
+                setBusy(true);onBusyChange?.(true);
                 setError("");
                 try {
                   await flush();
@@ -179,10 +195,10 @@ export default function SyncReview({
                 } catch (e) {
                   setError((e as Error).message);
                 } finally {
-                  setBusy(false);
+                  setBusy(false);onBusyChange?.(false);
                 }
               }}
-            >{tr("确认同步并定稿")}</Button>
+            >{tr(job.chapterSync?"确认同步资料":"确认同步并定稿")}</Button>
           </div>
         </Modal>
       )}

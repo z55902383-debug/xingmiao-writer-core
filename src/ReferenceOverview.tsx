@@ -4,6 +4,7 @@ import { number } from "./api";
 import type { ContextInfo } from "./types";
 
 const labels: Record<string, string> = {
+  cheat: '金手指设定',
   imitationReferences: '仿写故事对标', imitationSource: '仿写分析原文',
   book: "作品信息", premise: "故事想法", bookOutline: "全文大纲", world: "世界设定", characters: "人物档案",
   worldRecords: "世界条目", foreshadows: "待回收伏笔", memories: "有效记忆", timeline: "时间线状态", chapterPlans: "本章计划",
@@ -27,6 +28,7 @@ export default function ReferenceOverview({ context, snapshot = false }: { conte
         </li>)}</ul>
       </section>;
     }) : <p className="reference-help">{tr(snapshot ? "旧记录的参考清单不完整；未记录不代表未使用，无法从当前配置补还原。" : "正在准备引用清单。")}</p>}
+    {context.cheat && <details className="reference-snapshot-styles"><summary>{tr(snapshot ? '查看当时的金手指设定' : '查看本次金手指设定')}</summary>{([['name','方案名称（可选）'],['owner','持有者'],['ability','核心能力与作用'],['limits','限制与失效条件'],['cost','使用代价'],['growth','成长与解锁计划'],['reveal','知情与揭露边界'],['notes','贯穿全书的补充约束']] as const).filter(([key])=>context.cheat![key]).map(([key,label])=><div key={key}><strong>{tr(label)}</strong><p className="writing-profile-text">{context.cheat![key]}</p></div>)}{context.cheat.holders?.map((holder,index)=><div key={holder.id}><strong>{tr('持有者')} {index+1} · {holder.name}</strong>{([['powerName','金手指名称'],['ability','核心能力与作用'],['trigger','触发与读取方式'],['limits','限制与失效条件'],['cost','使用代价'],['growth','成长与解锁计划'],['reveal','知情与揭露边界']] as const).filter(([key])=>holder[key]).map(([key,label])=><p className="writing-profile-text" key={key}>{tr(label)}：{holder[key]}</p>)}</div>)}{context.cheat.document&&<div><strong>{tr('完整金手指方案')}</strong><p className="writing-profile-text">{context.cheat.document}</p></div>}</details>}
     {snapshot && !!context.writingReferences?.length && <details className="reference-snapshot-styles"><summary>{tr("查看当时的风格与要求内容")} · {context.writingReferences.length}</summary>{context.writingReferences.map(item => <details key={item.id}><summary>{tr(item.kind === "style" ? "写作风格" : "写作要求")} · {item.title}{item.weight != null ? ` · ${item.weight}%` : ''}</summary><div className="writing-profile-text">{item.body}</div></details>)}</details>}
     <div className="reference-total"><p>{Number.isFinite(context.characters) && context.characters >= 0 ? tr(snapshot ? '当时输入约 {0} 字符' : '预计输入约 {0} 字符', { 0: number(context.characters) }) : tr('输入字符数未记录')}</p><details className="reference-input-help"><summary>{tr('输入字符数包含什么？')}</summary><p>{tr('包含系统规则、任务说明及发送的资料文本；不是生成字数，也不是 Token 数。仿写、风格和要求的数量仅统计参考档案，不包含分析原文或全部故事资料。')}</p></details></div>
     {!!context.imitationReferences?.length && <details className="reference-snapshot-styles"><summary>{tr('查看仿写对标档案与占比')}</summary>{context.imitationReferences.map(row => <details key={row.id}><summary>{row.title} · {row.weight}%</summary><div className="writing-profile-text">{row.body}</div></details>)}</details>}

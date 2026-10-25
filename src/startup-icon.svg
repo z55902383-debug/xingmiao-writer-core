@@ -1,0 +1,35 @@
+<svg class="scene" viewBox="0 0 1000 600" aria-label="猫咪和书本轮廓绘出，猫咪看书眨眼并翻过一页"><defs><linearGradient id="boot-pageShade"><stop stop-color="#c1cfd4"/><stop offset=".45" stop-color="#f4efe0"/><stop offset="1" stop-color="#e0e5df"/></linearGradient><linearGradient id="boot-plateMaterial" x2=".8" y2="1"><stop stop-color="#3668a6"/><stop offset="1" stop-color="#214675"/></linearGradient>
+<linearGradient id="boot-ivory" x2=".3" y2="1"><stop stop-color="#fff4e0"/><stop offset="1" stop-color="#e3d9c7"/></linearGradient>
+<linearGradient id="boot-cover" x2=".8" y2="1"><stop stop-color="#21696b"/><stop offset="1" stop-color="#10474e"/></linearGradient>
+<linearGradient id="boot-metal"><stop stop-color="#8e969e"/><stop offset=".3" stop-color="#e9e4d8"/><stop offset=".53" stop-color="#b6b7ae"/><stop offset=".78" stop-color="#f6f0df"/><stop offset="1" stop-color="#7a8691"/></linearGradient>
+<linearGradient id="boot-barrel"><stop stop-color="#121c29"/><stop offset=".35" stop-color="#344457"/><stop offset=".56" stop-color="#253446"/><stop offset="1" stop-color="#101923"/></linearGradient></defs>
+<g id="boot-icon" transform="translate(500 270)">
+<rect id="boot-plate" x="-132" y="-132" width="264" height="264" rx="59" fill="url(#boot-plateMaterial)" stroke="#91afd0" stroke-opacity=".18" stroke-width="1" opacity="0"/>
+<g id="boot-head"><path id="boot-catFill" class="color-fill" fill="url(#boot-ivory)" d="M-101 32 Q-110 4 -94 -25 Q-91 -50 -80 -91 Q-73 -120 -58 -103 L-27 -68 Q0 -73 42 -57 L64 -89 Q79 -111 87 -87 Q103 -51 89 -24 Q111 8 103 36 L80 86 L-80 86Z"/>
+<path id="boot-catLine" class="sketch" pathLength="1" d="M-101 32 Q-110 4 -94 -25 Q-91 -50 -80 -91 Q-73 -120 -58 -103 L-27 -68 Q0 -73 42 -57 L64 -89 Q79 -111 87 -87 Q103 -51 89 -24 Q111 8 103 36"/>
+<g id="boot-eyes" opacity="0"><ellipse id="boot-eyeL" cx="-44" cy="-11" rx="7" ry="8.5" fill="#123677"/><ellipse id="boot-eyeR" cx="42" cy="-5" rx="7" ry="8.5" fill="#123677"/></g>
+<g id="boot-pen" opacity="0" aria-hidden="true">
+<g transform="rotate(32)">
+<path d="M-6 -115 Q0 -123 6 -115 L7 -40 L-7 -40Z" fill="url(#boot-barrel)" stroke="#8fa4b7" stroke-opacity=".35" stroke-width=".6"/>
+<path d="M-4 -111 L-4 -59" fill="none" stroke="#d0d9db" stroke-opacity=".35" stroke-width=".8"/>
+<rect x="-7" y="-43" width="14" height="4" rx="1" fill="url(#boot-metal)"/>
+<path d="M-6 -39 L6 -39 L7 -24 L-7 -24Z" fill="#1c2a3b"/>
+<path d="M-7 -24 Q-9 -15 0 0 Q9 -15 7 -24Z" fill="url(#boot-metal)" stroke="#e2dfd2" stroke-opacity=".4" stroke-width=".55"/>
+<path d="M0 -19 L0 -2" stroke="#555c60" stroke-width=".7"/><circle cx="0" cy="-19" r="1.3" fill="#5b6368"/>
+</g></g></g>
+<g id="boot-book"><path class="color-fill" fill="#dfe7df" d="M-108 14 Q-54 4 0 42 Q54 4 108 14 L100 37 Q48 27 0 59 Q-48 27 -100 37Z"/>
+<path id="boot-bookFill" class="color-fill" fill="url(#boot-cover)" d="M-110 26 Q-49 26 0 61 Q49 26 110 26 L98 104 Q46 91 0 117 Q-46 91 -98 104Z"/>
+<path id="boot-bookLine" class="sketch" pathLength="1" d="M-108 14 Q-54 4 0 42 Q54 4 108 14 L98 104 Q46 91 0 117 Q-46 91 -98 104 L-108 14"/>
+<path id="boot-spineLine" class="sketch" pathLength="1" d="M0 42 L0 117"/><path id="boot-pageDetail" d="M-95 22 Q-49 19 -6 45 M6 45 Q49 19 95 22" fill="none" stroke="#b9d8d6" stroke-width="1.2" opacity="0"/>
+<path id="boot-turningPage" d="M0 42 Q54 4 104 14 L98 27 Q48 17 0 49Z" fill="url(#boot-pageShade)" stroke="#c6d7d4" stroke-width=".7" opacity="0"/>
+</g>
+<g id="boot-pen" opacity="0" aria-hidden="true">
+<g transform="rotate(32)">
+<path d="M-6 -115 Q0 -123 6 -115 L7 -40 L-7 -40Z" fill="url(#boot-barrel)" stroke="#8fa4b7" stroke-opacity=".35" stroke-width=".6"/>
+<path d="M-4 -111 L-4 -59" fill="none" stroke="#d0d9db" stroke-opacity=".35" stroke-width=".8"/>
+<rect x="-7" y="-43" width="14" height="4" rx="1" fill="url(#boot-metal)"/>
+<path d="M-6 -39 L6 -39 L7 -24 L-7 -24Z" fill="#1c2a3b"/>
+<path d="M-7 -24 Q-9 -15 0 0 Q9 -15 7 -24Z" fill="url(#boot-metal)" stroke="#e2dfd2" stroke-opacity=".4" stroke-width=".55"/>
+<path d="M0 -19 L0 -2" stroke="#555c60" stroke-width=".7"/><circle cx="0" cy="-19" r="1.3" fill="#5b6368"/>
+</g></g></g>
+</svg>

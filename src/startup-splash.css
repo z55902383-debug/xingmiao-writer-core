@@ -1,0 +1,78 @@
+.startup-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #080a0d;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  overflow: hidden;
+}
+.startup-splash.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+.startup-splash canvas,
+.startup-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.startup-art {
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+}
+.startup-art .scene {
+  width: min(100%, 1200px);
+  height: min(100%, 720px);
+  display: block;
+}
+.startup-art .sketch {
+  fill: none;
+  stroke: #b0cbec;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.startup-art .color-fill {
+  opacity: 0;
+}
+.startup-skip {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #c4d4ed38;
+  border-radius: 6px;
+  background: transparent;
+  color: #a5b1c2;
+  font-size: 22px;
+  cursor: pointer;
+}
+.startup-skip:hover {
+  color: #edf1f7;
+  border-color: #8bafdf;
+}
+.startup-skip:focus-visible {
+  outline: 2px solid #8bafdf;
+  outline-offset: 4px;
+}
+:root[data-theme="light"] .startup-splash {
+  background: #edf2f8;
+}
+:root[data-theme="light"] .startup-art .sketch {
+  stroke: #255faf;
+}
+:root[data-theme="light"] .startup-skip {
+  color: #506178;
+  border-color: #243e6438;
+}
+@media (prefers-reduced-motion: reduce) {
+  .startup-splash {
+    transition: none;
+  }
+}

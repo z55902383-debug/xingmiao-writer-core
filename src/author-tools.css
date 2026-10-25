@@ -41,3 +41,14 @@
   .editor-toolbar .toolbar-actions > .author-tools-trigger { margin-right: 4px; padding-inline: 8px; }
 }
 .prose-review { max-height: 300px; overflow: auto; }
+
+/* 本章出场人物列表 */
+.local-cast-list { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; padding: 4px 0; }
+.local-cast-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.local-cast-head p { margin: 0; flex: 1; line-height: 1.6; }
+.local-cast-head .button { flex: 0 0 auto; min-height: 32px; padding: 4px 10px; font-size: 12px; }
+.local-cast-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; cursor: pointer; line-height: 1.4; transition: background 0.12s; }
+.local-cast-row:hover { background: var(--sunken); }
+.local-cast-row input[type="checkbox"] { flex: none; width: 15px; height: 15px; margin: 0; }
+.local-cast-name { flex: 0 1 auto; color: var(--ink); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.local-cast-role { flex: 1 1 auto; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }

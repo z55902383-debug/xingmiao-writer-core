@@ -7,6 +7,7 @@ function describeReferences(data, writingReferences = [], skills = [], instructi
   const text = value => typeof value === 'string' && !!value.trim();
   const records = value => typeof value === 'string' ? JSON.parse(value) : value || [];
   add('book', 'story', data.book?.title, undefined, [data.book?.title]);
+  add('cheat', 'story', data.cheat, 1, [data.cheat?.name || '金手指设定']);
   for (const [key, field] of [['premise','premise'], ['bookOutline','outline'], ['world','world']]) add(key,'story',text(data.book?.[field]));
   for (const [key, field] of [['characters','characters'], ['worldRecords','worldRecords'], ['foreshadows','openForeshadows'], ['memories','facts']]) {
     const entries = records(data[field]); add(key,'story',entries.length,entries.length,entries.map(row => row.name || row.title).filter(Boolean));

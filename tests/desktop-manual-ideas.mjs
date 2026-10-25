@@ -722,6 +722,17 @@ try {
     },
   );
 
+  await check("the submit action remains visible at the supported minimum window size", async () => {
+    await page.setViewportSize({width:1000,height:680});
+    if(!await ideaPanel().isVisible())await page.getByRole('group',{name:'视图',exact:true}).getByRole('button',{name:'灵感助手',exact:true}).click();
+    for(const mode of ['dark','light']) {
+      await theme(mode);
+      await ideaPanel().getByRole('textbox',{name:'热梗或关键词',exact:true}).fill('失物招领、命运交换');
+      await assertInsideWritingArea(ideaPanel().getByRole('button',{name:'开始构思',exact:true}),'minimum-window brainstorm submit',mode);
+      await snapshot(`minimum-window-${mode}-1000.png`);
+    }
+  });
+
   await check("memo content survives an isolated app restart", async () => {
     const before = await Promise.all(books.map((book) => memos(book.id)));
     await app.close();

@@ -5,6 +5,20 @@
 .toolbox-content > .toolbox-heading, .toolbox-content > .toolbox-toolbar { flex: 0 0 auto; }
 .toolbox-tools-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 2px 4px 12px 2px; }
 .toolbox-tools-scroll > .toolbox-group:first-child { margin-top: 8px; }
+/* Keep orientation and search compact so the workflow owns the viewport. */
+.toolbox-shell > .toolbox-content { padding-top: 20px; }
+.toolbox-content > .toolbox-heading { align-items: center; gap: 24px; padding-bottom: 16px; }
+.toolbox-content > .toolbox-heading h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.25; letter-spacing: -.025em; }
+.toolbox-content > .toolbox-heading p { font-size: 12px; line-height: 1.6; }
+.toolbox-heading > div { min-width: 0; }
+.toolbox-heading > .toolbox-search { flex-shrink: 0; }
+.toolbox-content > .toolbox-workflow-intro { justify-content: flex-start; align-items: baseline; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 12px; padding-block: 12px; border-top: 1px solid var(--border); }
+.toolbox-workflow-intro h2 { flex-shrink: 0; margin: 0; font-size: 14px; line-height: 1.6; }
+.toolbox-workflow-intro .toolbox-route-hint { flex: 1 1 420px; max-width: none; margin: 0; line-height: 1.6; }
+@media(max-width:760px) {
+  .toolbox-content > .toolbox-heading { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .toolbox-heading > .toolbox-search { width: 100%; flex-basis: 100%; }
+}
 .shelf-main:has(> .plaza-page) { display: flex; min-height: 0; overflow: hidden; }
 .plaza-page { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
 .plaza-page > .shelf-top { flex: 0 0 auto; }
@@ -55,4 +69,10 @@
   .plaza-page .plaza-heading h1 { font-size: 26px; }
   .plaza-page .plaza-toolbar { gap: 8px; }
   .toolbox-shell > .toolbox-top { padding-inline: 16px; }
+  .toolbox-shell > .toolbox-top { flex-basis: 48px; min-height: 48px; }
+  .toolbox-shell > .toolbox-content { padding-top: 12px; }
+  .toolbox-content > .toolbox-heading { gap: 8px; padding-bottom: 10px; }
+  .toolbox-content > .toolbox-heading p { display: none; }
+  .toolbox-content > .toolbox-heading h1 { font-size: 26px; margin-bottom: 0; }
+  .toolbox-content > .toolbox-workflow-intro { padding-block: 8px; margin-bottom: 8px; gap: 4px; }
 }

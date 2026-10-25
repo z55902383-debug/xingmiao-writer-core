@@ -1,6 +1,6 @@
 /* Display refinement: preserve the writing surface and the existing theme. */
 :root { --dim: #8f98a3; }
-:root[data-theme=light] { --dim: #66717e; }
+:root[data-theme=light] { --dim: #56657a; }
 .toolbox-group { margin-block: 26px; }
 .toolbox-group h2, .toolbox-recent h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 16px; color: var(--ink); }
 .toolbox-group h2 small { color: var(--muted); font-size: 12px; font-weight: 400; }
@@ -40,3 +40,6 @@
 .chapter-quick-tools .icon-button { min-width: 38px; min-height: 38px; }
 @media(max-width: 760px) { .creative-tool-dialog .creative-context-panel { position: static; } .creative-tool-dialog { max-height: calc(100dvh - 20px); } }
 @media(prefers-reduced-motion: reduce) { .toolbox-group .toolbox-card:hover { transform: none; } }
+.top-actions > .workspace-memo-trigger { white-space: nowrap; flex-shrink: 0; gap: 6px; }
+.top-actions > .workspace-memo-trigger.memo-toolbar-active { color: var(--accent-bright); background: var(--accent-soft); }
+@media(max-width:1100px) { .workspace-memo-trigger > span { display: none; } }

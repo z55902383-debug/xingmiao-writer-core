@@ -136,6 +136,7 @@ try {
     .getByLabel("章节正文", { exact: true })
     .fill("新正文：雾港的雨停了。");
   await page.getByRole("button", { name: "本章定稿", exact: true }).click();
+ await page.getByRole("dialog",{name:"提交章节与同步资料",exact:true}).getByRole("button",{name:"返回写作",exact:true}).click();
   await page.getByRole("button", { name: "世界设定", exact: true }).click();
   await expect(page.locator(".event-row")).toContainText("待复核");
   await page.getByRole("button", { name: "重新核对", exact: true }).click();
@@ -182,7 +183,7 @@ try {
     volume.id,
   );
   await page.getByLabel('修改章节名称 '+first.title,{exact:true}).fill('重新命名的章节');
-  await page.getByRole('button',{name:'已保存',exact:true}).click();
+  await page.getByRole('button',{name:/^保存作品，当前状态：/}).click();
   assert.equal((await call('book:get',{id:b.id})).chapters[0].title,'重新命名的章节');
   await page.getByRole('button',{name:'删除章节 重新命名的章节',exact:true}).click();
   await page.getByRole('button',{name:'确认删除章节',exact:true}).click();

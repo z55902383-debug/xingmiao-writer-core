@@ -41,7 +41,8 @@
 }
 .mt-memo-expanded > .mt-memo-filter,
 .mt-memo-expanded > .mt-memo-list,
-.mt-memo-expanded .mt-memo-title-field {
+.mt-memo-expanded .mt-memo-title-field,
+.mt-memo-expanded .mt-memo-category-field {
   display: none;
 }
 .mt-root .mt-memo-expanded > .mt-memo-editor {
@@ -61,4 +62,21 @@
 .mt-memo-expanded .mt-memo-detail,
 .mt-memo-expanded .mt-memo-actions {
   flex-shrink: 0;
+}
+
+/* Keep classification in the existing metadata space, leaving the editor usable. */
+.mt-memo-panel .mt-memo-filter { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.mt-memo-panel .mt-memo-filter > .field:first-child { grid-column: 1; grid-row: 1; }
+.mt-memo-panel .mt-memo-filter > .button { grid-column: 2; grid-row: 1; justify-self: end; align-self: end; }
+.mt-memo-panel .mt-memo-filter > .mt-memo-hint { grid-column: 1/-1; }
+.mt-memo-metadata { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); gap: 10px; flex-shrink: 0; }
+.mt-memo-metadata > div { min-width: 0; }
+.mt-memo-panel .mt-memo-editor { overflow-y: auto; }
+.mt-root .mt-memo-panel .mt-memo-content-field { min-height: 112px; flex-shrink: 0; }
+.mt-memo-editor > .mt-memo-detail, .mt-memo-editor > .mt-memo-actions { flex-shrink: 0; }
+.mt-memo-expanded .mt-memo-metadata { display: none; }
+.mt-root .mt-memo-panel.mt-memo-expanded .mt-memo-content-field { min-height: 0; }
+.mt-memo-panel.mt-memo-expanded > .mt-memo-filter { display: none; }
+@media (max-height:800px) {
+  .mt-memo-metadata .field > label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
