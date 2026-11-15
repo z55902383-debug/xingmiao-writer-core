@@ -262,6 +262,7 @@ class Store {
       if (key in patch)
         book[key] = text(patch[key], key === "title" ? 120 : Infinity);
     assert(book.title.trim(), "书名不能为空");
+      if ('cover' in patch) book.cover = require('./book-cover.cjs').normalize(patch.cover);
     if ('cheat' in patch) book.cheat = require('./cheat.cjs').normalize(patch.cheat);
     if ("style" in patch && !book.style.trim() && book.writingSelection) {
       book.writingSelection.styleIds = book.writingSelection.styleIds.filter(id => id !== require("./writing-profiles.cjs").LEGACY);

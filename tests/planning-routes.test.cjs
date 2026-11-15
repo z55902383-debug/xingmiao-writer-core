@@ -135,3 +135,5 @@ test("生成具体章名时复用同卷同编号的空白默认章，不留下�
   db.adopt(job(db,b,c,"chapterPlan",{chapters:[{title:"第1章 访客",summary:"初遇"},{title:"第2章 消息",summary:"新线索"}]},{targetVolumeId:v.id}).id,"replace");
   const after=db.book(b.id).chapters;assert.equal(after.length,2);assert.equal(after[0].id,c.id);assert.equal(after[1].id,second.id);
 });
+
+test('后卷规划不抢占未归卷的初始空章',t=>{const {db,b,c}=setup(t);db.saveVolume(b.id,{title:'第一卷',outline:'起点'});db.saveVolume(b.id,{title:'第二卷',outline:'后续'});const v=db.book(b.id).volumes[1];const j=job(db,b,c,'chapterPlan',{chapters:[{title:'第1章 后卷开场',summary:'后续事件'}]},{targetVolumeId:v.id});db.adopt(j.id,'replace');assert.equal(db.chapter(c.id).volumeId,'');assert.equal(db.chapter(c.id).summary,'');assert.equal(db.book(b.id).chapters.filter(row=>row.volumeId===v.id).length,1);});

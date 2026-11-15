@@ -206,6 +206,8 @@ export default function App({ onReady }: { onReady?: () => void }) {
       ) : (
         <Shelf
           books={books}
+          notify={notify}
+          onCoverSaved={async () => { setBooks(await api<BookSummary[]>('books:list')); }}
           onNew={() => setNewBook(true)}
           onOpen={(id, chapterId) =>
             safe(async () => {

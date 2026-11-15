@@ -1,4 +1,3 @@
-import { ManuscriptImport } from "./AuthorTools";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { tr, genreLabel, useLanguage } from "./i18n";
 import { useEffect, useMemo, useState } from "react";
@@ -8,10 +7,9 @@ import {
   ArrowUpRight,
   BookOpen,
   Archive,
-  Sparkle,
-  
+  Toolbox,
   ArrowCounterClockwise,
-  
+  Sparkle,
   PencilLine,
   DownloadSimple,
   UploadSimple,
@@ -25,6 +23,9 @@ import {
   ListDashes,
   SquaresFour,
   CaretRight,
+  Check,
+  GridNine,
+  ImageSquare,
 } from "@phosphor-icons/react";
 import { api, number, date } from "./api";
 import { currentTheme, toggleThemeFrom } from "./theme";
@@ -32,10 +33,19 @@ import type { BookSummary } from "./types";
 import { Button, Empty, Field, IconButton, Menu, Modal } from "./ui";
 
 
+import BookCoverEditor, { CoverImage } from './BookCoverEditor';
+import { ManuscriptImport } from "./AuthorTools";
 
 /* 书架浏览偏好（排序 / 筛选 / 视图）只影响本机显示，存在 localStorage */
 const SHELF_KEY = "xm-shelf-view";
-type ShelfView = { sort: "recent" | "created" | "title"; compact: boolean };
+type ShelfLayout = 'cards' | 'compact' | 'covers' | 'dense';
+type ShelfView = { sort: "recent" | "created" | "title"; layout: ShelfLayout };
+const shelfLayouts = [
+  { id: 'cards', name: '舒展卡片', description: '封面与作品详情并排', icon: SquaresFour },
+  { id: 'compact', name: '紧凑列表', description: '单列浏览，信息更清楚', icon: ListDashes },
+  { id: 'covers', name: '封面书墙', description: '像图书馆一样，只看封面', icon: ImageSquare },
+  { id: 'dense', name: '密集图文', description: '小封面搭配简介，展示更多作品', icon: GridNine },
+] as const;
 function loadShelfView(): ShelfView {
   try {
     const raw = JSON.parse(localStorage.getItem(SHELF_KEY) || "{}");
@@ -43,10 +53,10 @@ function loadShelfView(): ShelfView {
       sort: ["recent", "created", "title"].includes(raw.sort)
         ? raw.sort
         : "recent",
-      compact: !!raw.compact,
+      layout: ['cards', 'compact', 'covers', 'dense'].includes(raw.layout) ? raw.layout : raw.compact ? 'compact' : 'cards',
     };
   } catch {
-    return { sort: "recent", compact: false };
+    return { sort: "recent", layout: 'cards' };
   }
 }
 /* 字数目标、定稿和作者确认完结分别显示。 */
@@ -177,38 +187,36 @@ export function NewBook({
 export default function Shelf({
   books,
   onNew,
+  onCoverSaved,
   onOpen,
   onDemo,
   onArchive,
   onDelete,
   onSettings,
-  
-  
-  
   onManualTyping,
+  notify,
   onBackup,
   onRestore,
   busy,
 }: {
   books: BookSummary[];
   onNew: () => void;
+  onCoverSaved: () => Promise<void>;
   onOpen: (id: string, chapterId?: string) => void;
   onDemo: () => void;
   onArchive: (b: BookSummary) => void;
   onDelete: (b: BookSummary) => void;
   onSettings: () => void;
-  
-  
-  
   onManualTyping: () => void;
+  notify: (message: string) => void;
   onBackup: () => void;
   onRestore: () => void;
   busy: boolean;
 }) {
-  const [importOpen, setImportOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [coverBook, setCoverBook] = useState<BookSummary | null>(null);
   const [archived, setArchived] = useState(false);
-  
+  const [importOpen, setImportOpen] = useState(false);
   const [genre, setGenre] = useState("");
   const [view, setView] = useState<ShelfView>(loadShelfView);
   const setShelfView = (patch: Partial<ShelfView>) =>
@@ -225,13 +233,15 @@ export default function Shelf({
   const language = useLanguage();
   const genres = useMemo(
     () => [...new Set(books.map((b) => b.genre).filter(Boolean))].sort(),
-    [books]);
+    [books],
+  );
   const visible = useMemo(() => {
     const match = books.filter(
       (b) =>
         b.archived === archived &&
         `${b.title} ${b.genre} ${genreLabel(b.genre)} ${b.premise || ""}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()) &&
-        (!genre || b.genre === genre));
+        (!genre || b.genre === genre),
+    );
     const by: Record<
       ShelfView["sort"],
       (a: BookSummary, b: BookSummary) => number
@@ -247,13 +257,16 @@ export default function Shelf({
   const recentBook = active.reduce<BookSummary | null>(
     (latest, book) =>
       !latest || book.updatedAt > latest.updatedAt ? book : latest,
-    null);
+    null,
+  );
   const total = active.reduce((s, b) => s + b.words, 0);
   const finished = active.filter(
-    (b) => b.target > 0 && b.words >= b.target).length;
+    (b) => b.target > 0 && b.words >= b.target,
+  ).length;
   const lastTouched = active.reduce(
     (acc, b) => (b.updatedAt > acc ? b.updatedAt : acc),
-    "");
+    "",
+  );
   const dayKeys = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setHours(12, 0, 0, 0);
@@ -266,13 +279,20 @@ export default function Shelf({
         sum +
         ((book.writingActivity || []).find((d) => d.date === key)?.netWords ??
           0),
-      0));
+      0,
+    ),
+  );
   const weekTotal = week.reduce((sum, n) => sum + n, 0);
   const writingDays = week.filter((n) => n > 0).length;
   const chartMax = Math.max(1, ...week.map((n) => Math.max(0, n)));
   return (
     <div className="shelf-shell">
       {importOpen && <ManuscriptImport onClose={() => setImportOpen(false)} onCreated={book => { setImportOpen(false); onOpen(book.id, book.chapters.at(-1)?.id); }}/>}
+      {coverBook && <BookCoverEditor book={coverBook} onClose={() => setCoverBook(null)} onSave={async cover => {
+        await api('book:update', { id: coverBook.id, patch: { cover } });
+        await onCoverSaved();
+        notify(tr('封面已保存'));
+      }} />}
       <aside className="shelf-nav">
         <div className="brand">
           <div className="brand-mark">
@@ -287,19 +307,17 @@ export default function Shelf({
         <button
           className={`nav-item ${!archived ? "active" : ""}`}
           aria-current={!archived ? "page" : undefined}
-          onClick={() => { setArchived(false); }}
+          onClick={() => { setArchived(false);  }}
         >
           <Books size={20} />{tr("我的书架")}<span>{active.length}</span>
         </button>
         <button
           className={`nav-item ${archived ? "active" : ""}`}
           aria-current={archived ? "page" : undefined}
-          onClick={() => { setArchived(true); }}
+          onClick={() => { setArchived(true);  }}
         >
           <Archive size={20} />{tr("已归档")}<span>{books.length - active.length}</span>
         </button>
-        
-        
         <button
           className="nav-item typing-nav-item"
           onClick={onManualTyping}
@@ -325,13 +343,12 @@ export default function Shelf({
             <UploadSimple size={20} />{tr("恢复备份")}</button>
           <button className="nav-item" onClick={onSettings}>
             <GearSix size={20} />{tr("模型与设置")}</button>
-          
           <div className="local-note">
             <i />{tr("本地创作空间")}</div>
         </div>
       </aside>
-      <main className={`shelf-main ${"shelf-home"}`}>
-        {<>
+      <main className="shelf-main shelf-home">
+          <>
         <header className="shelf-top">
           <span>{tr("创作工作台")}{" "}<span className="slash">/</span>{" "}
             {archived ? tr("已归档") : tr("我的书架")}
@@ -350,13 +367,16 @@ export default function Shelf({
               </h1>
               <p>{tr("写下一个念头，让它成为一个世界。")}</p>
             </div>
-            <div className="shelf-heading-actions"><Button onClick={() => setImportOpen(true)} disabled={busy}>{tr("导入已有书稿")}</Button>
-            <Button variant="primary" onClick={onNew} disabled={busy}>
-              <Plus size={19} />{tr("新建作品")}</Button></div>
+            <div className="shelf-heading-actions">
+              <Button onClick={() => setImportOpen(true)} disabled={busy}>{tr("导入已有书稿")}</Button>
+              <Button variant="primary" onClick={onNew} disabled={busy}>
+                <Plus size={19} />{tr("新建作品")}</Button>
+            </div>
           </div>
+          <div className={`shelf-overview ${!archived && !search && !genre && recentBook ? "has-recent" : ""}`}>
           {!archived && !search && !genre && recentBook && (
             <section className="recent-project" aria-label={tr("最近创作")}>
-              <div className="recent-project-mark" aria-hidden="true"><PencilLine size={25} weight="duotone" /></div>
+              <div className={`recent-project-mark cover-${coverVariant(recentBook.id)}`} aria-hidden="true"><BookOpen size={30} weight="light" /></div>
               <div className="recent-project-copy">
                 <span>{tr("最近创作")}</span>
                 <strong>{recentBook.title}</strong>
@@ -420,6 +440,7 @@ export default function Shelf({
               </div>
             </div>
           </div>
+          </div>
           <div className="shelf-tools">
             <h2>
               {archived ? tr("归档作品") : tr("全部作品")} <span>{visible.length}</span>
@@ -459,33 +480,32 @@ export default function Shelf({
                 <option value="created">{tr("创建时间")}</option>
                 <option value="title">{tr("作品名")}</option>
               </select>
-              <IconButton
-                label={view.compact ? tr("切换为网格视图") : tr("切换为紧凑列表")}
-                aria-pressed={view.compact}
-                onClick={() => setShelfView({ compact: !view.compact })}
-              >
-                {view.compact ? (
-                  <SquaresFour size={18} />
-                ) : (
-                  <ListDashes size={18} />
-                )}
-              </IconButton>
+              <div className="shelf-layout-picker">
+                <Menu label={tr('排列方式')} escapeClipping trigger={<>{(() => { const LayoutIcon = shelfLayouts.find(item => item.id === view.layout)!.icon; return <LayoutIcon size={18} />; })()}<span className="shelf-layout-current">{tr(shelfLayouts.find(item => item.id === view.layout)!.name)}</span></>}>
+                  {shelfLayouts.map(item => <button key={item.id} className={`shelf-layout-option ${view.layout === item.id ? 'selected' : ''}`} aria-pressed={view.layout === item.id} onClick={() => setShelfView({ layout: item.id })}>
+                    <item.icon size={22} /><span><strong>{tr(item.name)}</strong><small>{tr(item.description)}</small></span>{view.layout === item.id && <Check size={16} />}
+                  </button>)}
+                </Menu>
+              </div>
             </div>
           </div>
           <div className="shelf-library" aria-label={tr("作品列表")}>
           {visible.length ? (
-            <div className={`book-grid ${view.compact ? "compact" : ""}`}>
+            <div className={`book-grid ${view.layout === 'compact' ? 'compact' : ''} layout-${view.layout}`}>
               {visible.map((b) => {
                 const stage = bookStage(b);
                 const pct =
                   b.target > 0 ? Math.min(100, (b.words / b.target) * 100) : 0;
                 return (
                   <article className="book-card" key={b.id}>
+                    <div className="book-cover-slot">
                     <button
-                      className={`book-cover cover-${coverVariant(b.id)}`}
+                      className={`book-cover cover-${coverVariant(b.id)} ${b.cover ? 'has-image' : ''}`}
                       onClick={() => onOpen(b.id)}
                       aria-label={tr("打开 {0}", {0: b.title})}
+                      title={b.title}
                     >
+                      {b.cover ? <CoverImage cover={b.cover} title={b.title} /> : <>
                       <span className="cover-tag">{genreLabel(b.genre)}</span>
                       <div className="cover-lines" />
                       <strong>{b.title}</strong>
@@ -493,7 +513,10 @@ export default function Shelf({
                         <span>{tr("星喵 · 原创作品")}</span>
                         <ArrowUpRight size={23} />
                       </div>
+                      </>}
                     </button>
+                    <IconButton label={tr('管理封面：{0}', { 0: b.title })} className="cover-manage" onClick={() => setCoverBook(b)}><UploadSimple size={16} /></IconButton>
+                    </div>
                     <div className="book-info">
                       <div className="book-head">
                         <h3 className="book-title">{b.title}</h3>
@@ -501,9 +524,11 @@ export default function Shelf({
                           {tr(stage.label)}
                         </span>
                         <Menu
+                          escapeClipping
                           label={tr("更多操作 {0}", {0: b.title})}
                           trigger={<DotsThree size={17} />}
                         >
+                          <button onClick={() => setCoverBook(b)}><UploadSimple size={15} />{tr(b.cover ? '编辑封面' : '上传封面')}</button>
                           <button onClick={() => onOpen(b.id, localStorage.getItem(`xm-last-chapter:${b.id}`) || b.recentChapterId)}>
                             <CaretRight size={15} />{tr("打开继续写作")}</button>
                           <button
@@ -533,7 +558,8 @@ export default function Shelf({
                         </Menu>
                       </div>
                       <p>{b.premise || tr("故事尚未展开，下一句由你来写。")}</p>
-                      <div className="book-meta"><span>{tr("定稿 {0}/{1} 章", { 0: b.finalizedCount || 0, 1: b.chapterCount })}{b.target > 0 && b.words >= b.target ? " · " + tr("目标字数已达成") : ""}</span>
+                      <div className="book-meta">
+                        <span>{tr('定稿 {0}/{1} 章', { 0: b.finalizedCount || 0, 1: b.chapterCount })}{b.target > 0 && b.words >= b.target ? ` · ${tr('目标字数已达成')}` : ''}</span>
                         <span>
                           {number(b.words)}{" "}{tr("字 ·")}{" "}{b.chapterCount}{" "}{tr("章", {count: b.chapterCount})}</span>
                         <span>
@@ -609,7 +635,7 @@ export default function Shelf({
             <span>{tr("星喵写作 · 本地优先")}</span>
           </footer>
         </div>
-          </>}
+          </>
       </main>
     </div>
   );

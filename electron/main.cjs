@@ -423,6 +423,7 @@ async function restoreBackup() {
       const atlasRestored = require('./atlas.cjs').restoreAtlas(source, { chapterMap, characterMap });
       const { idMaps: atlasIdMaps = {}, ...atlasFields } = atlasRestored;
       const restored = {
+        cover: source.cover == null ? null : require('./book-cover.cjs').normalize(source.cover),
         cheat: require('./cheat.cjs').normalize(source.cheat || {}),
         memos: (source.memos || []).map(memo=>({id:id(), title:text(memo.title || '未命名备忘录',160), content:text(memo.content || ''), createdAt:text(memo.createdAt || now(),64), updatedAt:text(memo.updatedAt || now(),64), ...require('./memo-metadata.mjs').normalizeMemoMetadata(memo)})),
         id: bookId,

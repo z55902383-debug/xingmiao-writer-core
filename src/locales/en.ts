@@ -3073,5 +3073,16 @@ export const english: Record<string, string> = {
   "自动创作 · 功能预览": "Automatic writing · Preview",
   "自动创作设计预览": "Automatic writing design preview",
   "当前展示交互设计，不会调用模型或创建作品。": "Interactive design preview only. No model calls or books are created.",
-  "关闭预览": "Close preview"
+  "关闭预览": "Close preview",
+  "封面已保存": "Cover saved",
+  "排列方式": "Layout",
+  "管理封面：{0}": "Manage cover: {0}",
+  "舒展卡片": "Spacious cards",
+  "紧凑列表": "Compact list",
+  "封面书墙": "Cover gallery",
+  "密集图文": "Dense cards",
+  "封面与作品详情并排": "Cover beside book details",
+  "单列浏览，信息更清楚": "Browse details in one column",
+  "像图书馆一样，只看封面": "Browse a library of covers",
+  "小封面搭配简介，展示更多作品": "Small covers and summaries for more books"
 };

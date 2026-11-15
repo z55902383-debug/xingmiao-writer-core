@@ -12,6 +12,7 @@ import "./reference-controls.css";
 import "./section-spacing.css";
 import "./display-refinement.css";
 import "./page-scroll-regions.css";
+import "./studio-design.css";
 applySavedTheme();
 function StartupRoot() {
   const [ready, setReady] = useState(false);

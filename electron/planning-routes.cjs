@@ -45,7 +45,8 @@ function fieldPatch(record, fields) {
 function chapterRows(book, volume, records, kind, reusePlaceholder = true) {
   if (!Array.isArray(records) || !records.length || records.length > 200) throw Error("章节规划应包含 1–200 章，请按卷生成。");
   const existing = book.chapters.filter(c => (c.volumeId || '') === volume.id);
-  const placeholder = require('./author-workflow.cjs').safePlaceholder(book);
+  const placeholder = (!volume.id || book.volumes?.[0]?.id === volume.id)
+    ? require('./author-workflow.cjs').safePlaceholder(book) : null;
   const targets = kind !== 'chapterDetails' && placeholder && !existing.some(c => c.id === placeholder.id) ? [...existing, placeholder] : existing;
   const rows = records.map((record, i) => {
     if (!record || typeof record !== "object") throw Error("章节规划字段不完整。");
@@ -100,11 +101,23 @@ function planningRows(book, job, chapter) {
       if (!batch || JSON.stringify(batch)!==JSON.stringify(job.planningBatch)) throw Error('本卷分批进度已变化，请重新生成当前批次');
       if (!Array.isArray(data.chapters) || data.chapters.length!==batch.positions.length || data.chapters.length>10) throw Error('本批章节数量不完整或超过10章，请重新生成当前批次');
       const slots=chapterSlots(book,volume.id),seen=new Set();
+      // The initial empty chapter is not assigned to a volume yet. It can
+      // safely become the first slot of the first volume, just as in non-batch planning.
+      const placeholder=require('./author-workflow.cjs').safePlaceholder(book);
+      if (job.kind==='chapterPlan' && !slots.length && batch.positions.includes(1) &&
+          book.volumes?.[0]?.id===volume.id && placeholder) {
+        slots.push({position:1,chapter:placeholder});
+      }
       const records=data.chapters.map(record=>{
         if (!Number.isInteger(record?.position) || !batch.positions.includes(record.position) || seen.has(record.position)) throw Error('生成结果包含重复或其他批次的位置，未采用任何章节');
         seen.add(record.position);
         const existing=slots.find(row=>row.position===record.position)?.chapter;
-        if (record.id && record.id!==existing?.id) throw Error('本批章节编号不属于对应规划位置');
+        // New slots have no persistent ID. Models sometimes invent one; the
+        // validated batch position is authoritative and storage assigns the ID.
+        if (record.id && record.id!==existing?.id &&
+            (existing || book.chapters.some(chapter=>chapter.id===record.id))) {
+          throw Error('本批章节编号不属于对应规划位置');
+        }
         return {...record,id:existing?.id};
       }).sort((a,b)=>a.position-b.position);
       const rows=chapterRows(book,volume,records,job.kind,false);

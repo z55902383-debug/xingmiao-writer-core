@@ -280,7 +280,9 @@ export type AtlasPosition = {
   stale?: boolean;
   evidence?: string;
 };
+export type BookCover = { src: string; zoom: number; x: number; y: number };
 export type Book = {
+  cover?: BookCover | null;
   atlasMaps?: AtlasMap[];
   atlasNodes?: AtlasNode[];
   atlasEdges?: AtlasEdge[];
